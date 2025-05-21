@@ -1,14 +1,19 @@
 
 import { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, MessageCircle, Code, HelpCircle } from "lucide-react";
+import { Send, MessageCircle, User, LogIn, Mic, MicOff, Code } from "lucide-react";
 import SkillLevelSelector from "@/components/SkillLevelSelector";
 import LanguageSelector, { Language } from "@/components/LanguageSelector";
 import Message from "@/components/Message";
 import VoiceInput from "@/components/VoiceInput";
-import UserAuthButton from "@/components/UserAuthButton";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { Footer } from "@/components/Footer";
+import { supabase } from "@/integrations/supabase/client";
+import { Session } from "@supabase/supabase-js";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 // Define message type
 type MessageType = {
@@ -38,7 +43,10 @@ const Index = () => {
   const [language, setLanguage] = useState<Language>("en");
   const [isTyping, setIsTyping] = useState(false);
   const [user, setUser] = useState<UserType>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
   // Add welcome message on first load
   useEffect(() => {
@@ -53,6 +61,48 @@ const Index = () => {
     };
     setMessages([welcomeMessage]);
   }, [language]);
+
+  // Check authentication status
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      setSession(data.session);
+      
+      if (data.session?.user) {
+        setUser({
+          id: data.session.user.id,
+          name: data.session.user.user_metadata?.full_name || data.session.user.email?.split('@')[0] || "User",
+          email: data.session.user.email || "",
+          skillLevel: skillLevel,
+          language: language,
+        });
+      }
+    };
+    
+    checkSession();
+    
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      setSession(session);
+      
+      if (session?.user) {
+        setUser({
+          id: session.user.id,
+          name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || "User",
+          email: session.user.email || "",
+          skillLevel: skillLevel,
+          language: language,
+        });
+      } else {
+        setUser(null);
+      }
+    });
+    
+    return () => {
+      if (authListener && authListener.subscription) {
+        authListener.subscription.unsubscribe();
+      }
+    };
+  }, []);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -103,40 +153,30 @@ const Index = () => {
     }
   };
 
-  // Handle login
-  const handleLogin = (email: string, password: string) => {
-    // This would normally validate against a backend
-    // For now, we'll just simulate a successful login
-    setUser({
-      id: "user1",
-      name: "Demo User",
-      email,
-      skillLevel,
-      language,
-    });
-  };
-
-  // Handle signup
-  const handleSignup = (email: string, password: string, name: string) => {
-    // This would normally create a new account in the backend
-    // For now, we'll just simulate a successful signup and login
-    setUser({
-      id: "user1",
-      name,
-      email,
-      skillLevel,
-      language,
-    });
-  };
-
   // Handle logout
-  const handleLogout = () => {
-    setUser(null);
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      toast.success("Logged out successfully");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to log out");
+    }
   };
 
   // Handle voice input
   const handleVoiceInput = (text: string) => {
     setInputValue(text);
+  };
+
+  // Navigate to auth page
+  const goToAuth = () => {
+    navigate("/auth");
+  };
+
+  // Navigate to dashboard
+  const goToDashboard = () => {
+    navigate("/dashboard");
   };
 
   // Handle form submission
@@ -230,7 +270,7 @@ const Index = () => {
         content: `Kulingana na kiwango chako cha ${getSkillLevelInSwahili(level)}, ningependekeza kuanza na misingi na polepole kujenga maarifa yako. Kuna jambo mahususi kuhusu "${input}" ungependa kujifunza?`
       };
     } else {
-      // English responses (same as before)
+      // English responses
       if (lowerInput.includes("hello") || lowerInput.includes("hi")) {
         return {
           content: `Hello! How can I help you with your ${level}-level tech questions today?`
@@ -279,15 +319,44 @@ const Index = () => {
   return (
     <div className="flex flex-col h-screen max-h-screen bg-background">
       {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-purple-600 to-indigo-800 text-white">
+      <header className="flex items-center justify-between px-4 sm:px-6 py-4 border-b bg-gradient-to-r from-purple-600 to-indigo-800 text-white">
         <div className="flex items-center">
           <MessageCircle className="mr-2 h-6 w-6" />
           <h1 className="text-xl font-bold">Nurath.AI</h1>
-          <span className="ml-2 text-xs bg-white/20 px-2 py-1 rounded-full">
-            by NK Technology (Tanzania)
-          </span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
+          {!isMobile && (
+            <>
+              <LanguageSelector 
+                currentLanguage={language}
+                onLanguageChange={handleLanguageChange}
+              />
+              <SkillLevelSelector 
+                currentLevel={skillLevel}
+                onLevelChange={handleSkillLevelChange}
+              />
+            </>
+          )}
+          <ThemeToggle />
+          {session ? (
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" className="bg-white/10 border-white/20" onClick={goToDashboard}>
+                <User className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">Dashboard</span>
+              </Button>
+            </div>
+          ) : (
+            <Button variant="outline" size="sm" className="bg-white/10 border-white/20" onClick={goToAuth}>
+              <LogIn className="h-4 w-4 mr-0 sm:mr-2" />
+              <span className="hidden sm:inline">Login</span>
+            </Button>
+          )}
+        </div>
+      </header>
+
+      {/* Mobile settings bar */}
+      {isMobile && (
+        <div className="flex items-center justify-between px-4 py-2 border-b bg-background">
           <LanguageSelector 
             currentLanguage={language}
             onLanguageChange={handleLanguageChange}
@@ -296,15 +365,8 @@ const Index = () => {
             currentLevel={skillLevel}
             onLevelChange={handleSkillLevelChange}
           />
-          <UserAuthButton 
-            isLoggedIn={!!user}
-            onLogin={handleLogin}
-            onSignup={handleSignup}
-            onLogout={handleLogout}
-            username={user?.name}
-          />
         </div>
-      </header>
+      )}
 
       {/* Chat Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -341,17 +403,18 @@ const Index = () => {
         <div className="flex justify-between items-center mt-2 text-xs text-muted-foreground">
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" className="h-auto p-1 text-xs">
-              <Code className="h-3 w-3 mr-1" /> Tutorial
-            </Button>
-            <Button variant="ghost" size="sm" className="h-auto p-1 text-xs">
-              <HelpCircle className="h-3 w-3 mr-1" /> Help
+              <Code className="h-3 w-3 mr-1" />
+              <span className="hidden sm:inline">Tutorial</span>
             </Button>
           </div>
-          <div>
+          <div className="hidden sm:block">
             {language === "en" ? "Ask me anything about technology!" : "Niulize chochote kuhusu teknolojia!"}
           </div>
         </div>
       </form>
+
+      {/* Footer on the landing page */}
+      <Footer />
     </div>
   );
 };
