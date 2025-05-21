@@ -21,8 +21,8 @@ const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscription, disabled = fal
       }
 
       // Create speech recognition instance
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
+      const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognitionAPI();
       
       // Configure speech recognition
       recognitionRef.current.continuous = true;
