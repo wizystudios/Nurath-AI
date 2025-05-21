@@ -1,6 +1,6 @@
 
 import React from "react";
-import { MessageCircle, User } from "lucide-react";
+import { MessageCircle, User, Code, Info, AlertCircle } from "lucide-react";
 
 interface MessageProps {
   message: {
@@ -8,6 +8,7 @@ interface MessageProps {
     role: "user" | "assistant";
     content: string;
     timestamp: Date;
+    type?: "text" | "code" | "info" | "warning";
   };
 }
 
@@ -17,6 +18,34 @@ const Message: React.FC<MessageProps> = ({ message }) => {
     hour: "numeric",
     minute: "numeric",
   }).format(new Date(message.timestamp));
+
+  // Determine icon based on message type and role
+  const getIcon = () => {
+    if (isUser) return <User className="h-5 w-5" />;
+    
+    switch (message.type) {
+      case "code":
+        return <Code className="h-5 w-5" />;
+      case "info":
+        return <Info className="h-5 w-5" />;
+      case "warning":
+        return <AlertCircle className="h-5 w-5" />;
+      default:
+        return <MessageCircle className="h-5 w-5" />;
+    }
+  };
+
+  // Format content based on type
+  const renderContent = () => {
+    if (message.type === "code") {
+      return (
+        <pre className="whitespace-pre-wrap overflow-x-auto p-2 rounded bg-gray-800 text-white">
+          <code>{message.content}</code>
+        </pre>
+      );
+    }
+    return <p>{message.content}</p>;
+  };
 
   return (
     <div
@@ -32,7 +61,7 @@ const Message: React.FC<MessageProps> = ({ message }) => {
             isUser ? "bg-primary" : "bg-purple-600"
           } text-white`}
         >
-          {isUser ? <User className="h-5 w-5" /> : <MessageCircle className="h-5 w-5" />}
+          {getIcon()}
         </div>
         <div>
           <div className="flex items-center gap-2 mb-1">
@@ -48,7 +77,7 @@ const Message: React.FC<MessageProps> = ({ message }) => {
                 : "bg-muted"
             }`}
           >
-            {message.content}
+            {renderContent()}
           </div>
         </div>
       </div>
