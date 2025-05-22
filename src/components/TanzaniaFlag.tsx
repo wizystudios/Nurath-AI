@@ -15,21 +15,21 @@ const TanzaniaFlag: React.FC<TanzaniaFlagProps> = ({ className = "", size = "md"
   
   return (
     <div className={`relative ${sizeClasses[size]} inline-block ${className}`}>
-      {/* Tanzania flag: green, black diagonal, blue */}
+      {/* Simplified Tanzania flag */}
       <div className="absolute inset-0 overflow-hidden">
         {/* Green section (top) */}
-        <div className="absolute top-0 left-0 w-full h-[33.33%] bg-green-600 z-10"></div>
+        <div className="absolute top-0 left-0 w-full h-[33.33%] bg-green-600"></div>
+        
+        {/* Yellow section (middle) */}
+        <div className="absolute top-[33.33%] left-0 w-full h-[33.33%] bg-yellow-400"></div>
+        
+        {/* Blue section (bottom) */}
+        <div className="absolute bottom-0 left-0 w-full h-[33.33%] bg-blue-600"></div>
         
         {/* Black diagonal stripe */}
         <div className="absolute inset-0 w-full h-full overflow-hidden">
-          <div className="absolute top-0 left-0 w-[140%] h-[140%] bg-black transform origin-top-left rotate-[30deg] translate-x-[-20%] translate-y-[-10%]"></div>
+          <div className="absolute top-0 left-0 w-[140%] h-full bg-black transform origin-top-left rotate-[30deg] translate-x-[-20%]"></div>
         </div>
-        
-        {/* Yellow section (middle) */}
-        <div className="absolute top-[33.33%] left-0 w-full h-[33.33%] bg-yellow-400 z-10"></div>
-        
-        {/* Blue section (bottom) */}
-        <div className="absolute bottom-0 left-0 w-full h-[33.33%] bg-blue-600 z-10"></div>
       </div>
     </div>
   );

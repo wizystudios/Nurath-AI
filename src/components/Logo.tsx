@@ -30,7 +30,7 @@ const Logo: React.FC<LogoProps> = ({ size = "md", showText = true, className = "
         <div className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-400 rounded-full animate-pulse" />
       </div>
       {showText && (
-        <span className={`${textSizeClasses[size]} font-bold bg-gradient-to-r from-white to-indigo-200 bg-clip-text text-transparent`}>
+        <span className={`${textSizeClasses[size]} font-bold bg-gradient-to-r from-indigo-600 to-purple-800 dark:from-indigo-400 dark:to-purple-600 bg-clip-text text-transparent`}>
           Nurath.AI
         </span>
       )}
