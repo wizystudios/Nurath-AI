@@ -6,10 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
   Send, 
-  Mic, 
-  MicOff, 
-  Code, 
-  AlignJustify,
+  Code,
   PanelLeft
 } from "lucide-react";
 import SkillLevelSelector from "@/components/SkillLevelSelector";
@@ -22,9 +19,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Session } from "@supabase/supabase-js";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { generateAIResponse } from "@/utils/aiResponseHandler";
-import Logo from "@/components/Logo";
+import NKTechLogo from "@/components/NKTechLogo";
 import UserDropdown from "@/components/UserDropdown";
 import ChatSidebar from "@/components/ChatSidebar";
+import WelcomeScreen from "@/components/WelcomeScreen";
 
 // Define message type
 type MessageType = {
@@ -60,10 +58,11 @@ const Index = () => {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [searchParams] = useSearchParams();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [showWelcomeScreen, setShowWelcomeScreen] = useState(false);
   const navigate = useNavigate();
   const isMobile = useIsMobile();
 
-  // Check URL parameters for conversation ID
+  // Check URL parameters for conversation ID and also check if it's first visit
   useEffect(() => {
     const convId = searchParams.get('conversation');
     if (convId) {
@@ -71,6 +70,13 @@ const Index = () => {
       fetchConversationMessages(convId);
     } else {
       // Add welcome message on first load if no conversation ID
+      const firstVisit = localStorage.getItem('nurath_first_visit') !== 'false';
+      
+      if (firstVisit) {
+        setShowWelcomeScreen(true);
+        localStorage.setItem('nurath_first_visit', 'false');
+      }
+      
       const welcomeMessage: MessageType = {
         id: "welcome",
         role: "assistant",
@@ -419,6 +425,15 @@ const Index = () => {
 
   return (
     <div className="flex flex-col h-screen max-h-screen bg-background">
+      {/* Welcome Screen */}
+      {showWelcomeScreen && (
+        <WelcomeScreen 
+          onClose={() => setShowWelcomeScreen(false)} 
+          onLanguageSelect={handleLanguageChange}
+          currentLanguage={language}
+        />
+      )}
+      
       {/* Sidebar */}
       <ChatSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       
@@ -433,7 +448,7 @@ const Index = () => {
           >
             <PanelLeft className="h-5 w-5" />
           </Button>
-          <Logo />
+          <NKTechLogo size="md" className="text-white" />
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
           {!isMobile && (
