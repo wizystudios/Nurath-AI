@@ -81,9 +81,22 @@ export const generateAIResponse = ({ prompt, skillLevel, language }: AIResponseO
     }
     
     if (lowerPrompt.includes("teach me") || lowerPrompt.includes("help me learn")) {
-      return {
-        content: "I'd be happy to help you learn! What specific technology or programming concept are you interested in? I can teach you about HTML, CSS, JavaScript, React, or help with general web development concepts. Let me know what you'd like to focus on."
-      };
+      if (skillLevel === "beginner") {
+        return {
+          content: "I'd be happy to help you learn programming! For beginners, I recommend starting with HTML basics. HTML is the foundation of web pages and helps structure content. Would you like to learn about HTML tags, how to create a simple webpage, or would you prefer another topic?",
+          type: "info" as "text" | "code" | "info" | "warning"
+        };
+      } else if (skillLevel === "intermediate") {
+        return {
+          content: "With your intermediate skills, we can explore more advanced topics. Would you like to learn about CSS layouts, JavaScript functions, or perhaps backend technologies? I can also help you with specific programming problems or concepts you're curious about.",
+          type: "info" as "text" | "code" | "info" | "warning"
+        };
+      } else {
+        return {
+          content: "Given your advanced skill level, we can dive into complex topics. Would you be interested in learning about state management in React, building RESTful APIs, optimizing database queries, or something else entirely? Feel free to ask about any specific technology or concept!",
+          type: "info" as "text" | "code" | "info" | "warning"
+        };
+      }
     }
     
     if (lowerPrompt.includes("html")) {

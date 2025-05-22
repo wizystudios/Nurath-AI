@@ -1,13 +1,14 @@
 
 import React from "react";
-import { MessageCircle } from "lucide-react";
+import { Brain } from "lucide-react";
 
 interface LogoProps {
   size?: "sm" | "md" | "lg";
   showText?: boolean;
+  className?: string;
 }
 
-const Logo: React.FC<LogoProps> = ({ size = "md", showText = true }) => {
+const Logo: React.FC<LogoProps> = ({ size = "md", showText = true, className = "" }) => {
   const sizeClasses = {
     sm: "h-6 w-6",
     md: "h-8 w-8",
@@ -21,9 +22,11 @@ const Logo: React.FC<LogoProps> = ({ size = "md", showText = true }) => {
   };
 
   return (
-    <div className="flex items-center gap-2">
+    <div className={`flex items-center gap-2 ${className}`}>
       <div className="relative">
-        <MessageCircle className={`${sizeClasses[size]} text-white`} />
+        <div className={`${sizeClasses[size]} bg-gradient-to-br from-indigo-600 to-purple-800 rounded-lg flex items-center justify-center text-white`}>
+          <Brain className={`${size === "sm" ? "h-4 w-4" : size === "md" ? "h-5 w-5" : "h-7 w-7"} text-white`} />
+        </div>
         <div className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-400 rounded-full animate-pulse" />
       </div>
       {showText && (
