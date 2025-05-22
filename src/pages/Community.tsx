@@ -1,389 +1,350 @@
 
-import React from "react";
-import { Layout } from "@/components/Layout";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, MessageSquare, Send, Clock, User, Heart, MessageCircle } from "lucide-react";
-import { useTheme } from "@/components/theme-provider";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ThumbsUp, MessageSquare, Plus, Send } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/components/ui/sonner";
+import { Discussion, ChatMessage } from "@/types/community";
+import NKTechLogo from "@/components/NKTechLogo";
 
 const Community = () => {
-  const { theme } = useTheme();
+  const navigate = useNavigate();
+  const [discussions, setDiscussions] = useState<Discussion[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [messageInput, setMessageInput] = useState("");
+
+  // Fetch discussions and messages when component mounts
+  useEffect(() => {
+    const fetchCommunityData = async () => {
+      setLoading(true);
+      try {
+        // Fetch discussions
+        const { data: discussionsData, error: discussionsError } = await supabase
+          .from('discussions')
+          .select(`
+            id, 
+            title,
+            content,
+            created_at,
+            likes,
+            replies,
+            profiles(id, full_name, role, avatar_url)
+          `)
+          .order('created_at', { ascending: false })
+          .limit(10);
+        
+        if (discussionsError) throw discussionsError;
+        
+        // Fetch chat messages
+        const { data: messagesData, error: messagesError } = await supabase
+          .from('chat_messages')
+          .select(`
+            id,
+            content,
+            created_at,
+            profiles(id, full_name, role, avatar_url)
+          `)
+          .order('created_at', { ascending: false })
+          .limit(20);
+          
+        if (messagesError) throw messagesError;
+        
+        // Format the discussions data
+        const formattedDiscussions: Discussion[] = discussionsData?.map((disc: any) => ({
+          id: disc.id,
+          title: disc.title,
+          content: disc.content,
+          author: {
+            id: disc.profiles?.id || "",
+            name: disc.profiles?.full_name || "Unknown User",
+            role: disc.profiles?.role || "Community Member",
+            avatarUrl: disc.profiles?.avatar_url
+          },
+          createdAt: new Date(disc.created_at),
+          likes: disc.likes || 0,
+          replies: disc.replies || 0
+        })) || [];
+        
+        // Format the messages data
+        const formattedMessages: ChatMessage[] = messagesData?.map((msg: any) => ({
+          id: msg.id,
+          content: msg.content,
+          user: {
+            id: msg.profiles?.id || "",
+            name: msg.profiles?.full_name || "Unknown User",
+            role: msg.profiles?.role || "Community Member",
+            avatarUrl: msg.profiles?.avatar_url
+          },
+          createdAt: new Date(msg.created_at)
+        })) || [];
+        
+        setDiscussions(formattedDiscussions);
+        setMessages(formattedMessages);
+      } catch (error) {
+        console.error("Error fetching community data:", error);
+        toast.error("Failed to load community data");
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchCommunityData();
+    
+    // Set up real-time subscription for chat messages
+    const messageSubscription = supabase
+      .channel('community_chat')
+      .on('postgres_changes', 
+          { event: 'INSERT', schema: 'public', table: 'chat_messages' }, 
+          handleNewMessage)
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(messageSubscription);
+    };
+  }, []);
+  
+  // Handle new chat messages from the real-time subscription
+  const handleNewMessage = async (payload: any) => {
+    // Fetch user profile for the new message
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('id, full_name, role, avatar_url')
+      .eq('id', payload.new.user_id)
+      .single();
+      
+    const newMessage: ChatMessage = {
+      id: payload.new.id,
+      content: payload.new.content,
+      user: {
+        id: payload.new.user_id,
+        name: profileData?.full_name || "Unknown User",
+        role: profileData?.role || "Community Member",
+        avatarUrl: profileData?.avatar_url
+      },
+      createdAt: new Date(payload.new.created_at)
+    };
+    
+    setMessages(prev => [newMessage, ...prev]);
+  };
+  
+  // Format date to relative time (e.g., "2 hours ago")
+  const formatRelativeTime = (date: Date) => {
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+    
+    if (diffInSeconds < 60) {
+      return "Just now";
+    } else if (diffInSeconds < 3600) {
+      const minutes = Math.floor(diffInSeconds / 60);
+      return `${minutes} ${minutes === 1 ? "minute" : "minutes"} ago`;
+    } else if (diffInSeconds < 86400) {
+      const hours = Math.floor(diffInSeconds / 3600);
+      return `${hours} ${hours === 1 ? "hour" : "hours"} ago`;
+    } else {
+      const days = Math.floor(diffInSeconds / 86400);
+      return `${days} ${days === 1 ? "day" : "days"} ago`;
+    }
+  };
+  
+  // Send a new chat message
+  const sendMessage = async () => {
+    if (!messageInput.trim()) return;
+    
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData?.session?.user) {
+      toast.error("You must be logged in to send messages");
+      return;
+    }
+    
+    try {
+      const { error } = await supabase
+        .from('chat_messages')
+        .insert({
+          content: messageInput,
+          user_id: sessionData.session.user.id
+        });
+        
+      if (error) throw error;
+      
+      setMessageInput("");
+    } catch (error) {
+      console.error("Error sending message:", error);
+      toast.error("Failed to send message");
+    }
+  };
+  
+  // Create a new discussion
+  const createNewDiscussion = () => {
+    navigate("/community/new-discussion");
+  };
+  
+  // Get initials from name for avatar fallback
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(part => part[0])
+      .join('')
+      .toUpperCase()
+      .substring(0, 2);
+  };
 
   return (
-    <Layout>
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Community Hub</h1>
-            <p className="text-muted-foreground mt-2">
-              Connect with other learners and mentors
-            </p>
+    <div className="container mx-auto py-6 space-y-8">
+      <div className="flex flex-col space-y-2">
+        <h1 className="text-3xl font-bold">Community Hub</h1>
+        <p className="text-muted-foreground">Connect with other learners and mentors</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Left Column: Discussions */}
+        <div className="md:col-span-2 space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-semibold">Recent Discussions</h2>
+            <Button onClick={createNewDiscussion}>
+              <Plus className="h-4 w-4 mr-2" /> New Discussion
+            </Button>
           </div>
+          <p className="text-sm text-muted-foreground">Join conversations or start a new topic</p>
+          
+          {loading ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map(i => (
+                <Card key={i} className="animate-pulse">
+                  <CardHeader className="pb-3">
+                    <div className="h-5 w-3/4 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                    <div className="flex items-center mt-2">
+                      <div className="h-10 w-10 rounded-full bg-gray-200 dark:bg-gray-700"></div>
+                      <div className="ml-3">
+                        <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                        <div className="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded mt-1"></div>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-4 w-full bg-gray-200 dark:bg-gray-700 rounded"></div>
+                    <div className="h-4 w-5/6 bg-gray-200 dark:bg-gray-700 rounded mt-2"></div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : discussions.length > 0 ? (
+            <div className="space-y-4">
+              {discussions.map((discussion) => (
+                <Card key={discussion.id} className="transition-all hover:shadow-md cursor-pointer">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg font-bold">{discussion.title}</CardTitle>
+                    <div className="flex items-center mt-1">
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={discussion.author.avatarUrl || undefined} />
+                        <AvatarFallback>{getInitials(discussion.author.name)}</AvatarFallback>
+                      </Avatar>
+                      <div className="ml-2">
+                        <p className="text-sm font-medium">{discussion.author.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {discussion.author.role} · {formatRelativeTime(discussion.createdAt)}
+                        </p>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground line-clamp-2">{discussion.content}</p>
+                    <div className="flex items-center mt-4 space-x-6">
+                      <div className="flex items-center text-sm text-muted-foreground">
+                        <ThumbsUp className="h-4 w-4 mr-1" />
+                        <span>{discussion.likes}</span>
+                      </div>
+                      <div className="flex items-center text-sm text-muted-foreground">
+                        <MessageSquare className="h-4 w-4 mr-1" />
+                        <span>{discussion.replies}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card className="p-8 text-center">
+              <p className="text-muted-foreground mb-4">No discussions yet. Be the first to start a conversation!</p>
+              <Button onClick={createNewDiscussion}>Start a Discussion</Button>
+            </Card>
+          )}
         </div>
         
-        <Tabs defaultValue="discussions" className="w-full mb-8">
-          <TabsList className="w-full max-w-md mb-4">
-            <TabsTrigger value="discussions" className="flex-1">
-              <MessageSquare className="mr-2 h-4 w-4" />
-              Discussions
-            </TabsTrigger>
-            <TabsTrigger value="mentors" className="flex-1">
-              <Users className="mr-2 h-4 w-4" />
-              Mentors
-            </TabsTrigger>
-            <TabsTrigger value="events" className="flex-1">
-              <Clock className="mr-2 h-4 w-4" />
-              Events
-            </TabsTrigger>
-          </TabsList>
-          
-          {/* Discussions Tab */}
-          <TabsContent value="discussions">
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Discussions</CardTitle>
-                <CardDescription>
-                  Join conversations or start a new topic
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <DiscussionPost 
-                  author="Maria Johnson"
-                  authorRole="React Developer"
-                  avatar="/placeholder.svg"
-                  time="2 hours ago"
-                  title="Best practice for React state management?"
-                  content="I'm building a medium-sized React application and I'm wondering what's the current best approach for state management. Should I use Redux, Context API, or something else?"
-                  likes={12}
-                  comments={5}
-                />
-                
-                <DiscussionPost 
-                  author="Ahmed Hassan"
-                  authorRole="Full Stack Developer"
-                  avatar="/placeholder.svg"
-                  time="5 hours ago"
-                  title="Resources for learning TypeScript"
-                  content="Can anyone recommend good resources for learning TypeScript? I'm comfortable with JavaScript but want to add type safety to my projects."
-                  likes={8}
-                  comments={7}
-                />
-                
-                <DiscussionPost 
-                  author="Grace Mwangi"
-                  authorRole="UI/UX Designer"
-                  avatar="/placeholder.svg"
-                  time="1 day ago"
-                  title="Favorite CSS framework in 2025?"
-                  content="What CSS frameworks are you all using in 2025? Still using Tailwind or moved to something else?"
-                  likes={15}
-                  comments={20}
-                />
-              </CardContent>
-              <CardFooter>
-                <Button className="w-full">
-                  <MessageSquare className="mr-2 h-4 w-4" />
-                  Start a New Discussion
-                </Button>
-              </CardFooter>
-            </Card>
-          </TabsContent>
-          
-          {/* Mentors Tab */}
-          <TabsContent value="mentors">
-            <Card>
-              <CardHeader>
-                <CardTitle>Available Mentors</CardTitle>
-                <CardDescription>
-                  Connect with experienced developers who can guide your learning journey
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3">
-                  <MentorCard 
-                    name="David Ngugi"
-                    expertise="Web Development"
-                    languages={["JavaScript", "React", "Node.js"]}
-                    avatar="/placeholder.svg"
-                  />
-                  
-                  <MentorCard 
-                    name="Sarah Kimani"
-                    expertise="UI/UX Design"
-                    languages={["Figma", "Adobe XD", "CSS"]}
-                    avatar="/placeholder.svg"
-                  />
-                  
-                  <MentorCard 
-                    name="Michael Omondi"
-                    expertise="Mobile Development"
-                    languages={["React Native", "Flutter", "Swift"]}
-                    avatar="/placeholder.svg"
-                  />
+        {/* Right Column: Chat */}
+        <div>
+          <Card className="h-[600px] flex flex-col">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Live Community Chat</CardTitle>
+              <p className="text-sm text-muted-foreground">Ask questions and get help in real-time</p>
+            </CardHeader>
+            <div className="flex-1 overflow-y-auto px-4 space-y-4">
+              {loading ? (
+                <div className="space-y-4 py-2">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="flex items-start animate-pulse">
+                      <div className="h-8 w-8 rounded-full bg-gray-200 dark:bg-gray-700"></div>
+                      <div className="ml-2 space-y-1">
+                        <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                        <div className="h-12 w-48 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
-          {/* Events Tab */}
-          <TabsContent value="events">
-            <Card>
-              <CardHeader>
-                <CardTitle>Upcoming Events</CardTitle>
-                <CardDescription>
-                  Join virtual meetups, webinars, and coding sessions
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <EventCard 
-                  title="Web Development Workshop"
-                  date="May 25, 2025"
-                  time="2:00 PM EAT"
-                  description="Learn to build responsive websites with HTML, CSS, and JavaScript in this hands-on workshop."
-                />
-                
-                <EventCard 
-                  title="AI in Coding: Live Q&A"
-                  date="May 28, 2025"
-                  time="6:00 PM EAT"
-                  description="Join our experts to discuss how AI is changing the coding landscape and how you can leverage it in your projects."
-                />
-                
-                <EventCard 
-                  title="Hackathon: Build for Tanzania"
-                  date="June 10-12, 2025"
-                  time="All day"
-                  description="A three-day virtual hackathon focused on building solutions for local challenges in Tanzania."
-                />
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-        
-        {/* Community Chat */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Live Community Chat</CardTitle>
-            <CardDescription>
-              Ask questions and get help in real-time
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-64 overflow-y-auto border rounded-md p-4 mb-4">
-              <ChatMessage 
-                author="System"
-                content="Welcome to the Nurath.AI community chat!"
-                time="Just now"
-                isSystem
-              />
-              <ChatMessage 
-                author="Sam Jones"
-                avatar="/placeholder.svg"
-                content="Hey everyone! Has anyone worked with the Web Audio API before? Need some help."
-                time="5 min ago"
-              />
-              <ChatMessage 
-                author="Jane Smith"
-                avatar="/placeholder.svg"
-                content="@Sam I've used it for a music visualization project. What do you need help with?"
-                time="3 min ago"
-              />
-              <ChatMessage 
-                author="Sam Jones"
-                avatar="/placeholder.svg"
-                content="Thanks Jane! I'm trying to analyze frequency data but getting weird results."
-                time="2 min ago"
-              />
+              ) : messages.length > 0 ? (
+                messages.map((message) => (
+                  <div key={message.id} className="flex items-start">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={message.user.avatarUrl || undefined} />
+                      <AvatarFallback>{getInitials(message.user.name)}</AvatarFallback>
+                    </Avatar>
+                    <div className="ml-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">{message.user.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {formatRelativeTime(message.createdAt)}
+                        </span>
+                      </div>
+                      <p className="text-sm mt-1 bg-muted p-2 rounded-md">{message.content}</p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="h-full flex items-center justify-center">
+                  <p className="text-center text-muted-foreground">
+                    No messages yet. Be the first to say hello!
+                  </p>
+                </div>
+              )}
             </div>
-            <div className="flex gap-2">
-              <Input placeholder="Type your message..." className="flex-1" />
-              <Button size="icon">
-                <Send className="h-4 w-4" />
-              </Button>
+            <div className="p-4 border-t">
+              <div className="flex gap-2">
+                <Input 
+                  value={messageInput}
+                  onChange={(e) => setMessageInput(e.target.value)}
+                  placeholder="Type your message..."
+                  onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+                />
+                <Button onClick={sendMessage} variant="default" size="icon">
+                  <Send className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
-    </Layout>
-  );
-};
-
-interface DiscussionPostProps {
-  author: string;
-  authorRole: string;
-  avatar: string;
-  time: string;
-  title: string;
-  content: string;
-  likes: number;
-  comments: number;
-}
-
-const DiscussionPost = ({ 
-  author,
-  authorRole,
-  avatar,
-  time,
-  title,
-  content,
-  likes,
-  comments
-}: DiscussionPostProps) => {
-  return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-start">
-        <div className="flex items-center gap-2">
-          <Avatar className="h-10 w-10">
-            <AvatarImage src={avatar} alt={author} />
-            <AvatarFallback>{author[0]}</AvatarFallback>
-          </Avatar>
-          <div>
-            <div className="font-medium">{author}</div>
-            <div className="text-xs text-muted-foreground">{authorRole}</div>
-          </div>
+          </Card>
         </div>
-        <div className="text-xs text-muted-foreground">{time}</div>
       </div>
       
-      <div>
-        <h3 className="text-lg font-semibold mb-2">{title}</h3>
-        <p className="text-sm text-muted-foreground">{content}</p>
-      </div>
-      
-      <div className="flex gap-4 pt-2">
-        <Button variant="ghost" size="sm" className="text-muted-foreground">
-          <Heart className="mr-1 h-4 w-4" />
-          {likes}
-        </Button>
-        <Button variant="ghost" size="sm" className="text-muted-foreground">
-          <MessageCircle className="mr-1 h-4 w-4" />
-          {comments}
-        </Button>
-      </div>
-      
-      <div className="border-t pt-4"></div>
-    </div>
-  );
-};
-
-interface MentorCardProps {
-  name: string;
-  expertise: string;
-  languages: string[];
-  avatar: string;
-}
-
-const MentorCard = ({
-  name,
-  expertise,
-  languages,
-  avatar
-}: MentorCardProps) => {
-  return (
-    <Card>
-      <CardContent className="pt-6">
-        <div className="flex flex-col items-center text-center mb-4">
-          <Avatar className="h-20 w-20 mb-4">
-            <AvatarImage src={avatar} alt={name} />
-            <AvatarFallback>{name[0]}</AvatarFallback>
-          </Avatar>
-          <h3 className="font-semibold text-lg">{name}</h3>
-          <p className="text-sm text-muted-foreground">{expertise}</p>
+      <div className="p-4 mt-8 border-t text-center text-sm text-muted-foreground">
+        <div className="flex items-center justify-center mb-2">
+          <NKTechLogo size="sm" />
         </div>
-        
-        <div className="flex flex-wrap gap-1 justify-center mb-4">
-          {languages.map((lang, index) => (
-            <span 
-              key={index} 
-              className="bg-secondary text-secondary-foreground text-xs py-1 px-2 rounded-full"
-            >
-              {lang}
-            </span>
-          ))}
-        </div>
-        
-        <Button variant="outline" size="sm" className="w-full">
-          <MessageCircle className="mr-2 h-4 w-4" />
-          Contact
-        </Button>
-      </CardContent>
-    </Card>
-  );
-};
-
-interface EventCardProps {
-  title: string;
-  date: string;
-  time: string;
-  description: string;
-}
-
-const EventCard = ({
-  title,
-  date,
-  time,
-  description
-}: EventCardProps) => {
-  return (
-    <Card>
-      <CardContent className="p-6">
-        <div className="flex justify-between items-start mb-4">
-          <h3 className="font-semibold text-lg">{title}</h3>
-          <div className="bg-primary/10 text-primary px-3 py-1 rounded-full text-xs">
-            {date}
-          </div>
-        </div>
-        <p className="text-sm text-muted-foreground mb-4">{description}</p>
-        <div className="flex justify-between items-center">
-          <div className="text-sm flex items-center">
-            <Clock className="mr-1 h-4 w-4 text-muted-foreground" />
-            <span className="text-muted-foreground">{time}</span>
-          </div>
-          <Button size="sm">Register</Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
-
-interface ChatMessageProps {
-  author: string;
-  content: string;
-  time: string;
-  avatar?: string;
-  isSystem?: boolean;
-}
-
-const ChatMessage = ({
-  author,
-  content,
-  time,
-  avatar,
-  isSystem = false
-}: ChatMessageProps) => {
-  return (
-    <div className={`flex gap-3 mb-4 ${isSystem ? 'items-center' : 'items-start'}`}>
-      {isSystem ? (
-        <div className="bg-primary/20 text-primary p-1 rounded-full">
-          <MessageCircle className="h-4 w-4" />
-        </div>
-      ) : (
-        <Avatar className="h-8 w-8">
-          <AvatarImage src={avatar} alt={author} />
-          <AvatarFallback>{author[0]}</AvatarFallback>
-        </Avatar>
-      )}
-      <div className="flex-1">
-        <div className="flex items-center gap-2">
-          <span className="font-medium text-sm">{author}</span>
-          <span className="text-xs text-muted-foreground">{time}</span>
-        </div>
-        <p className={`text-sm ${isSystem ? 'text-muted-foreground italic' : ''}`}>
-          {content}
-        </p>
+        <p>© 2025 Nurath.AI by NK Technology (Tanzania)</p>
       </div>
     </div>
   );
