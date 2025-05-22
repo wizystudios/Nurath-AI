@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +9,7 @@ interface Tutorial {
   id: string;
   title: string;
   level: string;
+  duration: string;
 }
 
 interface UserProgress {
@@ -76,9 +76,8 @@ const ProgressTracker = () => {
           // Estimate hours based on completed tutorials and progress
           let hoursEstimate = 0;
           progressData.forEach(progress => {
-            const tutorial = progress.tutorial as Tutorial;
             // Extract numeric part of duration (e.g., "2 hours" -> 2)
-            const hours = parseFloat(tutorial.tutorial.duration.split(' ')[0]);
+            const hours = parseFloat(progress.tutorial.duration.split(' ')[0]);
             // Completed tutorials count fully, in-progress ones count proportionally
             hoursEstimate += progress.completed ? hours : (hours * progress.progress / 100);
           });
@@ -183,7 +182,7 @@ const ProgressTracker = () => {
                 .map(progress => (
                   <CourseProgressItem 
                     key={progress.id}
-                    title={(progress.tutorial as any).title} 
+                    title={progress.tutorial.title} 
                     progress={progress.progress} 
                     status={progress.completed ? "Completed" : progress.progress >= 50 ? "In Progress" : "Just Started"}
                     completedLessons={Math.round(progress.progress / 10)}
@@ -219,7 +218,7 @@ const ProgressTracker = () => {
                   </div>
                   <div>
                     <div className="flex items-center">
-                      <h3 className="font-medium text-sm">{(progress.tutorial as any).title}</h3>
+                      <h3 className="font-medium text-sm">{progress.tutorial.title}</h3>
                       <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-muted">
                         {progress.completed ? "Completed" : `${progress.progress}%`}
                       </span>
