@@ -1,10 +1,17 @@
 
 import { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, MessageCircle, User, LogIn, Mic, MicOff, Code } from "lucide-react";
+import { 
+  Send, 
+  Mic, 
+  MicOff, 
+  Code, 
+  AlignJustify,
+  PanelLeft
+} from "lucide-react";
 import SkillLevelSelector from "@/components/SkillLevelSelector";
 import LanguageSelector, { Language } from "@/components/LanguageSelector";
 import Message from "@/components/Message";
@@ -14,6 +21,10 @@ import { Footer } from "@/components/Footer";
 import { supabase } from "@/integrations/supabase/client";
 import { Session } from "@supabase/supabase-js";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { generateAIResponse } from "@/utils/aiResponseHandler";
+import Logo from "@/components/Logo";
+import UserDropdown from "@/components/UserDropdown";
+import ChatSidebar from "@/components/ChatSidebar";
 
 // Define message type
 type MessageType = {
@@ -34,6 +45,7 @@ type UserType = {
   email: string;
   skillLevel: SkillLevel;
   language: Language;
+  avatarUrl?: string | null;
 } | null;
 
 const Index = () => {
@@ -44,23 +56,33 @@ const Index = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [user, setUser] = useState<UserType>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const isMobile = useIsMobile();
 
-  // Add welcome message on first load
+  // Check URL parameters for conversation ID
   useEffect(() => {
-    const welcomeMessage: MessageType = {
-      id: "welcome",
-      role: "assistant",
-      content: language === "en" 
-        ? `Welcome to Nurath.AI! I'm here to help you with technology questions. Your current skill level is set to ${skillLevel}. How can I assist you today?`
-        : `Karibu kwenye Nurath.AI! Niko hapa kukusaidia na maswali ya teknolojia. Kiwango chako cha ujuzi kimewekwa kuwa ${getSkillLevelInSwahili(skillLevel)}. Nawezaje kukusaidia leo?`,
-      timestamp: new Date(),
-      type: "info"
-    };
-    setMessages([welcomeMessage]);
-  }, [language]);
+    const convId = searchParams.get('conversation');
+    if (convId) {
+      setConversationId(convId);
+      fetchConversationMessages(convId);
+    } else {
+      // Add welcome message on first load if no conversation ID
+      const welcomeMessage: MessageType = {
+        id: "welcome",
+        role: "assistant",
+        content: language === "en" 
+          ? `Welcome to Nurath.AI! I'm here to help you with technology questions. Your current skill level is set to ${skillLevel}. How can I assist you today?`
+          : `Karibu kwenye Nurath.AI! Niko hapa kukusaidia na maswali ya teknolojia. Kiwango chako cha ujuzi kimewekwa kuwa ${getSkillLevelInSwahili(skillLevel)}. Nawezaje kukusaidia leo?`,
+        timestamp: new Date(),
+        type: "info"
+      };
+      setMessages([welcomeMessage]);
+    }
+  }, [language, searchParams]);
 
   // Check authentication status
   useEffect(() => {
@@ -69,29 +91,69 @@ const Index = () => {
       setSession(data.session);
       
       if (data.session?.user) {
+        // Fetch user profile from the profiles table
+        const { data: profileData, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.session.user.id)
+          .single();
+          
+        if (error) {
+          console.error("Error fetching profile:", error);
+        }
+        
         setUser({
           id: data.session.user.id,
-          name: data.session.user.user_metadata?.full_name || data.session.user.email?.split('@')[0] || "User",
+          name: profileData?.full_name || data.session.user.user_metadata?.full_name || data.session.user.email?.split('@')[0] || "User",
           email: data.session.user.email || "",
-          skillLevel: skillLevel,
-          language: language,
+          skillLevel: (profileData?.skill_level as SkillLevel) || skillLevel,
+          language: (profileData?.language_preference as Language) || language,
+          avatarUrl: profileData?.avatar_url
         });
+        
+        if (profileData?.skill_level) {
+          setSkillLevel(profileData.skill_level as SkillLevel);
+        }
+        
+        if (profileData?.language_preference) {
+          setLanguage(profileData.language_preference as Language);
+        }
       }
     };
     
     checkSession();
     
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session);
       
       if (session?.user) {
+        // Fetch user profile from the profiles table
+        const { data: profileData, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+          
+        if (error) {
+          console.error("Error fetching profile:", error);
+        }
+        
         setUser({
           id: session.user.id,
-          name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || "User",
+          name: profileData?.full_name || session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || "User",
           email: session.user.email || "",
-          skillLevel: skillLevel,
-          language: language,
+          skillLevel: (profileData?.skill_level as SkillLevel) || skillLevel,
+          language: (profileData?.language_preference as Language) || language,
+          avatarUrl: profileData?.avatar_url
         });
+        
+        if (profileData?.skill_level) {
+          setSkillLevel(profileData.skill_level as SkillLevel);
+        }
+        
+        if (profileData?.language_preference) {
+          setLanguage(profileData.language_preference as Language);
+        }
       } else {
         setUser(null);
       }
@@ -103,6 +165,42 @@ const Index = () => {
       }
     };
   }, []);
+
+  // Fetch conversation messages
+  const fetchConversationMessages = async (id: string) => {
+    try {
+      const { data: conversationData, error: conversationError } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('id', id)
+        .single();
+        
+      if (conversationError) throw conversationError;
+      
+      const { data: messagesData, error: messagesError } = await supabase
+        .from('chat_messages')
+        .select('*')
+        .eq('conversation_id', id)
+        .order('created_at', { ascending: true });
+        
+      if (messagesError) throw messagesError;
+      
+      if (messagesData) {
+        const formattedMessages: MessageType[] = messagesData.map(msg => ({
+          id: msg.id,
+          role: msg.role as "user" | "assistant",
+          content: msg.content,
+          timestamp: new Date(msg.created_at || Date.now()),
+          type: msg.type as "text" | "code" | "info" | "warning" | undefined
+        }));
+        
+        setMessages(formattedMessages);
+      }
+    } catch (error) {
+      console.error("Error fetching conversation messages:", error);
+      toast.error("Could not load conversation messages");
+    }
+  };
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -120,7 +218,7 @@ const Index = () => {
   };
 
   // Handle skill level change
-  const handleSkillLevelChange = (level: SkillLevel) => {
+  const handleSkillLevelChange = async (level: SkillLevel) => {
     setSkillLevel(level);
     toast.success(language === "en" 
       ? `Skill level updated to ${level}`
@@ -133,11 +231,19 @@ const Index = () => {
         ...user,
         skillLevel: level
       });
+      
+      // Update the profile in the database
+      if (session?.user) {
+        await supabase
+          .from('profiles')
+          .update({ skill_level: level })
+          .eq('id', session.user.id);
+      }
     }
   };
 
   // Handle language change
-  const handleLanguageChange = (lang: Language) => {
+  const handleLanguageChange = async (lang: Language) => {
     setLanguage(lang);
     toast.success(lang === "en" 
       ? "Language changed to English"
@@ -150,17 +256,14 @@ const Index = () => {
         ...user,
         language: lang
       });
-    }
-  };
-
-  // Handle logout
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-      toast.success("Logged out successfully");
-    } catch (error) {
-      console.error(error);
-      toast.error("Failed to log out");
+      
+      // Update the profile in the database
+      if (session?.user) {
+        await supabase
+          .from('profiles')
+          .update({ language_preference: lang })
+          .eq('id', session.user.id);
+      }
     }
   };
 
@@ -174,13 +277,68 @@ const Index = () => {
     navigate("/auth");
   };
 
-  // Navigate to dashboard
-  const goToDashboard = () => {
-    navigate("/dashboard");
+  // Store message in the database
+  const storeMessage = async (
+    content: string, 
+    role: "user" | "assistant", 
+    type?: "text" | "code" | "info" | "warning",
+    conversation_id?: string | null
+  ) => {
+    if (!session?.user?.id) return null;
+    
+    try {
+      // If no conversation_id, create a new conversation first
+      let conversationIdToUse = conversation_id;
+      
+      if (!conversationIdToUse) {
+        // Create a title based on the first user message
+        const title = content.length > 30 
+          ? content.substring(0, 30) + "..." 
+          : content;
+          
+        const { data: conversationData, error: conversationError } = await supabase
+          .from('conversations')
+          .insert([
+            { 
+              user_id: session.user.id,
+              title
+            }
+          ])
+          .select()
+          .single();
+          
+        if (conversationError) throw conversationError;
+        
+        conversationIdToUse = conversationData.id;
+        setConversationId(conversationData.id);
+      }
+      
+      // Store the message
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .insert([
+          {
+            user_id: session.user.id,
+            content,
+            role,
+            type,
+            conversation_id: conversationIdToUse
+          }
+        ])
+        .select()
+        .single();
+        
+      if (error) throw error;
+      
+      return data.id;
+    } catch (error) {
+      console.error("Error storing message:", error);
+      return null;
+    }
   };
 
   // Handle form submission
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!inputValue.trim()) return;
@@ -194,13 +352,26 @@ const Index = () => {
     };
     
     setMessages((prev) => [...prev, userMessage]);
+    const userInput = inputValue; // Store input before clearing
     setInputValue("");
     
-    // Simulate AI response
+    // Store user message in database
+    const storedMsgId = await storeMessage(userInput, "user", undefined, conversationId);
+    if (storedMsgId) {
+      userMessage.id = storedMsgId;
+    }
+    
+    // Show AI is typing
     setIsTyping(true);
     
-    setTimeout(() => {
-      const aiResponse = generateAIResponse(inputValue, skillLevel, language);
+    // AI responds
+    setTimeout(async () => {
+      const aiResponse = generateAIResponse({
+        prompt: userInput,
+        skillLevel,
+        language
+      });
+      
       const assistantMessage: MessageType = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
@@ -211,118 +382,58 @@ const Index = () => {
       
       setMessages((prev) => [...prev, assistantMessage]);
       setIsTyping(false);
+      
+      // Store AI message in database
+      const storedAiMsgId = await storeMessage(
+        aiResponse.content, 
+        "assistant", 
+        aiResponse.type, 
+        conversationId
+      );
+      
+      if (storedAiMsgId) {
+        assistantMessage.id = storedAiMsgId;
+      }
     }, 1000);
   };
 
-  // Generate AI response based on input, skill level, and language
-  const generateAIResponse = (input: string, level: SkillLevel, lang: Language): { content: string, type?: "text" | "code" | "info" | "warning" } => {
-    // This is a placeholder for actual AI integration
-    const lowerInput = input.toLowerCase();
-    
-    // Example of code response
-    if (lowerInput.includes("code") || lowerInput.includes("example") || lowerInput.includes("syntax")) {
-      if (lowerInput.includes("html")) {
-        return {
-          content: `<!DOCTYPE html>\n<html>\n<head>\n  <title>Hello World</title>\n</head>\n<body>\n  <h1>Hello World!</h1>\n  <p>This is a simple HTML page.</p>\n</body>\n</html>`,
-          type: "code"
-        };
-      }
-      if (lowerInput.includes("css")) {
-        return {
-          content: `body {\n  font-family: Arial, sans-serif;\n  margin: 0;\n  padding: 20px;\n  background-color: #f5f5f5;\n}\n\nh1 {\n  color: navy;\n}`,
-          type: "code"
-        };
-      }
-      if (lowerInput.includes("javascript") || lowerInput.includes("js")) {
-        return {
-          content: `// Simple JavaScript function\nfunction greet(name) {\n  return \`Hello, \${name}! Welcome to coding.\`;\n}\n\nconsole.log(greet('Developer'));`,
-          type: "code"
-        };
-      }
+  // Quick questions the user can ask
+  const quickQuestions = [
+    { 
+      en: "What can you help me with?",
+      sw: "Unaweza kunisaidia na nini?"
+    },
+    {
+      en: "Teach me HTML basics",
+      sw: "Nifundishe misingi ya HTML"
+    },
+    {
+      en: "How do I create a website?",
+      sw: "Nitatengenezaje tovuti?"
+    },
+    {
+      en: "Show me a JavaScript example",
+      sw: "Nionyeshe mfano wa JavaScript"
     }
-
-    // Handle regular text responses based on language
-    if (lang === "sw") {
-      if (lowerInput.includes("hello") || lowerInput.includes("hi") || lowerInput.includes("habari")) {
-        return {
-          content: `Habari! Nawezaje kukusaidia na maswali yako ya teknolojia leo? Ninaweza kukupa mwongozo kulingana na kiwango chako cha ${getSkillLevelInSwahili(level)}.`
-        };
-      }
-      
-      if (lowerInput.includes("react")) {
-        if (level === "beginner") {
-          return {
-            content: "React ni maktaba ya JavaScript inayotumika kuunda kiolesura cha mtumiaji. Huwaruhusu waandaaji kutengeneza vipengele vya UI vinavyoweza kutumika tena."
-          };
-        } else if (level === "intermediate") {
-          return {
-            content: "React hutumia DOM pepe kurahisisha utendaji wa kiolesura. Ungependa kujifunza kuhusu hooks na usimamizi wa hali?"
-          };
-        } else {
-          return {
-            content: "Kwa maendeleo ya hali ya juu ya React, fikiria kuchunguza mbinu za uboreshaji wa utendaji kama vile memo, useMemo, na useCallback. Unaweza pia kutazama React Server Components au suluhisho za hali ya juu za usimamizi wa hali."
-          };
-        }
-      }
-      
-      // Default response in Swahili
-      return {
-        content: `Kulingana na kiwango chako cha ${getSkillLevelInSwahili(level)}, ningependekeza kuanza na misingi na polepole kujenga maarifa yako. Kuna jambo mahususi kuhusu "${input}" ungependa kujifunza?`
-      };
-    } else {
-      // English responses
-      if (lowerInput.includes("hello") || lowerInput.includes("hi")) {
-        return {
-          content: `Hello! How can I help you with your ${level}-level tech questions today?`
-        };
-      }
-      
-      if (lowerInput.includes("react")) {
-        if (level === "beginner") {
-          return {
-            content: "React is a JavaScript library for building user interfaces. It lets you create reusable UI components."
-          };
-        } else if (level === "intermediate") {
-          return {
-            content: "React uses a virtual DOM to optimize rendering performance. You might want to learn about hooks and state management next."
-          };
-        } else {
-          return {
-            content: "For advanced React development, consider exploring performance optimization techniques like memo, useMemo, and useCallback. You might also want to look into React Server Components or advanced state management solutions."
-          };
-        }
-      }
-      
-      if (lowerInput.includes("css") || lowerInput.includes("style")) {
-        if (level === "beginner") {
-          return {
-            content: "CSS (Cascading Style Sheets) is used to style web pages. You can change colors, fonts, and layouts with it."
-          };
-        } else if (level === "intermediate") {
-          return {
-            content: "For more complex styling, consider learning about Flexbox and CSS Grid for layouts, and CSS variables for maintainable code."
-          };
-        } else {
-          return {
-            content: "At your level, you might want to explore CSS-in-JS libraries, CSS architecture patterns like BEM or SMACSS, or advanced animations using CSS keyframes and transitions."
-          };
-        }
-      }
-      
-      // Default response
-      return {
-        content: `Based on your ${level} skill level, I'd recommend starting with the fundamentals and gradually building up your knowledge. Is there something specific about "${input}" you'd like to learn?`
-      };
-    }
-  };
+  ];
 
   return (
     <div className="flex flex-col h-screen max-h-screen bg-background">
+      {/* Sidebar */}
+      <ChatSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      
       {/* Header */}
       <header className="flex items-center justify-between px-4 sm:px-6 py-4 border-b bg-gradient-to-r from-purple-600 to-indigo-800 text-white">
-        <div className="flex items-center">
-          <MessageCircle className="mr-2 h-6 w-6" />
-          <h1 className="text-xl font-bold">Nurath.AI</h1>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="text-white" 
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+          >
+            <PanelLeft className="h-5 w-5" />
+          </Button>
+          <Logo />
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
           {!isMobile && (
@@ -339,16 +450,13 @@ const Index = () => {
           )}
           <ThemeToggle />
           {session ? (
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" className="bg-white/10 border-white/20" onClick={goToDashboard}>
-                <User className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">Dashboard</span>
-              </Button>
-            </div>
+            <UserDropdown 
+              userName={user?.name || "User"}
+              avatarUrl={user?.avatarUrl}
+            />
           ) : (
             <Button variant="outline" size="sm" className="bg-white/10 border-white/20" onClick={goToAuth}>
-              <LogIn className="h-4 w-4 mr-0 sm:mr-2" />
-              <span className="hidden sm:inline">Login</span>
+              Login
             </Button>
           )}
         </div>
@@ -386,10 +494,38 @@ const Index = () => {
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Quick Questions */}
+      {messages.length <= 2 && !isTyping && (
+        <div className="px-4 py-2">
+          <p className="text-sm text-muted-foreground mb-2">
+            {language === "en" ? "Try asking:" : "Jaribu kuuliza:"}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {quickQuestions.map((q, i) => (
+              <Button 
+                key={i} 
+                variant="outline" 
+                size="sm"
+                className="text-xs"
+                onClick={() => {
+                  setInputValue(language === "en" ? q.en : q.sw);
+                  setTimeout(() => {
+                    document.getElementById("chat-input")?.focus();
+                  }, 100);
+                }}
+              >
+                {language === "en" ? q.en : q.sw}
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Input Form */}
       <form onSubmit={handleSubmit} className="border-t p-4 bg-muted/20">
         <div className="flex gap-2">
           <Input
+            id="chat-input"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             placeholder={language === "en" ? "Ask Nurath.AI a question..." : "Uliza Nurath.AI swali..."}
@@ -404,16 +540,16 @@ const Index = () => {
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" className="h-auto p-1 text-xs">
               <Code className="h-3 w-3 mr-1" />
-              <span className="hidden sm:inline">Tutorial</span>
+              <span className="hidden sm:inline">Examples</span>
             </Button>
           </div>
           <div className="hidden sm:block">
-            {language === "en" ? "Ask me anything about technology!" : "Niulize chochote kuhusu teknolojia!"}
+            {language === "en" ? "Nurath.AI answers tech questions in multiple languages!" : "Nurath.AI hujibu maswali ya teknolojia kwa lugha nyingi!"}
           </div>
         </div>
       </form>
 
-      {/* Footer on the landing page */}
+      {/* Footer */}
       <Footer />
     </div>
   );

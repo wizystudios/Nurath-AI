@@ -1,19 +1,33 @@
 
 import React from "react";
 
-const TanzaniaFlag: React.FC = () => {
+interface TanzaniaFlagProps {
+  className?: string;
+  size?: "sm" | "md" | "lg";
+}
+
+const TanzaniaFlag: React.FC<TanzaniaFlagProps> = ({ className = "", size = "md" }) => {
+  const sizeClasses = {
+    sm: "w-4 h-3",
+    md: "w-6 h-4",
+    lg: "w-8 h-6"
+  };
+  
   return (
-    <div className="relative w-6 h-4 inline-block mr-2">
-      {/* Green section (top) */}
-      <div className="absolute top-0 left-0 right-0 h-1/3 bg-green-600"></div>
-      {/* Yellow section (middle) */}
-      <div className="absolute top-1/3 left-0 right-0 h-1/3 bg-yellow-400"></div>
-      {/* Blue section (bottom) */}
-      <div className="absolute bottom-0 left-0 right-0 h-1/3 bg-blue-600"></div>
+    <div className={`relative ${sizeClasses[size]} inline-block ${className}`}>
       {/* Black diagonal stripe */}
-      <div className="absolute top-0 bottom-0 left-0 right-0 overflow-hidden">
-        <div className="absolute w-8 h-8 bg-black -rotate-45 -left-1 -top-2"></div>
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden">
+        <div className="absolute top-0 left-0 w-[140%] h-[140%] bg-black transform origin-top-left rotate-[30deg] translate-x-[-20%] translate-y-[-10%]"></div>
       </div>
+      
+      {/* Green section (top) */}
+      <div className="absolute top-0 left-0 w-full h-[33.33%] bg-green-600 z-10"></div>
+      
+      {/* Yellow section (middle) */}
+      <div className="absolute top-[33.33%] left-0 w-full h-[33.33%] bg-yellow-400 z-10"></div>
+      
+      {/* Blue section (bottom) */}
+      <div className="absolute bottom-0 left-0 w-full h-[33.33%] bg-blue-600 z-10"></div>
     </div>
   );
 };

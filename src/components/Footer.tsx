@@ -10,7 +10,7 @@ export function Footer() {
             © {new Date().getFullYear()} Nurath.AI
           </p>
         </div>
-        <div className="flex items-center">
+        <div className="flex items-center gap-2">
           <TanzaniaFlag />
           <span className="text-sm text-muted-foreground">
             by NK Technology (Tanzania)

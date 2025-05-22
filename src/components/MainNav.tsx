@@ -17,11 +17,40 @@ import {
 import { useIsMobile } from "@/hooks/use-mobile";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import UserDropdown from "./UserDropdown";
 
 export function MainNav() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
   const isMobile = useIsMobile();
+  const [userName, setUserName] = useState<string>("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  
+  // Fetch user data on component mount
+  useState(() => {
+    const fetchUserData = async () => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      
+      if (sessionData.session?.user) {
+        // Fetch profile data from profiles table
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', sessionData.session.user.id)
+          .single();
+          
+        if (profileData) {
+          setUserName(profileData.full_name || sessionData.session.user.user_metadata?.full_name || sessionData.session.user.email?.split('@')[0] || "User");
+          setAvatarUrl(profileData.avatar_url);
+        } else {
+          setUserName(sessionData.session.user.user_metadata?.full_name || sessionData.session.user.email?.split('@')[0] || "User");
+        }
+      }
+    };
+    
+    fetchUserData();
+  });
   
   const handleLogout = async () => {
     try {
@@ -63,11 +92,6 @@ export function MainNav() {
       href: "/community",
       icon: Users,
     },
-    {
-      title: "Profile",
-      href: "/profile",
-      icon: User,
-    },
   ];
 
   const isActive = (path: string) => {
@@ -91,9 +115,7 @@ export function MainNav() {
           </Button>
         ))}
         <ThemeToggle />
-        <Button variant="destructive" size="icon" onClick={handleLogout}>
-          <LogOut className="h-4 w-4" />
-        </Button>
+        <UserDropdown userName={userName} avatarUrl={avatarUrl} />
       </div>
 
       <div className="flex md:hidden">
@@ -110,6 +132,15 @@ export function MainNav() {
       {isMobile && mobileMenuOpen && (
         <div className="fixed inset-0 z-50 bg-background pt-16">
           <nav className="grid gap-2 p-4">
+            <div className="flex justify-center mb-8">
+              <Avatar className="h-20 w-20 border-2 border-primary">
+                <AvatarImage src={avatarUrl || undefined} alt={userName} />
+                <AvatarFallback className="text-2xl">
+                  {userName.split(' ').map(n => n[0]).join('').toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+            </div>
+            
             {navItems.map((item) => (
               <Button
                 key={item.href}

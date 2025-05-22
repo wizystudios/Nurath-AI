@@ -13,7 +13,16 @@ import LanguageSelector from "@/components/LanguageSelector"; // Fixed import
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
-import { Save, User as UserIcon, Bell, Shield } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { 
+  Save, 
+  User as UserIcon, 
+  Bell, 
+  Shield, 
+  Upload,
+  Camera,
+  Trash2
+} from "lucide-react";
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -23,6 +32,8 @@ const Profile = () => {
   const [email, setEmail] = useState("");
   const [skillLevel, setSkillLevel] = useState("beginner");
   const [emailNotifications, setEmailNotifications] = useState(true);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
   
   useEffect(() => {
     async function getUserProfile() {
@@ -36,7 +47,23 @@ const Profile = () => {
         
         setUser(user);
         setEmail(user.email || "");
-        setFullName(user.user_metadata?.full_name || "");
+        
+        // Fetch profile data from profiles table
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        
+        if (profileError) {
+          console.error("Error fetching profile:", profileError);
+        } else if (profileData) {
+          setFullName(profileData.full_name || user.user_metadata?.full_name || "");
+          setSkillLevel(profileData.skill_level || "beginner");
+          setAvatarUrl(profileData.avatar_url || null);
+        } else {
+          setFullName(user.user_metadata?.full_name || "");
+        }
       } catch (error) {
         console.error("Error fetching user:", error);
       } finally {
@@ -49,19 +76,97 @@ const Profile = () => {
   
   const handleUpdateProfile = async () => {
     try {
-      const { error } = await supabase.auth.updateUser({
+      setLoading(true);
+      
+      // Update auth metadata
+      const { error: authError } = await supabase.auth.updateUser({
         data: {
           full_name: fullName,
-          skill_level: skillLevel,
         }
       });
       
-      if (error) throw error;
+      if (authError) throw authError;
+      
+      // Handle avatar upload if there's a new file
+      let newAvatarUrl = avatarUrl;
+      
+      if (avatarFile) {
+        // Upload the file to storage
+        const fileExt = avatarFile.name.split('.').pop();
+        const filePath = `avatars/${user?.id}/${Date.now()}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('profiles')
+          .upload(filePath, avatarFile);
+          
+        if (uploadError) throw uploadError;
+        
+        // Get the public URL
+        const { data: publicUrlData } = supabase.storage
+          .from('profiles')
+          .getPublicUrl(filePath);
+          
+        newAvatarUrl = publicUrlData.publicUrl;
+      }
+      
+      // Update profile data in the profiles table
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          full_name: fullName,
+          skill_level: skillLevel,
+          avatar_url: newAvatarUrl,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user?.id);
+        
+      if (profileError) throw profileError;
       
       toast.success("Profile updated successfully!");
+      
+      // Clear avatar file after upload
+      setAvatarFile(null);
     } catch (error: any) {
       toast.error(error.message || "Error updating profile");
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      
+      // Check if file is an image
+      if (!file.type.startsWith('image/')) {
+        toast.error("Please select an image file");
+        return;
+      }
+      
+      // Check file size (max 2MB)
+      if (file.size > 2 * 1024 * 1024) {
+        toast.error("Image is too large (max 2MB)");
+        return;
+      }
+      
+      setAvatarFile(file);
+      const objectUrl = URL.createObjectURL(file);
+      setAvatarUrl(objectUrl);
+    }
+  };
+
+  const handleRemoveAvatar = () => {
+    setAvatarUrl(null);
+    setAvatarFile(null);
+  };
+
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(part => part[0])
+      .join('')
+      .toUpperCase()
+      .substring(0, 2);
   };
 
   if (loading) {
@@ -110,16 +215,52 @@ const Profile = () => {
                   Update your personal information and preferences
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Full Name</Label>
-                  <Input 
-                    id="name" 
-                    placeholder="Your name" 
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                  />
+              <CardContent className="space-y-6">
+                {/* Avatar Upload */}
+                <div className="flex flex-col items-center sm:flex-row sm:items-start gap-6">
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="relative">
+                      <Avatar className="w-24 h-24 border-4 border-muted">
+                        <AvatarImage src={avatarUrl || undefined} alt={fullName} />
+                        <AvatarFallback className="text-2xl">{getInitials(fullName)}</AvatarFallback>
+                      </Avatar>
+                      <label 
+                        htmlFor="avatar-upload" 
+                        className="absolute bottom-0 right-0 bg-primary text-white p-1 rounded-full cursor-pointer"
+                      >
+                        <Camera className="h-4 w-4" />
+                      </label>
+                      <input 
+                        id="avatar-upload" 
+                        type="file" 
+                        accept="image/*"
+                        className="hidden" 
+                        onChange={handleAvatarChange}
+                      />
+                    </div>
+                    {avatarUrl && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={handleRemoveAvatar}
+                        className="text-xs text-destructive"
+                      >
+                        <Trash2 className="h-3 w-3 mr-1" />
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                  <div className="space-y-2 flex-1">
+                    <Label htmlFor="name">Full Name</Label>
+                    <Input 
+                      id="name" 
+                      placeholder="Your name" 
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                    />
+                  </div>
                 </div>
+                
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <Input 
@@ -132,13 +273,14 @@ const Profile = () => {
                     Email address cannot be changed
                   </p>
                 </div>
+                
                 <div className="space-y-2">
                   <Label htmlFor="skill">Skill Level</Label>
                   <Select 
                     value={skillLevel}
                     onValueChange={setSkillLevel}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger id="skill">
                       <SelectValue placeholder="Select skill level" />
                     </SelectTrigger>
                     <SelectContent>
@@ -148,6 +290,7 @@ const Profile = () => {
                     </SelectContent>
                   </Select>
                 </div>
+                
                 <div className="space-y-2">
                   <Label>Language Preference</Label>
                   <div className="pt-2">
@@ -159,7 +302,7 @@ const Profile = () => {
                 </div>
               </CardContent>
               <CardFooter>
-                <Button onClick={handleUpdateProfile}>
+                <Button onClick={handleUpdateProfile} disabled={loading}>
                   <Save className="mr-2 h-4 w-4" />
                   Save Changes
                 </Button>
@@ -201,7 +344,10 @@ const Profile = () => {
                 </div>
               </CardContent>
               <CardFooter>
-                <Button>Save Notification Preferences</Button>
+                <Button>
+                  <Save className="mr-2 h-4 w-4" />
+                  Save Notification Preferences
+                </Button>
               </CardFooter>
             </Card>
           </TabsContent>
@@ -215,7 +361,10 @@ const Profile = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <Button variant="outline">Change Password</Button>
+                <Button variant="outline">
+                  <Shield className="mr-2 h-4 w-4" />
+                  Change Password
+                </Button>
                 <div className="pt-4">
                   <h3 className="font-medium mb-2">Account Activity</h3>
                   <div className="rounded-md border p-4">
