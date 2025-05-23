@@ -44,8 +44,11 @@ const Tutorials = () => {
       try {
         setLoading(true);
         
-        // Use comprehensive tutorial content instead of fetching from database
-        const tutorialsData = comprehensiveTutorials;
+        // Use comprehensive tutorial content
+        const tutorialsData = comprehensiveTutorials.map(tutorial => ({
+          ...tutorial,
+          level: tutorial.level === 'non-developer' ? 'beginner' : tutorial.level
+        }));
         
         setTutorials(tutorialsData);
         setFilteredTutorials(tutorialsData);
@@ -123,7 +126,14 @@ const Tutorials = () => {
       return;
     }
     
-    const filtered = tutorials.filter(tutorial => tutorial.level === level);
+    // Map non-developer to beginner for filtering
+    const mappedLevel = level === 'non-developer' ? 'beginner' : level;
+    const filtered = tutorials.filter(tutorial => 
+      tutorial.level === level || 
+      (level === 'beginner' && comprehensiveTutorials.some(t => 
+        t.id === tutorial.id && t.level === 'non-developer'
+      ))
+    );
     setFilteredTutorials(filtered);
   };
   
@@ -246,10 +256,28 @@ const Tutorials = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Comprehensive Programming Tutorials</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Complete Programming Curriculum</h1>
           <p className="text-muted-foreground mt-2">
-            Master programming with our in-depth, structured learning materials
+            Master programming step-by-step: Non-Developer → Beginner → Intermediate → Pro
           </p>
+          <div className="flex items-center gap-2 mt-2">
+            <div className="flex items-center gap-1 text-sm">
+              <div className="w-3 h-3 rounded-full bg-green-500"></div>
+              <span>Non-Developer</span>
+            </div>
+            <div className="flex items-center gap-1 text-sm">
+              <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+              <span>Beginner</span>
+            </div>
+            <div className="flex items-center gap-1 text-sm">
+              <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+              <span>Intermediate</span>
+            </div>
+            <div className="flex items-center gap-1 text-sm">
+              <div className="w-3 h-3 rounded-full bg-red-500"></div>
+              <span>Advanced</span>
+            </div>
+          </div>
         </div>
       </div>
       
@@ -284,7 +312,20 @@ const Tutorials = () => {
                 <div>
                   <CardTitle className="text-2xl">{selectedTutorial.title}</CardTitle>
                   <div className="flex items-center gap-2 mt-2">
-                    <Badge variant="outline" className="capitalize">{selectedTutorial.level}</Badge>
+                    <Badge 
+                      variant="outline" 
+                      className={`capitalize ${
+                        comprehensiveTutorials.find(t => t.id === selectedTutorial.id)?.level === 'non-developer' 
+                          ? 'bg-green-100 text-green-800 border-green-300' 
+                          : selectedTutorial.level === 'beginner' 
+                            ? 'bg-blue-100 text-blue-800 border-blue-300'
+                            : selectedTutorial.level === 'intermediate'
+                              ? 'bg-orange-100 text-orange-800 border-orange-300'
+                              : 'bg-red-100 text-red-800 border-red-300'
+                      }`}
+                    >
+                      {comprehensiveTutorials.find(t => t.id === selectedTutorial.id)?.level || selectedTutorial.level}
+                    </Badge>
                     <Badge variant="outline" className="capitalize">{selectedTutorial.category}</Badge>
                     <div className="flex items-center text-muted-foreground">
                       <Clock className="h-3 w-3 mr-1" />
@@ -358,8 +399,9 @@ const Tutorials = () => {
           </div>
           
           <Tabs defaultValue="all" className="mb-8">
-            <TabsList className="w-full max-w-md mb-4">
-              <TabsTrigger value="all" onClick={() => handleLevelFilter("all")}>All</TabsTrigger>
+            <TabsList className="w-full max-w-lg mb-4">
+              <TabsTrigger value="all" onClick={() => handleLevelFilter("all")}>All Levels</TabsTrigger>
+              <TabsTrigger value="non-developer" onClick={() => handleLevelFilter("non-developer")}>Non-Developer</TabsTrigger>
               <TabsTrigger value="beginner" onClick={() => handleLevelFilter("beginner")}>Beginner</TabsTrigger>
               <TabsTrigger value="intermediate" onClick={() => handleLevelFilter("intermediate")}>Intermediate</TabsTrigger>
               <TabsTrigger value="advanced" onClick={() => handleLevelFilter("advanced")}>Advanced</TabsTrigger>
@@ -404,19 +446,17 @@ const Tutorials = () => {
               </div>
             </TabsContent>
             
-            {["beginner", "intermediate", "advanced"].map((level) => (
+            {["non-developer", "beginner", "intermediate", "advanced"].map((level) => (
               <TabsContent key={level} value={level}>
                 <div className="grid gap-6 sm:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
-                  {filteredTutorials
-                    .filter(tutorial => tutorial.level === level)
-                    .map((tutorial) => (
-                      <TutorialCard 
-                        key={tutorial.id} 
-                        tutorial={tutorial} 
-                        progress={userProgress[tutorial.id]}
-                        onStart={() => startTutorial(tutorial)}
-                      />
-                    ))}
+                  {filteredTutorials.map((tutorial) => (
+                    <TutorialCard 
+                      key={tutorial.id} 
+                      tutorial={tutorial} 
+                      progress={userProgress[tutorial.id]}
+                      onStart={() => startTutorial(tutorial)}
+                    />
+                  ))}
                 </div>
               </TabsContent>
             ))}
@@ -426,7 +466,7 @@ const Tutorials = () => {
             <CardHeader>
               <CardTitle>Programming Learning Paths</CardTitle>
               <CardDescription>
-                Structured courses to master programming languages
+                Structured courses to master programming languages step-by-step
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -476,10 +516,30 @@ interface TutorialCardProps {
 }
 
 const TutorialCard = ({ tutorial, progress, onStart }: TutorialCardProps) => {
+  // Find the original tutorial to get the correct level
+  const originalTutorial = comprehensiveTutorials.find(t => t.id === tutorial.id);
+  const actualLevel = originalTutorial?.level || tutorial.level;
+  
+  const getLevelColor = (level: string) => {
+    switch (level) {
+      case 'non-developer': return 'bg-green-500';
+      case 'beginner': return 'bg-blue-500';
+      case 'intermediate': return 'bg-orange-500';
+      case 'advanced': return 'bg-red-500';
+      default: return 'bg-gray-500';
+    }
+  };
+
   return (
     <Card className="overflow-hidden h-full flex flex-col hover:shadow-lg transition-shadow">
-      <div className="bg-gradient-to-br from-purple-500 to-indigo-600 h-32 flex items-center justify-center">
+      <div className={`${getLevelColor(actualLevel)} h-32 flex items-center justify-center relative`}>
         <BookOpen className="h-12 w-12 text-white" />
+        <Badge 
+          variant="secondary" 
+          className="absolute top-2 right-2 bg-white/20 text-white border-white/30"
+        >
+          {actualLevel}
+        </Badge>
       </div>
       <CardHeader className="pb-2 flex-1">
         <div className="flex items-center justify-between">
@@ -491,7 +551,7 @@ const TutorialCard = ({ tutorial, progress, onStart }: TutorialCardProps) => {
         <div className="flex items-center justify-between text-sm mb-3">
           <div className="flex items-center">
             <Code className="mr-2 h-4 w-4 text-muted-foreground" />
-            <span className="text-muted-foreground capitalize">{tutorial.level}</span>
+            <span className="text-muted-foreground capitalize">{tutorial.category}</span>
           </div>
           <div className="flex items-center">
             <Clock className="mr-2 h-4 w-4 text-muted-foreground" />
