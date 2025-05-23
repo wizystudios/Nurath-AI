@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom';
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
 import Index from './pages/Index';
@@ -21,7 +21,7 @@ const App: React.FC = () => {
       <ThemeProvider defaultTheme="system" storageKey="nurath-ui-theme">
         <Toaster />
         <Routes>
-          <Route path="/" element={<Layout />}>
+          <Route element={<Layout><Outlet /></Layout>}>
             <Route index element={<Index />} />
             <Route path="auth" element={<Auth />} />
             <Route path="dashboard" element={<Dashboard />} />
