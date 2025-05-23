@@ -14,12 +14,14 @@ import {
   X,
   LogOut,
   Globe,
+  MessageCircle
 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import UserDropdown from "./UserDropdown";
+import LanguageSelector, { Language } from "./LanguageSelector";
 
 export function MainNav() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -30,6 +32,30 @@ export function MainNav() {
   const isMobile = useIsMobile();
   const [userName, setUserName] = useState<string>("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [currentLanguage, setCurrentLanguage] = useState<Language>("en");
+  
+  // Handle language change
+  const handleLanguageChange = (language: Language) => {
+    setCurrentLanguage(language);
+    localStorage.setItem("preferredLanguage", language);
+    
+    // Update user profile if authenticated
+    if (isAuthenticated) {
+      updateUserLanguagePreference(language);
+    }
+    
+    toast.success(`Language changed to ${language === "en" ? "English" : "Kiswahili"}`);
+  };
+  
+  const updateUserLanguagePreference = async (language: Language) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      await supabase
+        .from('profiles')
+        .update({ language_preference: language })
+        .eq('id', session.user.id);
+    }
+  };
   
   // Check authentication status
   useEffect(() => {
@@ -48,10 +74,22 @@ export function MainNav() {
         if (profileData) {
           setUserName(profileData.full_name || data.session.user.user_metadata?.full_name || data.session.user.email?.split('@')[0] || "User");
           setAvatarUrl(profileData.avatar_url);
+          
+          // Set language preference from profile
+          if (profileData.language_preference) {
+            setCurrentLanguage(profileData.language_preference as Language);
+          }
         } else {
           setUserName(data.session.user.user_metadata?.full_name || data.session.user.email?.split('@')[0] || "User");
         }
       }
+      
+      // Get language from localStorage if available
+      const savedLanguage = localStorage.getItem("preferredLanguage") as Language | null;
+      if (savedLanguage && (savedLanguage === "en" || savedLanguage === "sw")) {
+        setCurrentLanguage(savedLanguage);
+      }
+      
       setLoading(false);
     };
 
@@ -80,6 +118,11 @@ export function MainNav() {
     } catch (error) {
       toast.error("Error logging out");
     }
+  };
+
+  const handleChatClick = () => {
+    navigate("/code-editor");
+    toast.success("Opening chat with Nurath.AI...");
   };
 
   const navItems = [
@@ -135,14 +178,20 @@ export function MainNav() {
           </Button>
         ))}
         
+        <Button 
+          variant="ghost" 
+          className="bg-white/10 hover:bg-white/20 flex items-center gap-2"
+          onClick={handleChatClick}
+        >
+          <MessageCircle className="h-4 w-4" />
+          <span>Chat with AI</span>
+        </Button>
+        
         {/* Language Selector */}
-        <div className="flex items-center gap-1 text-sm text-white/80">
-          <Globe className="h-4 w-4" />
-          <select className="bg-white/10 border border-white/20 rounded text-white text-sm px-2 py-1 outline-none">
-            <option value="en" className="text-black">English</option>
-            <option value="sw" className="text-black">Kiswahili</option>
-          </select>
-        </div>
+        <LanguageSelector 
+          currentLanguage={currentLanguage} 
+          onLanguageChange={handleLanguageChange} 
+        />
         
         <ThemeToggle />
         {isAuthenticated && <UserDropdown userName={userName} avatarUrl={avatarUrl} />}
@@ -179,6 +228,18 @@ export function MainNav() {
               </div>
             )}
             
+            <Button 
+              variant="ghost" 
+              className="w-full justify-start text-lg"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                handleChatClick();
+              }}
+            >
+              <MessageCircle className="mr-2 h-5 w-5" />
+              Chat with Nurath.AI
+            </Button>
+            
             {navItems.map((item) => (
               <Button
                 key={item.href}
@@ -195,6 +256,14 @@ export function MainNav() {
             ))}
             
             <div className="flex justify-between mt-4 pt-4 border-t">
+              <LanguageSelector 
+                currentLanguage={currentLanguage} 
+                onLanguageChange={(lang) => {
+                  handleLanguageChange(lang);
+                  setMobileMenuOpen(false);
+                }} 
+              />
+              
               <ThemeToggle />
               {isAuthenticated ? (
                 <Button variant="destructive" onClick={handleLogout}>

@@ -1,11 +1,11 @@
 
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Star, Plus } from "lucide-react";
+import { Star, Plus, Upload } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 
 const TestimonialsSection = () => {
@@ -13,38 +13,25 @@ const TestimonialsSection = () => {
     name: '',
     role: '',
     text: '',
-    rating: 5
+    rating: 5,
+    image: ''
   });
 
-  const [testimonials, setTestimonials] = useState([
-    {
-      id: 1,
-      name: "Maria Johnson",
-      role: "Software Developer",
-      image: "https://randomuser.me/api/portraits/women/44.jpg",
-      text: "Nurath.AI completely transformed how I learn programming. The AI feedback is incredibly helpful!",
-      rating: 5,
-      verified: true
-    },
-    {
-      id: 2,
-      name: "Ahmed Hassan",
-      role: "CS Student",
-      image: "https://randomuser.me/api/portraits/men/32.jpg",
-      text: "I went from knowing nothing about coding to building my own web apps in just 3 months!",
-      rating: 5,
-      verified: true
-    },
-    {
-      id: 3,
-      name: "Grace Mwangi",
-      role: "Frontend Engineer",
-      image: "https://randomuser.me/api/portraits/women/68.jpg",
-      text: "The AI assistance is like having a personal tutor available 24/7. Absolutely incredible.",
-      rating: 5,
-      verified: true
-    }
-  ]);
+  const [testimonials, setTestimonials] = useState([]);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    // Create a preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string);
+      setNewTestimonial({...newTestimonial, image: reader.result as string});
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleSubmitTestimonial = (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,12 +44,12 @@ const TestimonialsSection = () => {
     const testimonial = {
       id: Date.now(),
       ...newTestimonial,
-      image: `https://randomuser.me/api/portraits/${Math.random() > 0.5 ? 'women' : 'men'}/${Math.floor(Math.random() * 100)}.jpg`,
       verified: false
     };
 
     setTestimonials([...testimonials, testimonial]);
-    setNewTestimonial({ name: '', role: '', text: '', rating: 5 });
+    setNewTestimonial({ name: '', role: '', text: '', rating: 5, image: '' });
+    setImagePreview(null);
     toast.success("Thank you for your feedback! It will be reviewed before publishing.");
   };
 
@@ -79,9 +66,9 @@ const TestimonialsSection = () => {
     <section className="py-20 bg-gray-50 dark:bg-gray-800">
       <div className="container mx-auto px-4">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">What Our Users Say</h2>
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">Share Your Experience</h2>
           <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto mb-6">
-            Join thousands of learners who have transformed their careers with Nurath.AI
+            Join the Nurath.AI community and share how AI has helped your coding journey
           </p>
           
           <Dialog>
@@ -112,6 +99,28 @@ const TestimonialsSection = () => {
                     required
                   />
                 </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-2">Profile Image</label>
+                  <div className="flex items-center gap-4">
+                    {imagePreview && (
+                      <div className="w-12 h-12 rounded-full overflow-hidden">
+                        <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                    <label className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-md cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700">
+                      <Upload className="h-4 w-4" />
+                      <span className="text-sm">Upload Photo</span>
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        className="hidden" 
+                        onChange={handleImageUpload}
+                      />
+                    </label>
+                  </div>
+                </div>
+                
                 <div>
                   <label className="block text-sm font-medium mb-2">Rating</label>
                   <div className="flex gap-1">
@@ -147,34 +156,41 @@ const TestimonialsSection = () => {
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {testimonials.map((testimonial) => (
-            <Card key={testimonial.id} className="border-none shadow-lg hover:shadow-xl transition-shadow bg-white dark:bg-gray-900">
-              <CardContent className="pt-6">
-                <div className="flex items-center mb-4">
-                  <img 
-                    src={testimonial.image} 
-                    alt={testimonial.name}
-                    className="w-12 h-12 rounded-full mr-4"
-                  />
-                  <div>
-                    <h4 className="font-bold flex items-center gap-2">
-                      {testimonial.name}
-                      {testimonial.verified && (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
-                          Verified
+          {testimonials.length > 0 ? (
+            testimonials.map((testimonial: any) => (
+              <Card key={testimonial.id} className="border-none shadow-lg hover:shadow-xl transition-shadow bg-white dark:bg-gray-900">
+                <CardContent className="pt-6">
+                  <div className="flex items-center mb-4">
+                    {testimonial.image ? (
+                      <img 
+                        src={testimonial.image} 
+                        alt={testimonial.name}
+                        className="w-12 h-12 rounded-full mr-4 object-cover"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center mr-4">
+                        <span className="text-white font-bold text-lg">
+                          {testimonial.name.charAt(0)}
                         </span>
-                      )}
-                    </h4>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">{testimonial.role}</p>
-                    <div className="flex mt-1">
-                      {renderStars(testimonial.rating)}
+                      </div>
+                    )}
+                    <div>
+                      <h4 className="font-bold">{testimonial.name}</h4>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">{testimonial.role}</p>
+                      <div className="flex mt-1">
+                        {renderStars(testimonial.rating)}
+                      </div>
                     </div>
                   </div>
-                </div>
-                <p className="text-gray-600 dark:text-gray-300 italic">"{testimonial.text}"</p>
-              </CardContent>
-            </Card>
-          ))}
+                  <p className="text-gray-600 dark:text-gray-300 italic">"{testimonial.text}"</p>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <div className="col-span-3 text-center py-8">
+              <p className="text-gray-500 dark:text-gray-400">Be the first to share your experience!</p>
+            </div>
+          )}
         </div>
       </div>
     </section>

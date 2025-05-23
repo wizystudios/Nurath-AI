@@ -15,6 +15,7 @@ export function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
   const [checking, setChecking] = useState(true);
   const isHomePage = location.pathname === "/";
+  const isAuthPage = location.pathname === "/auth";
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -41,7 +42,8 @@ export function Layout({ children }: LayoutProps) {
     );
   }
 
-  if (isHomePage) {
+  // Don't wrap with layout for home or auth pages
+  if (isHomePage || isAuthPage) {
     return <>{children}</>;
   }
 
@@ -49,7 +51,7 @@ export function Layout({ children }: LayoutProps) {
     <div className="flex min-h-screen flex-col bg-background">
       <header className="sticky top-0 z-50 border-b bg-gradient-to-r from-purple-600 to-indigo-800 text-white">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate("/")}>
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate("/dashboard")}>
             <Logo />
           </div>
           <MainNav />

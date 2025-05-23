@@ -1,5 +1,5 @@
 
-import TanzaniaFlag from "./TanzaniaFlag";
+import NKTechLogo from "./NKTechLogo";
 
 export function Footer() {
   return (
@@ -11,10 +11,7 @@ export function Footer() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <TanzaniaFlag />
-          <span className="text-sm text-muted-foreground">
-            by NK Technology (Tanzania)
-          </span>
+          <NKTechLogo size="sm" />
         </div>
       </div>
     </footer>
