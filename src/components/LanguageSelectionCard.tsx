@@ -3,7 +3,7 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { SkillLevel } from "@/pages/Index";
+import { type SkillLevel } from "@/types/skill";
 
 interface LanguageSelectionCardProps {
   title: string;
@@ -11,7 +11,7 @@ interface LanguageSelectionCardProps {
   icon: React.ReactNode;
   level: string;
   onSelect: () => void;
-  difficulty: "beginner" | "intermediate" | "advanced";
+  difficulty: SkillLevel;
 }
 
 const LanguageSelectionCard: React.FC<LanguageSelectionCardProps> = ({
