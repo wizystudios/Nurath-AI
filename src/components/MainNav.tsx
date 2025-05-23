@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
@@ -13,6 +13,7 @@ import {
   Menu,
   X,
   LogOut,
+  Globe,
 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,6 +26,7 @@ export function MainNav() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const location = useLocation();
+  const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [userName, setUserName] = useState<string>("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -73,6 +75,7 @@ export function MainNav() {
     try {
       await supabase.auth.signOut();
       toast.success("Logged out successfully");
+      navigate("/");
       setMobileMenuOpen(false);
     } catch (error) {
       toast.error("Error logging out");
@@ -131,6 +134,16 @@ export function MainNav() {
             </Link>
           </Button>
         ))}
+        
+        {/* Language Selector */}
+        <div className="flex items-center gap-1 text-sm text-white/80">
+          <Globe className="h-4 w-4" />
+          <select className="bg-white/10 border border-white/20 rounded text-white text-sm px-2 py-1 outline-none">
+            <option value="en" className="text-black">English</option>
+            <option value="sw" className="text-black">Kiswahili</option>
+          </select>
+        </div>
+        
         <ThemeToggle />
         {isAuthenticated && <UserDropdown userName={userName} avatarUrl={avatarUrl} />}
         {!isAuthenticated && (
