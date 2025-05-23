@@ -14,11 +14,12 @@ export function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const [checking, setChecking] = useState(true);
+  const isHomePage = location.pathname === "/";
 
   useEffect(() => {
     const checkAuth = async () => {
       const { data } = await supabase.auth.getSession();
-      if (!data.session && location.pathname !== "/auth") {
+      if (!data.session && !["", "/", "/auth"].includes(location.pathname)) {
         navigate("/auth");
       }
       setChecking(false);
@@ -38,6 +39,10 @@ export function Layout({ children }: LayoutProps) {
         </div>
       </div>
     );
+  }
+
+  if (isHomePage) {
+    return <>{children}</>;
   }
 
   return (
