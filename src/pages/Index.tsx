@@ -18,6 +18,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { type SkillLevel } from "@/types/skill";
+import TestimonialsSection from "@/components/TestimonialsSection";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -179,37 +180,7 @@ const Index = () => {
       </section>
 
       {/* Testimonials */}
-      <section className="py-20 bg-gray-50 dark:bg-gray-800">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">What Our Users Say</h2>
-            <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-              Join thousands of learners who have transformed their careers with Nurath.AI
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {testimonials.map((testimonial, index) => (
-              <Card key={index} className="border-none shadow-lg hover:shadow-xl transition-shadow">
-                <CardContent className="pt-6">
-                  <div className="flex items-center mb-4">
-                    <img 
-                      src={testimonial.image} 
-                      alt={testimonial.name}
-                      className="w-12 h-12 rounded-full mr-4"
-                    />
-                    <div>
-                      <h4 className="font-bold">{testimonial.name}</h4>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">{testimonial.role}</p>
-                    </div>
-                  </div>
-                  <p className="text-gray-600 dark:text-gray-300 italic">"{testimonial.text}"</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
+      <TestimonialsSection />
 
       {/* CTA Section */}
       <section className="py-20 bg-gradient-to-r from-indigo-600 to-purple-600 text-white">

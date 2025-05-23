@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -22,51 +22,64 @@ import UserDropdown from "./UserDropdown";
 
 export function MainNav() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
   const location = useLocation();
   const isMobile = useIsMobile();
   const [userName, setUserName] = useState<string>("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   
-  // Fetch user data on component mount
-  useState(() => {
-    const fetchUserData = async () => {
-      const { data: sessionData } = await supabase.auth.getSession();
+  // Check authentication status
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data } = await supabase.auth.getSession();
+      setIsAuthenticated(!!data.session);
       
-      if (sessionData.session?.user) {
+      if (data.session?.user) {
         // Fetch profile data from profiles table
         const { data: profileData } = await supabase
           .from('profiles')
           .select('*')
-          .eq('id', sessionData.session.user.id)
+          .eq('id', data.session.user.id)
           .single();
           
         if (profileData) {
-          setUserName(profileData.full_name || sessionData.session.user.user_metadata?.full_name || sessionData.session.user.email?.split('@')[0] || "User");
+          setUserName(profileData.full_name || data.session.user.user_metadata?.full_name || data.session.user.email?.split('@')[0] || "User");
           setAvatarUrl(profileData.avatar_url);
         } else {
-          setUserName(sessionData.session.user.user_metadata?.full_name || sessionData.session.user.email?.split('@')[0] || "User");
+          setUserName(data.session.user.user_metadata?.full_name || data.session.user.email?.split('@')[0] || "User");
         }
       }
+      setLoading(false);
     };
-    
-    fetchUserData();
-  });
+
+    checkAuth();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setIsAuthenticated(!!session);
+      if (session?.user) {
+        setUserName(session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || "User");
+      } else {
+        setUserName("");
+        setAvatarUrl(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
   
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
       toast.success("Logged out successfully");
+      setMobileMenuOpen(false);
     } catch (error) {
       toast.error("Error logging out");
     }
   };
 
   const navItems = [
-    {
-      title: "Home",
-      href: "/",
-      icon: Home,
-    },
     {
       title: "Dashboard",
       href: "/dashboard",
@@ -79,7 +92,7 @@ export function MainNav() {
     },
     {
       title: "Code Editor",
-      href: "/editor",
+      href: "/code-editor",
       icon: Code,
     },
     {
@@ -98,6 +111,10 @@ export function MainNav() {
     return location.pathname === path;
   };
 
+  if (loading) {
+    return <div className="w-6 h-6 animate-pulse bg-white/20 rounded"></div>;
+  }
+
   return (
     <>
       <div className="hidden md:flex items-center space-x-4">
@@ -106,7 +123,7 @@ export function MainNav() {
             key={item.href}
             variant={isActive(item.href) ? "default" : "ghost"}
             asChild
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 bg-white/10 hover:bg-white/20"
           >
             <Link to={item.href}>
               <item.icon className="h-4 w-4" />
@@ -115,7 +132,12 @@ export function MainNav() {
           </Button>
         ))}
         <ThemeToggle />
-        <UserDropdown userName={userName} avatarUrl={avatarUrl} />
+        {isAuthenticated && <UserDropdown userName={userName} avatarUrl={avatarUrl} />}
+        {!isAuthenticated && (
+          <Button asChild variant="outline" className="bg-white/10 hover:bg-white/20">
+            <Link to="/auth">Login</Link>
+          </Button>
+        )}
       </div>
 
       <div className="flex md:hidden">
@@ -124,6 +146,7 @@ export function MainNav() {
           size="icon"
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           aria-label="Toggle menu"
+          className="text-white hover:bg-white/10"
         >
           {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
         </Button>
@@ -132,14 +155,16 @@ export function MainNav() {
       {isMobile && mobileMenuOpen && (
         <div className="fixed inset-0 z-50 bg-background pt-16">
           <nav className="grid gap-2 p-4">
-            <div className="flex justify-center mb-8">
-              <Avatar className="h-20 w-20 border-2 border-primary">
-                <AvatarImage src={avatarUrl || undefined} alt={userName} />
-                <AvatarFallback className="text-2xl">
-                  {userName.split(' ').map(n => n[0]).join('').toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-            </div>
+            {isAuthenticated && (
+              <div className="flex justify-center mb-8">
+                <Avatar className="h-20 w-20 border-2 border-primary">
+                  <AvatarImage src={avatarUrl || undefined} alt={userName} />
+                  <AvatarFallback className="text-2xl">
+                    {userName.split(' ').map(n => n[0]).join('').toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              </div>
+            )}
             
             {navItems.map((item) => (
               <Button
@@ -155,12 +180,21 @@ export function MainNav() {
                 </Link>
               </Button>
             ))}
+            
             <div className="flex justify-between mt-4 pt-4 border-t">
               <ThemeToggle />
-              <Button variant="destructive" onClick={handleLogout}>
-                <LogOut className="mr-2 h-4 w-4" />
-                Logout
-              </Button>
+              {isAuthenticated ? (
+                <Button variant="destructive" onClick={handleLogout}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Logout
+                </Button>
+              ) : (
+                <Button asChild>
+                  <Link to="/auth" onClick={() => setMobileMenuOpen(false)}>
+                    Login
+                  </Link>
+                </Button>
+              )}
             </div>
           </nav>
         </div>

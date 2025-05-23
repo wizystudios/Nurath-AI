@@ -1,7 +1,6 @@
 
 import React, { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -11,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
+import { comprehensiveTutorials } from "@/data/tutorialContent";
 
 interface Tutorial {
   id: string;
@@ -45,13 +45,8 @@ const Tutorials = () => {
       try {
         setLoading(true);
         
-        // Fetch all tutorials
-        const { data: tutorialsData, error: tutorialsError } = await supabase
-          .from('tutorials')
-          .select('*')
-          .order('created_at', { ascending: true });
-          
-        if (tutorialsError) throw tutorialsError;
+        // Use comprehensive tutorial content instead of fetching from database
+        const tutorialsData = comprehensiveTutorials;
         
         setTutorials(tutorialsData);
         setFilteredTutorials(tutorialsData);
@@ -245,268 +240,233 @@ const Tutorials = () => {
       paths[tutorial.category].push(tutorial);
     });
     
-    return Object.entries(paths).filter(([category, tutorials]) => tutorials.length >= 2);
+    return Object.entries(paths).filter(([category, tutorials]) => tutorials.length >= 1);
   };
 
   return (
-    <Layout>
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Tutorials & Learning Resources</h1>
-            <p className="text-muted-foreground mt-2">
-              Expand your knowledge with our curated learning materials
-            </p>
-          </div>
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Comprehensive Programming Tutorials</h1>
+          <p className="text-muted-foreground mt-2">
+            Master programming with our in-depth, structured learning materials
+          </p>
         </div>
-        
-        {selectedTutorial ? (
-          // Tutorial detail view
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Button 
-                variant="outline"
-                onClick={closeSelectedTutorial}
-              >
-                <ArrowRight className="mr-2 h-4 w-4 rotate-180" />
-                Back to Tutorials
-              </Button>
-              
-              {userProgress[selectedTutorial.id] && (
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">
-                    Progress: {userProgress[selectedTutorial.id].progress}%
-                  </span>
-                  <Progress 
-                    value={userProgress[selectedTutorial.id].progress} 
-                    className="w-32 h-2"
-                  />
-                </div>
-              )}
-            </div>
+      </div>
+      
+      {selectedTutorial ? (
+        // Tutorial detail view with enhanced content
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <Button 
+              variant="outline"
+              onClick={closeSelectedTutorial}
+            >
+              <ArrowRight className="mr-2 h-4 w-4 rotate-180" />
+              Back to Tutorials
+            </Button>
             
-            <Card className="mb-8">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-2xl">{selectedTutorial.title}</CardTitle>
-                    <div className="flex items-center gap-2 mt-2">
-                      <Badge variant="outline">{selectedTutorial.level}</Badge>
-                      <Badge variant="outline">{selectedTutorial.category}</Badge>
-                      <div className="flex items-center text-muted-foreground">
-                        <Clock className="h-3 w-3 mr-1" />
-                        <span className="text-xs">{selectedTutorial.duration}</span>
-                      </div>
+            {userProgress[selectedTutorial.id] && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">
+                  Progress: {userProgress[selectedTutorial.id].progress}%
+                </span>
+                <Progress 
+                  value={userProgress[selectedTutorial.id].progress} 
+                  className="w-32 h-2"
+                />
+              </div>
+            )}
+          </div>
+          
+          <Card className="mb-8">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-2xl">{selectedTutorial.title}</CardTitle>
+                  <div className="flex items-center gap-2 mt-2">
+                    <Badge variant="outline" className="capitalize">{selectedTutorial.level}</Badge>
+                    <Badge variant="outline" className="capitalize">{selectedTutorial.category}</Badge>
+                    <div className="flex items-center text-muted-foreground">
+                      <Clock className="h-3 w-3 mr-1" />
+                      <span className="text-xs">{selectedTutorial.duration}</span>
                     </div>
                   </div>
                 </div>
-                <CardDescription className="text-base mt-2">
-                  {selectedTutorial.description}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="prose dark:prose-invert max-w-full">
-                <div className="p-4 border rounded-md">
-                  {/* Tutorial content would be rendered here with proper formatting */}
-                  {selectedTutorial.content.split("\n").map((paragraph, i) => (
-                    <p key={i}>{paragraph}</p>
-                  ))}
-                </div>
-              </CardContent>
-              <CardFooter className="flex items-center justify-between">
-                <div>
-                  {!userProgress[selectedTutorial.id]?.completed ? (
-                    <div className="flex gap-2">
-                      <Button 
-                        onClick={() => updateProgress(selectedTutorial.id, Math.min((userProgress[selectedTutorial.id]?.progress || 0) + 25, 100))}
-                      >
-                        Mark Progress
-                      </Button>
-                      <Button 
-                        variant="outline"
-                        onClick={() => updateProgress(selectedTutorial.id, 100)}
-                      >
-                        Mark as Complete
-                      </Button>
-                    </div>
-                  ) : (
-                    <Badge variant="default" className="bg-green-500">Completed</Badge>
-                  )}
-                </div>
-              </CardFooter>
-            </Card>
-            
-            <Card>
-              <CardHeader>
-                <CardTitle>Related Tutorials</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {tutorials
-                    .filter(t => 
-                      t.id !== selectedTutorial.id && 
-                      (t.category === selectedTutorial.category || 
-                       t.level === selectedTutorial.level)
-                    )
-                    .slice(0, 2)
-                    .map(tutorial => (
-                      <Card key={tutorial.id} className="overflow-hidden">
-                        <div className="p-4 flex gap-4">
-                          <div className="bg-muted rounded-md p-3 h-fit">
-                            <BookOpen className="h-6 w-6 text-muted-foreground" />
-                          </div>
-                          <div>
-                            <h3 className="text-sm font-medium">{tutorial.title}</h3>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {tutorial.description.substring(0, 80)}...
-                            </p>
-                            <div className="mt-2">
-                              <Button 
-                                variant="link" 
-                                className="p-0 h-auto" 
-                                onClick={() => startTutorial(tutorial)}
-                              >
-                                View Tutorial
-                                <ArrowRight className="ml-1 h-3 w-3" />
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      </Card>
-                    ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        ) : (
-          // Tutorial list view
-          <>
-            <div className="mb-6">
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search tutorials..."
-                  className="pl-10"
-                  value={searchQuery}
-                  onChange={handleSearch}
+              </div>
+              <CardDescription className="text-base mt-2">
+                {selectedTutorial.description}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="prose dark:prose-invert max-w-full">
+              <div className="p-6 border rounded-md bg-gray-50 dark:bg-gray-900">
+                <div 
+                  className="tutorial-content"
+                  dangerouslySetInnerHTML={{ 
+                    __html: selectedTutorial.content
+                      .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre class="bg-gray-800 text-green-400 p-4 rounded-md overflow-x-auto"><code>$2</code></pre>')
+                      .replace(/`([^`]+)`/g, '<code class="bg-gray-200 dark:bg-gray-700 px-1 py-0.5 rounded text-sm">$1</code>')
+                      .replace(/\n/g, '<br>')
+                      .replace(/#{6}\s(.+)/g, '<h6 class="text-sm font-semibold mt-4 mb-2">$1</h6>')
+                      .replace(/#{5}\s(.+)/g, '<h5 class="text-base font-semibold mt-4 mb-2">$1</h5>')
+                      .replace(/#{4}\s(.+)/g, '<h4 class="text-lg font-semibold mt-4 mb-2">$1</h4>')
+                      .replace(/#{3}\s(.+)/g, '<h3 class="text-xl font-semibold mt-6 mb-3">$1</h3>')
+                      .replace(/#{2}\s(.+)/g, '<h2 class="text-2xl font-bold mt-8 mb-4">$1</h2>')
+                      .replace(/#{1}\s(.+)/g, '<h1 class="text-3xl font-bold mt-8 mb-6">$1</h1>')
+                  }}
                 />
               </div>
+            </CardContent>
+            <CardFooter className="flex items-center justify-between">
+              <div>
+                {!userProgress[selectedTutorial.id]?.completed ? (
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={() => updateProgress(selectedTutorial.id, Math.min((userProgress[selectedTutorial.id]?.progress || 0) + 25, 100))}
+                    >
+                      Mark Progress (+25%)
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      onClick={() => updateProgress(selectedTutorial.id, 100)}
+                    >
+                      Mark as Complete
+                    </Button>
+                  </div>
+                ) : (
+                  <Badge variant="default" className="bg-green-500">
+                    <Trophy className="h-3 w-3 mr-1" />
+                    Completed
+                  </Badge>
+                )}
+              </div>
+            </CardFooter>
+          </Card>
+        </div>
+      ) : (
+        // Tutorial list view
+        <>
+          <div className="mb-6">
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search comprehensive tutorials..."
+                className="pl-10"
+                value={searchQuery}
+                onChange={handleSearch}
+              />
             </div>
+          </div>
+          
+          <Tabs defaultValue="all" className="mb-8">
+            <TabsList className="w-full max-w-md mb-4">
+              <TabsTrigger value="all" onClick={() => handleLevelFilter("all")}>All</TabsTrigger>
+              <TabsTrigger value="beginner" onClick={() => handleLevelFilter("beginner")}>Beginner</TabsTrigger>
+              <TabsTrigger value="intermediate" onClick={() => handleLevelFilter("intermediate")}>Intermediate</TabsTrigger>
+              <TabsTrigger value="advanced" onClick={() => handleLevelFilter("advanced")}>Advanced</TabsTrigger>
+            </TabsList>
             
-            <Tabs defaultValue="all" className="mb-8">
-              <TabsList className="w-full max-w-md mb-4">
-                <TabsTrigger value="all" onClick={() => handleLevelFilter("all")}>All</TabsTrigger>
-                <TabsTrigger value="beginner" onClick={() => handleLevelFilter("beginner")}>Beginner</TabsTrigger>
-                <TabsTrigger value="intermediate" onClick={() => handleLevelFilter("intermediate")}>Intermediate</TabsTrigger>
-                <TabsTrigger value="advanced" onClick={() => handleLevelFilter("advanced")}>Advanced</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="all">
-                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                  {loading ? (
-                    // Loading state
-                    Array(3).fill(0).map((_, index) => (
-                      <Card key={index} className="overflow-hidden animate-pulse">
-                        <div className="bg-muted h-40"></div>
-                        <CardHeader>
-                          <div className="h-6 bg-muted rounded w-3/4"></div>
-                          <div className="h-4 bg-muted rounded w-full mt-2"></div>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="flex items-center justify-between">
-                            <div className="h-4 bg-muted rounded w-1/3"></div>
-                            <div className="h-4 bg-muted rounded w-1/4"></div>
-                          </div>
-                        </CardContent>
-                        <CardFooter>
-                          <div className="h-10 bg-muted rounded w-full"></div>
-                        </CardFooter>
-                      </Card>
-                    ))
-                  ) : filteredTutorials.length > 0 ? (
-                    filteredTutorials.map((tutorial) => (
+            <TabsContent value="all">
+              <div className="grid gap-6 sm:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
+                {loading ? (
+                  // Loading state
+                  Array(3).fill(0).map((_, index) => (
+                    <Card key={index} className="overflow-hidden animate-pulse">
+                      <div className="bg-muted h-40"></div>
+                      <CardHeader>
+                        <div className="h-6 bg-muted rounded w-3/4"></div>
+                        <div className="h-4 bg-muted rounded w-full mt-2"></div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex items-center justify-between">
+                          <div className="h-4 bg-muted rounded w-1/3"></div>
+                          <div className="h-4 bg-muted rounded w-1/4"></div>
+                        </div>
+                      </CardContent>
+                      <CardFooter>
+                        <div className="h-10 bg-muted rounded w-full"></div>
+                      </CardFooter>
+                    </Card>
+                  ))
+                ) : filteredTutorials.length > 0 ? (
+                  filteredTutorials.map((tutorial) => (
+                    <TutorialCard 
+                      key={tutorial.id} 
+                      tutorial={tutorial} 
+                      progress={userProgress[tutorial.id]}
+                      onStart={() => startTutorial(tutorial)}
+                    />
+                  ))
+                ) : (
+                  <div className="col-span-full text-center p-8">
+                    <p className="text-muted-foreground">No tutorials matching your search criteria</p>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+            
+            {["beginner", "intermediate", "advanced"].map((level) => (
+              <TabsContent key={level} value={level}>
+                <div className="grid gap-6 sm:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
+                  {filteredTutorials
+                    .filter(tutorial => tutorial.level === level)
+                    .map((tutorial) => (
                       <TutorialCard 
                         key={tutorial.id} 
                         tutorial={tutorial} 
                         progress={userProgress[tutorial.id]}
                         onStart={() => startTutorial(tutorial)}
                       />
-                    ))
-                  ) : (
-                    <div className="col-span-full text-center p-8">
-                      <p className="text-muted-foreground">No tutorials matching your search criteria</p>
-                    </div>
-                  )}
+                    ))}
                 </div>
               </TabsContent>
-              
-              {["beginner", "intermediate", "advanced"].map((level) => (
-                <TabsContent key={level} value={level}>
-                  <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                    {filteredTutorials
-                      .filter(tutorial => tutorial.level === level)
-                      .map((tutorial) => (
-                        <TutorialCard 
-                          key={tutorial.id} 
-                          tutorial={tutorial} 
-                          progress={userProgress[tutorial.id]}
-                          onStart={() => startTutorial(tutorial)}
-                        />
-                      ))}
-                  </div>
-                </TabsContent>
-              ))}
-            </Tabs>
+            ))}
+          </Tabs>
 
-            <Card className="mb-8">
-              <CardHeader>
-                <CardTitle>Popular Learning Paths</CardTitle>
-                <CardDescription>
-                  Structured courses to help you achieve your goals
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 md:grid-cols-2">
-                  {getLearningPaths().map(([category, tutorials]) => (
-                    <Card key={category}>
-                      <CardHeader className="pb-2">
-                        <div className="flex items-center justify-between">
-                          <CardTitle className="capitalize">{category}</CardTitle>
-                          <Tag className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-muted-foreground mb-2">
-                          {tutorials.length} tutorials in this path
-                        </p>
-                        <ul className="space-y-1 text-sm">
-                          {tutorials.slice(0, 3).map(tutorial => (
-                            <li key={tutorial.id} className="flex items-center gap-2">
-                              <div className="w-1 h-1 rounded-full bg-primary"></div>
-                              {tutorial.title}
-                            </li>
-                          ))}
-                          {tutorials.length > 3 && (
-                            <li className="text-xs text-muted-foreground">
-                              + {tutorials.length - 3} more
-                            </li>
-                          )}
-                        </ul>
-                      </CardContent>
-                      <CardFooter>
-                        <Button variant="outline" size="sm">
-                          Explore Path
-                          <ArrowRight className="ml-2 h-4 w-4" />
-                        </Button>
-                      </CardFooter>
-                    </Card>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </>
-        )}
-      </div>
-    </Layout>
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle>Programming Learning Paths</CardTitle>
+              <CardDescription>
+                Structured courses to master programming languages
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {getLearningPaths().map(([category, tutorials]) => (
+                  <Card key={category}>
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="capitalize text-lg">{category}</CardTitle>
+                        <Tag className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        {tutorials.length} comprehensive tutorial{tutorials.length > 1 ? 's' : ''}
+                      </p>
+                      <ul className="space-y-1 text-sm">
+                        {tutorials.slice(0, 3).map(tutorial => (
+                          <li key={tutorial.id} className="flex items-center gap-2">
+                            <div className="w-1 h-1 rounded-full bg-primary"></div>
+                            {tutorial.title}
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                    <CardFooter>
+                      <Button variant="outline" size="sm" className="w-full">
+                        Start Learning Path
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
+    </div>
   );
 };
 
@@ -518,9 +478,9 @@ interface TutorialCardProps {
 
 const TutorialCard = ({ tutorial, progress, onStart }: TutorialCardProps) => {
   return (
-    <Card className="overflow-hidden h-full flex flex-col">
-      <div className="bg-muted h-40 flex items-center justify-center">
-        <BookOpen className="h-16 w-16 text-muted-foreground/50" />
+    <Card className="overflow-hidden h-full flex flex-col hover:shadow-lg transition-shadow">
+      <div className="bg-gradient-to-br from-purple-500 to-indigo-600 h-32 flex items-center justify-center">
+        <BookOpen className="h-12 w-12 text-white" />
       </div>
       <CardHeader className="pb-2 flex-1">
         <div className="flex items-center justify-between">
@@ -529,7 +489,7 @@ const TutorialCard = ({ tutorial, progress, onStart }: TutorialCardProps) => {
         <CardDescription className="line-clamp-2">{tutorial.description}</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="flex items-center justify-between text-sm">
+        <div className="flex items-center justify-between text-sm mb-3">
           <div className="flex items-center">
             <Code className="mr-2 h-4 w-4 text-muted-foreground" />
             <span className="text-muted-foreground capitalize">{tutorial.level}</span>
@@ -541,7 +501,7 @@ const TutorialCard = ({ tutorial, progress, onStart }: TutorialCardProps) => {
         </div>
         
         {progress && (
-          <div className="mt-3 space-y-1">
+          <div className="space-y-1">
             <div className="flex items-center justify-between text-xs">
               <span>{progress.completed ? "Completed" : `${progress.progress}% complete`}</span>
               <span>{progress.progress}/100</span>
