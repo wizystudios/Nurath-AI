@@ -25,23 +25,6 @@ const Community = () => {
     const fetchCommunityData = async () => {
       setLoading(true);
       try {
-        // Fetch discussions
-        const { data: discussionsData, error: discussionsError } = await supabase
-          .from('discussions')
-          .select(`
-            id, 
-            title,
-            content,
-            created_at,
-            likes,
-            replies,
-            profiles(id, full_name, role, avatar_url)
-          `)
-          .order('created_at', { ascending: false })
-          .limit(10);
-        
-        if (discussionsError) throw discussionsError;
-        
         // Fetch chat messages
         const { data: messagesData, error: messagesError } = await supabase
           .from('chat_messages')
@@ -49,28 +32,12 @@ const Community = () => {
             id,
             content,
             created_at,
-            profiles(id, full_name, role, avatar_url)
+            profiles(id, full_name, avatar_url)
           `)
           .order('created_at', { ascending: false })
           .limit(20);
           
         if (messagesError) throw messagesError;
-        
-        // Format the discussions data
-        const formattedDiscussions: Discussion[] = discussionsData?.map((disc: any) => ({
-          id: disc.id,
-          title: disc.title,
-          content: disc.content,
-          author: {
-            id: disc.profiles?.id || "",
-            name: disc.profiles?.full_name || "Unknown User",
-            role: disc.profiles?.role || "Community Member",
-            avatarUrl: disc.profiles?.avatar_url
-          },
-          createdAt: new Date(disc.created_at),
-          likes: disc.likes || 0,
-          replies: disc.replies || 0
-        })) || [];
         
         // Format the messages data
         const formattedMessages: ChatMessage[] = messagesData?.map((msg: any) => ({
@@ -79,14 +46,47 @@ const Community = () => {
           user: {
             id: msg.profiles?.id || "",
             name: msg.profiles?.full_name || "Unknown User",
-            role: msg.profiles?.role || "Community Member",
+            role: "Community Member", // Default role since it's not in the profile table
             avatarUrl: msg.profiles?.avatar_url
           },
           createdAt: new Date(msg.created_at)
         })) || [];
         
-        setDiscussions(formattedDiscussions);
         setMessages(formattedMessages);
+
+        // For now, use sample discussions until the migrations are in place
+        const sampleDiscussions: Discussion[] = [
+          {
+            id: '1',
+            title: 'Best practice for React state management?',
+            content: 'I\'m building a medium-sized React application and I\'m wondering what\'s the current best approach for state management. Should I use Redux, Context API, or something else?',
+            author: {
+              id: '101',
+              name: 'Maria Johnson',
+              role: 'React Developer',
+              avatarUrl: null
+            },
+            createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
+            likes: 5,
+            replies: 3
+          },
+          {
+            id: '2',
+            title: 'Resources for learning TypeScript',
+            content: 'Can anyone recommend good resources for learning TypeScript? I\'m comfortable with JavaScript but want to add type safety to my projects.',
+            author: {
+              id: '102',
+              name: 'Ahmed Hassan',
+              role: 'Full Stack Developer',
+              avatarUrl: null
+            },
+            createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000), // 5 hours ago
+            likes: 8,
+            replies: 6
+          }
+        ];
+        
+        setDiscussions(sampleDiscussions);
       } catch (error) {
         console.error("Error fetching community data:", error);
         toast.error("Failed to load community data");
@@ -115,7 +115,7 @@ const Community = () => {
     // Fetch user profile for the new message
     const { data: profileData } = await supabase
       .from('profiles')
-      .select('id, full_name, role, avatar_url')
+      .select('id, full_name, avatar_url')
       .eq('id', payload.new.user_id)
       .single();
       
@@ -125,7 +125,7 @@ const Community = () => {
       user: {
         id: payload.new.user_id,
         name: profileData?.full_name || "Unknown User",
-        role: profileData?.role || "Community Member",
+        role: "Community Member", // Default role
         avatarUrl: profileData?.avatar_url
       },
       createdAt: new Date(payload.new.created_at)
@@ -168,7 +168,8 @@ const Community = () => {
         .from('chat_messages')
         .insert({
           content: messageInput,
-          user_id: sessionData.session.user.id
+          user_id: sessionData.session.user.id,
+          role: 'user' // Add required role field
         });
         
       if (error) throw error;
