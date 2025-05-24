@@ -3,8 +3,9 @@ import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { Send, MessageCircle, Bot, User } from "lucide-react";
-import { toast } from "@/components/ui/sonner";
+import { Send, Bot, User } from "lucide-react";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Message {
   id: string;
@@ -35,7 +36,7 @@ const ChatInterface = () => {
   }, [messages]);
 
   const handleSendMessage = async () => {
-    if (!inputText.trim()) return;
+    if (!inputText.trim() || isLoading) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -45,20 +46,62 @@ const ChatInterface = () => {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const currentInput = inputText;
     setInputText("");
     setIsLoading(true);
 
-    // Simulate AI response (replace with actual AI integration later)
-    setTimeout(() => {
+    try {
+      console.log('Sending message to AI:', currentInput);
+
+      // Prepare conversation history for context
+      const conversationHistory = messages.map(msg => ({
+        role: msg.isBot ? 'assistant' : 'user',
+        content: msg.text
+      }));
+
+      const { data, error } = await supabase.functions.invoke('ai-chat', {
+        body: {
+          message: currentInput,
+          conversationHistory: conversationHistory
+        }
+      });
+
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw new Error(error.message || 'Failed to get AI response');
+      }
+
+      if (!data.success) {
+        throw new Error(data.error || 'AI service returned an error');
+      }
+
+      console.log('AI response received:', data.response);
+
       const botResponse: Message = {
         id: (Date.now() + 1).toString(),
-        text: `I understand you're asking about: "${inputText}". I'm here to help you learn coding! Let me break this down for you step by step...`,
+        text: data.response,
         isBot: true,
         timestamp: new Date()
       };
+
       setMessages(prev => [...prev, botResponse]);
+      
+    } catch (error) {
+      console.error('Error getting AI response:', error);
+      
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        text: "I'm sorry, I'm having trouble responding right now. Please try again in a moment. If the problem persists, please check that the OpenAI API key is properly configured.",
+        isBot: true,
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => [...prev, errorMessage]);
+      
+      toast.error("Failed to get AI response. Please try again.");
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -110,7 +153,7 @@ const ChatInterface = () => {
                       : 'bg-purple-600 text-white'
                   }`}
                 >
-                  <p className="text-sm">{message.text}</p>
+                  <p className="text-sm whitespace-pre-wrap">{message.text}</p>
                   <span className="text-xs opacity-70 mt-1 block">
                     {message.timestamp.toLocaleTimeString()}
                   </span>
@@ -157,6 +200,9 @@ const ChatInterface = () => {
               <Send className="h-4 w-4" />
             </Button>
           </div>
+          <p className="text-xs text-muted-foreground mt-2 text-center">
+            Press Enter to send, Shift+Enter for new line
+          </p>
         </div>
       </Card>
     </div>
