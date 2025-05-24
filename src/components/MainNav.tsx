@@ -122,6 +122,7 @@ export function MainNav() {
 
   const handleChatClick = () => {
     navigate("/code-editor");
+    setMobileMenuOpen(false);
     toast.success("Opening chat with Nurath.AI...");
   };
 
@@ -231,10 +232,7 @@ export function MainNav() {
             <Button 
               variant="ghost" 
               className="w-full justify-start text-lg"
-              onClick={() => {
-                setMobileMenuOpen(false);
-                handleChatClick();
-              }}
+              onClick={handleChatClick}
             >
               <MessageCircle className="mr-2 h-5 w-5" />
               Chat with Nurath.AI

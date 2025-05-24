@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,6 +36,7 @@ const Tutorials = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTutorial, setSelectedTutorial] = useState<Tutorial | null>(null);
+  const [selectedLanguage, setSelectedLanguage] = useState<string>("all");
   
   // Get the tutorial ID from the URL if provided
   const tutorialId = searchParams.get('id');
@@ -101,39 +103,35 @@ const Tutorials = () => {
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
     setSearchQuery(query);
-    
-    if (!query.trim()) {
-      setFilteredTutorials(tutorials);
-      return;
-    }
-    
-    const filtered = tutorials.filter(tutorial => {
-      const lowerQuery = query.toLowerCase();
-      return (
-        tutorial.title.toLowerCase().includes(lowerQuery) ||
-        tutorial.description.toLowerCase().includes(lowerQuery) ||
-        tutorial.category.toLowerCase().includes(lowerQuery) ||
-        tutorial.level.toLowerCase().includes(lowerQuery)
-      );
-    });
-    
-    setFilteredTutorials(filtered);
+    filterTutorials(query, selectedLanguage);
   };
   
-  const handleLevelFilter = (level: string) => {
-    if (level === "all") {
-      setFilteredTutorials(tutorials);
-      return;
+  const handleLanguageFilter = (language: string) => {
+    setSelectedLanguage(language);
+    filterTutorials(searchQuery, language);
+  };
+  
+  const filterTutorials = (query: string, language: string) => {
+    let filtered = tutorials;
+    
+    // Filter by language/category
+    if (language !== "all") {
+      filtered = filtered.filter(tutorial => tutorial.category.toLowerCase() === language.toLowerCase());
     }
     
-    // Map non-developer to beginner for filtering
-    const mappedLevel = level === 'non-developer' ? 'beginner' : level;
-    const filtered = tutorials.filter(tutorial => 
-      tutorial.level === level || 
-      (level === 'beginner' && comprehensiveTutorials.some(t => 
-        t.id === tutorial.id && t.level === 'non-developer'
-      ))
-    );
+    // Filter by search query
+    if (query.trim()) {
+      const lowerQuery = query.toLowerCase();
+      filtered = filtered.filter(tutorial => {
+        return (
+          tutorial.title.toLowerCase().includes(lowerQuery) ||
+          tutorial.description.toLowerCase().includes(lowerQuery) ||
+          tutorial.category.toLowerCase().includes(lowerQuery) ||
+          tutorial.level.toLowerCase().includes(lowerQuery)
+        );
+      });
+    }
+    
     setFilteredTutorials(filtered);
   };
   
@@ -238,51 +236,39 @@ const Tutorials = () => {
     setSearchParams({});
   };
   
-  // Group tutorials by category for learning paths
-  const getLearningPaths = () => {
-    const paths: Record<string, Tutorial[]> = {};
+  // Group tutorials by programming language
+  const getTutorialsByLanguage = () => {
+    const languages = ["javascript", "python", "java", "html/css", "react"];
+    const languageGroups: Record<string, Tutorial[]> = {};
     
-    tutorials.forEach(tutorial => {
-      if (!paths[tutorial.category]) {
-        paths[tutorial.category] = [];
-      }
-      paths[tutorial.category].push(tutorial);
+    languages.forEach(lang => {
+      languageGroups[lang] = tutorials.filter(tutorial => 
+        tutorial.category.toLowerCase() === lang.toLowerCase()
+      );
     });
     
-    return Object.entries(paths).filter(([category, tutorials]) => tutorials.length >= 1);
+    return languageGroups;
+  };
+  
+  const startLearningPath = (language: string) => {
+    setSelectedLanguage(language);
+    handleLanguageFilter(language);
+    toast.success(`Starting ${language.toUpperCase()} learning path!`);
   };
 
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Complete Programming Curriculum</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Programming Tutorials</h1>
           <p className="text-muted-foreground mt-2">
-            Master programming step-by-step: Non-Developer → Beginner → Intermediate → Pro
+            Learn programming languages step-by-step with AI guidance
           </p>
-          <div className="flex items-center gap-2 mt-2">
-            <div className="flex items-center gap-1 text-sm">
-              <div className="w-3 h-3 rounded-full bg-green-500"></div>
-              <span>Non-Developer</span>
-            </div>
-            <div className="flex items-center gap-1 text-sm">
-              <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-              <span>Beginner</span>
-            </div>
-            <div className="flex items-center gap-1 text-sm">
-              <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-              <span>Intermediate</span>
-            </div>
-            <div className="flex items-center gap-1 text-sm">
-              <div className="w-3 h-3 rounded-full bg-red-500"></div>
-              <span>Advanced</span>
-            </div>
-          </div>
         </div>
       </div>
       
       {selectedTutorial ? (
-        // Tutorial detail view with enhanced content
+        // Tutorial detail view
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <Button 
@@ -312,20 +298,7 @@ const Tutorials = () => {
                 <div>
                   <CardTitle className="text-2xl">{selectedTutorial.title}</CardTitle>
                   <div className="flex items-center gap-2 mt-2">
-                    <Badge 
-                      variant="outline" 
-                      className={`capitalize ${
-                        comprehensiveTutorials.find(t => t.id === selectedTutorial.id)?.level === 'non-developer' 
-                          ? 'bg-green-100 text-green-800 border-green-300' 
-                          : selectedTutorial.level === 'beginner' 
-                            ? 'bg-blue-100 text-blue-800 border-blue-300'
-                            : selectedTutorial.level === 'intermediate'
-                              ? 'bg-orange-100 text-orange-800 border-orange-300'
-                              : 'bg-red-100 text-red-800 border-red-300'
-                      }`}
-                    >
-                      {comprehensiveTutorials.find(t => t.id === selectedTutorial.id)?.level || selectedTutorial.level}
-                    </Badge>
+                    <Badge variant="outline" className="capitalize">{selectedTutorial.level}</Badge>
                     <Badge variant="outline" className="capitalize">{selectedTutorial.category}</Badge>
                     <div className="flex items-center text-muted-foreground">
                       <Clock className="h-3 w-3 mr-1" />
@@ -384,13 +357,13 @@ const Tutorials = () => {
           </Card>
         </div>
       ) : (
-        // Tutorial list view
+        // Tutorial list view organized by programming language
         <>
           <div className="mb-6">
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search comprehensive tutorials..."
+                placeholder="Search tutorials..."
                 className="pl-10"
                 value={searchQuery}
                 onChange={handleSearch}
@@ -398,20 +371,76 @@ const Tutorials = () => {
             </div>
           </div>
           
-          <Tabs defaultValue="all" className="mb-8">
-            <TabsList className="w-full max-w-lg mb-4">
-              <TabsTrigger value="all" onClick={() => handleLevelFilter("all")}>All Levels</TabsTrigger>
-              <TabsTrigger value="non-developer" onClick={() => handleLevelFilter("non-developer")}>Non-Developer</TabsTrigger>
-              <TabsTrigger value="beginner" onClick={() => handleLevelFilter("beginner")}>Beginner</TabsTrigger>
-              <TabsTrigger value="intermediate" onClick={() => handleLevelFilter("intermediate")}>Intermediate</TabsTrigger>
-              <TabsTrigger value="advanced" onClick={() => handleLevelFilter("advanced")}>Advanced</TabsTrigger>
+          <Tabs value={selectedLanguage} onValueChange={handleLanguageFilter} className="mb-8">
+            <TabsList className="w-full max-w-2xl mb-4">
+              <TabsTrigger value="all">All Languages</TabsTrigger>
+              <TabsTrigger value="javascript">JavaScript</TabsTrigger>
+              <TabsTrigger value="python">Python</TabsTrigger>
+              <TabsTrigger value="java">Java</TabsTrigger>
+              <TabsTrigger value="html/css">HTML/CSS</TabsTrigger>
+              <TabsTrigger value="react">React</TabsTrigger>
             </TabsList>
             
             <TabsContent value="all">
+              {/* Learning Paths Section */}
+              <Card className="mb-8">
+                <CardHeader>
+                  <CardTitle>Programming Learning Paths</CardTitle>
+                  <CardDescription>
+                    Choose a programming language to start your learning journey
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {Object.entries(getTutorialsByLanguage()).map(([language, tutorials]) => (
+                      tutorials.length > 0 && (
+                        <Card key={language} className="hover:shadow-lg transition-shadow">
+                          <CardHeader className="pb-2">
+                            <div className="flex items-center justify-between">
+                              <CardTitle className="capitalize text-lg">{language}</CardTitle>
+                              <Code className="h-5 w-5 text-primary" />
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <p className="text-sm text-muted-foreground mb-2">
+                              {tutorials.length} tutorial{tutorials.length > 1 ? 's' : ''} available
+                            </p>
+                            <ul className="space-y-1 text-sm">
+                              {tutorials.slice(0, 3).map(tutorial => (
+                                <li key={tutorial.id} className="flex items-center gap-2">
+                                  <div className="w-1 h-1 rounded-full bg-primary"></div>
+                                  {tutorial.title}
+                                </li>
+                              ))}
+                              {tutorials.length > 3 && (
+                                <li className="text-muted-foreground">
+                                  +{tutorials.length - 3} more...
+                                </li>
+                              )}
+                            </ul>
+                          </CardContent>
+                          <CardFooter>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="w-full"
+                              onClick={() => startLearningPath(language)}
+                            >
+                              Start Learning Path
+                              <ArrowRight className="ml-2 h-4 w-4" />
+                            </Button>
+                          </CardFooter>
+                        </Card>
+                      )
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* All Tutorials Grid */}
               <div className="grid gap-6 sm:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
                 {loading ? (
-                  // Loading state
-                  Array(3).fill(0).map((_, index) => (
+                  Array(6).fill(0).map((_, index) => (
                     <Card key={index} className="overflow-hidden animate-pulse">
                       <div className="bg-muted h-40"></div>
                       <CardHeader>
@@ -440,14 +469,21 @@ const Tutorials = () => {
                   ))
                 ) : (
                   <div className="col-span-full text-center p-8">
-                    <p className="text-muted-foreground">No tutorials matching your search criteria</p>
+                    <p className="text-muted-foreground">No tutorials found matching your criteria</p>
                   </div>
                 )}
               </div>
             </TabsContent>
             
-            {["non-developer", "beginner", "intermediate", "advanced"].map((level) => (
-              <TabsContent key={level} value={level}>
+            {/* Individual language tabs */}
+            {["javascript", "python", "java", "html/css", "react"].map((language) => (
+              <TabsContent key={language} value={language}>
+                <div className="mb-4">
+                  <h2 className="text-2xl font-bold capitalize mb-2">{language} Tutorials</h2>
+                  <p className="text-muted-foreground">
+                    Master {language} programming with step-by-step tutorials
+                  </p>
+                </div>
                 <div className="grid gap-6 sm:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
                   {filteredTutorials.map((tutorial) => (
                     <TutorialCard 
@@ -461,48 +497,6 @@ const Tutorials = () => {
               </TabsContent>
             ))}
           </Tabs>
-
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle>Programming Learning Paths</CardTitle>
-              <CardDescription>
-                Structured courses to master programming languages step-by-step
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {getLearningPaths().map(([category, tutorials]) => (
-                  <Card key={category}>
-                    <CardHeader className="pb-2">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="capitalize text-lg">{category}</CardTitle>
-                        <Tag className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground mb-2">
-                        {tutorials.length} comprehensive tutorial{tutorials.length > 1 ? 's' : ''}
-                      </p>
-                      <ul className="space-y-1 text-sm">
-                        {tutorials.slice(0, 3).map(tutorial => (
-                          <li key={tutorial.id} className="flex items-center gap-2">
-                            <div className="w-1 h-1 rounded-full bg-primary"></div>
-                            {tutorial.title}
-                          </li>
-                        ))}
-                      </ul>
-                    </CardContent>
-                    <CardFooter>
-                      <Button variant="outline" size="sm" className="w-full">
-                        Start Learning Path
-                        <ArrowRight className="ml-2 h-4 w-4" />
-                      </Button>
-                    </CardFooter>
-                  </Card>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
         </>
       )}
     </div>
@@ -516,43 +510,49 @@ interface TutorialCardProps {
 }
 
 const TutorialCard = ({ tutorial, progress, onStart }: TutorialCardProps) => {
-  // Find the original tutorial to get the correct level
-  const originalTutorial = comprehensiveTutorials.find(t => t.id === tutorial.id);
-  const actualLevel = originalTutorial?.level || tutorial.level;
-  
   const getLevelColor = (level: string) => {
     switch (level) {
-      case 'non-developer': return 'bg-green-500';
-      case 'beginner': return 'bg-blue-500';
+      case 'beginner': return 'bg-green-500';
       case 'intermediate': return 'bg-orange-500';
       case 'advanced': return 'bg-red-500';
       default: return 'bg-gray-500';
     }
   };
 
+  const getCategoryColor = (category: string) => {
+    const colors: Record<string, string> = {
+      'javascript': 'bg-yellow-500',
+      'python': 'bg-blue-500',
+      'java': 'bg-red-600',
+      'html/css': 'bg-orange-500',
+      'react': 'bg-cyan-500',
+    };
+    return colors[category.toLowerCase()] || 'bg-purple-500';
+  };
+
   return (
     <Card className="overflow-hidden h-full flex flex-col hover:shadow-lg transition-shadow">
-      <div className={`${getLevelColor(actualLevel)} h-32 flex items-center justify-center relative`}>
-        <BookOpen className="h-12 w-12 text-white" />
+      <div className={`${getCategoryColor(tutorial.category)} h-32 flex items-center justify-center relative`}>
+        <Code className="h-12 w-12 text-white" />
         <Badge 
           variant="secondary" 
           className="absolute top-2 right-2 bg-white/20 text-white border-white/30"
         >
-          {actualLevel}
+          {tutorial.level}
+        </Badge>
+        <Badge 
+          variant="secondary" 
+          className="absolute top-2 left-2 bg-black/20 text-white border-white/30 capitalize"
+        >
+          {tutorial.category}
         </Badge>
       </div>
       <CardHeader className="pb-2 flex-1">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg">{tutorial.title}</CardTitle>
-        </div>
+        <CardTitle className="text-lg">{tutorial.title}</CardTitle>
         <CardDescription className="line-clamp-2">{tutorial.description}</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex items-center justify-between text-sm mb-3">
-          <div className="flex items-center">
-            <Code className="mr-2 h-4 w-4 text-muted-foreground" />
-            <span className="text-muted-foreground capitalize">{tutorial.category}</span>
-          </div>
           <div className="flex items-center">
             <Clock className="mr-2 h-4 w-4 text-muted-foreground" />
             <span className="text-muted-foreground">{tutorial.duration}</span>
