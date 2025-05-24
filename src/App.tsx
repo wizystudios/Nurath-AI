@@ -12,6 +12,7 @@ import CodeEditor from './pages/CodeEditor';
 import ProgressTracker from './pages/Progress';
 import Community from './pages/Community';
 import Profile from './pages/Profile';
+import Chat from './pages/Chat';
 import NotFound from './pages/NotFound';
 import { Layout } from './components/Layout';
 import NewDiscussion from './pages/NewDiscussion';
@@ -57,6 +58,9 @@ const App: React.FC = () => {
               } />
               <Route path="/editor" element={
                 <ProtectedRoute><CodeEditor /></ProtectedRoute>
+              } />
+              <Route path="/chat" element={
+                <ProtectedRoute><Chat /></ProtectedRoute>
               } />
               <Route path="/progress" element={
                 <ProtectedRoute><ProgressTracker /></ProtectedRoute>

@@ -47,7 +47,7 @@ export function Layout({ children }: LayoutProps) {
     return <>{children}</>;
   }
 
-  // For all other pages, render with layout
+  // For all other pages, render with layout ONLY ONCE
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="sticky top-0 z-50 border-b bg-gradient-to-r from-purple-600 to-indigo-800 text-white">

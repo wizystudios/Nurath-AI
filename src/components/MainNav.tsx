@@ -121,7 +121,7 @@ export function MainNav() {
   };
 
   const handleChatClick = () => {
-    navigate("/code-editor");
+    navigate("/chat");
     setMobileMenuOpen(false);
     toast.success("Opening chat with Nurath.AI...");
   };
@@ -191,7 +191,17 @@ export function MainNav() {
         {/* Language Selector */}
         <LanguageSelector 
           currentLanguage={currentLanguage} 
-          onLanguageChange={handleLanguageChange} 
+          onLanguageChange={(lang) => {
+            setCurrentLanguage(lang);
+            localStorage.setItem("preferredLanguage", lang);
+            
+            // Update user profile if authenticated
+            if (isAuthenticated) {
+              updateUserLanguagePreference(lang);
+            }
+            
+            toast.success(`Language changed to ${lang === "en" ? "English" : "Kiswahili"}`);
+          }} 
         />
         
         <ThemeToggle />
@@ -257,7 +267,14 @@ export function MainNav() {
               <LanguageSelector 
                 currentLanguage={currentLanguage} 
                 onLanguageChange={(lang) => {
-                  handleLanguageChange(lang);
+                  setCurrentLanguage(lang);
+                  localStorage.setItem("preferredLanguage", lang);
+                  
+                  if (isAuthenticated) {
+                    updateUserLanguagePreference(lang);
+                  }
+                  
+                  toast.success(`Language changed to ${lang === "en" ? "English" : "Kiswahili"}`);
                   setMobileMenuOpen(false);
                 }} 
               />
@@ -282,3 +299,14 @@ export function MainNav() {
     </>
   );
 }
+
+// Helper function for updating language preference
+const updateUserLanguagePreference = async (language: Language) => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.user) {
+    await supabase
+      .from('profiles')
+      .update({ language_preference: language })
+      .eq('id', session.user.id);
+  }
+};
