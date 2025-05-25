@@ -16,6 +16,7 @@ export function Layout({ children }: LayoutProps) {
   const [checking, setChecking] = useState(true);
   const isHomePage = location.pathname === "/";
   const isAuthPage = location.pathname === "/auth";
+  const isChatPage = location.pathname === "/chat";
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -42,12 +43,12 @@ export function Layout({ children }: LayoutProps) {
     );
   }
 
-  // For home and auth pages, render children without layout
-  if (isHomePage || isAuthPage) {
+  // For home, auth, and chat pages, render children without layout
+  if (isHomePage || isAuthPage || isChatPage) {
     return <>{children}</>;
   }
 
-  // For all other pages, render with layout ONLY ONCE
+  // For all other pages, render with layout
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="sticky top-0 z-50 border-b bg-gradient-to-r from-purple-600 to-indigo-800 text-white">
