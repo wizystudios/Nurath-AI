@@ -1,9 +1,8 @@
-
 import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { Send, Bot, User, Sparkles, Code, Database, Globe, Menu, X, Plus, MessageCircle, MoreVertical, Trash2 } from "lucide-react";
+import { Send, Bot, User, Sparkles, Code, Database, Globe, Menu, X, Plus, MessageCircle, MoreVertical, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -32,46 +31,46 @@ interface Conversation {
 
 const learningTopics = [
   {
-    title: "Learn HTML",
+    title: "Learn HTML 🌐",
     description: "Master the foundation of web development",
     icon: <Code className="w-6 h-6" />,
-    color: "from-orange-500 to-red-500",
-    prompt: "I want to learn HTML from basics. Can you start with a beginner-friendly introduction?"
+    gradient: "from-orange-400 via-red-500 to-pink-500",
+    prompt: "I want to learn HTML from basics. Can you start with a beginner-friendly introduction and teach me step by step?"
   },
   {
-    title: "Learn CSS",
+    title: "Learn CSS ✨",
     description: "Style beautiful and responsive websites",
     icon: <Globe className="w-6 h-6" />,
-    color: "from-blue-500 to-cyan-500",
-    prompt: "I want to learn CSS styling. Can you teach me the fundamentals of CSS?"
+    gradient: "from-blue-400 via-purple-500 to-indigo-600",
+    prompt: "I want to learn CSS styling. Can you teach me the fundamentals of CSS with practical examples?"
   },
   {
-    title: "Learn JavaScript",
+    title: "Learn JavaScript ⚡",
     description: "Add interactivity to your web pages",
     icon: <Sparkles className="w-6 h-6" />,
-    color: "from-yellow-500 to-orange-500",
-    prompt: "I want to learn JavaScript programming. Can you start with the basics?"
+    gradient: "from-yellow-400 via-orange-500 to-red-500",
+    prompt: "I want to learn JavaScript programming. Can you start with the basics and show me interactive examples?"
   },
   {
-    title: "Learn Python",
+    title: "Learn Python 🐍",
     description: "Versatile programming for beginners",
     icon: <Code className="w-6 h-6" />,
-    color: "from-green-500 to-emerald-500",
-    prompt: "I want to learn Python programming. Can you guide me through the fundamentals?"
+    gradient: "from-green-400 via-emerald-500 to-teal-600",
+    prompt: "I want to learn Python programming. Can you guide me through the fundamentals with practical exercises?"
   },
   {
-    title: "Learn MySQL",
+    title: "Learn MySQL 🗄️",
     description: "Master database management",
     icon: <Database className="w-6 h-6" />,
-    color: "from-purple-500 to-indigo-500",
-    prompt: "I want to learn MySQL database. Can you teach me database concepts and SQL?"
+    gradient: "from-purple-400 via-indigo-500 to-blue-600",
+    prompt: "I want to learn MySQL database. Can you teach me database concepts and SQL with real examples?"
   },
   {
-    title: "Learn Java",
+    title: "Learn Java ☕",
     description: "Object-oriented programming mastery",
     icon: <Code className="w-6 h-6" />,
-    color: "from-red-500 to-pink-500",
-    prompt: "I want to learn Java programming. Can you start with object-oriented concepts?"
+    gradient: "from-red-400 via-pink-500 to-purple-600",
+    prompt: "I want to learn Java programming. Can you start with object-oriented concepts and provide hands-on examples?"
   }
 ];
 
@@ -79,7 +78,7 @@ const ChatInterface = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
-      text: "Hello! I'm Nurath.AI, your coding assistant created by NK Technology in Tanzania, co-founded by CEO Khalifa Nadhiru. I'm here to help you learn programming. What would you like to learn today?",
+      text: "Hello! 👋 I'm Nurath.AI, your coding assistant created by NK Technology in Tanzania, co-founded by CEO Khalifa Nadhiru. I'm here to help you learn programming step by step! ✨ What would you like to explore today?",
       isBot: true,
       timestamp: new Date()
     }
@@ -87,7 +86,7 @@ const ChatInterface = () => {
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
@@ -175,7 +174,6 @@ const ChatInterface = () => {
       let finalConversationId = conversationId || currentConversationId;
 
       if (!finalConversationId) {
-        // Create new conversation
         const { data: newConversation, error: convError } = await supabase
           .from('conversations')
           .insert({
@@ -203,7 +201,6 @@ const ChatInterface = () => {
 
       if (error) throw error;
 
-      // Update conversation's updated_at
       await supabase
         .from('conversations')
         .update({ updated_at: new Date().toISOString() })
@@ -222,14 +219,12 @@ const ChatInterface = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) return;
 
-      // Delete messages first
       await supabase
         .from('chat_messages')
         .delete()
         .eq('conversation_id', conversationId)
         .eq('user_id', session.user.id);
 
-      // Delete conversation
       const { error } = await supabase
         .from('conversations')
         .delete()
@@ -238,10 +233,9 @@ const ChatInterface = () => {
 
       if (error) throw error;
 
-      toast.success("Conversation deleted");
+      toast.success("Conversation deleted! 🗑️");
       loadConversations();
 
-      // If current conversation was deleted, start new chat
       if (currentConversationId === conversationId) {
         handleNewChat();
       }
@@ -268,7 +262,6 @@ const ChatInterface = () => {
     if (!messageText) setInputText("");
     setIsLoading(true);
 
-    // Save user message
     await saveMessage(textToSend, 'user');
 
     try {
@@ -300,8 +293,6 @@ const ChatInterface = () => {
       };
 
       setMessages(prev => [...prev, botResponse]);
-
-      // Save assistant message
       await saveMessage(data.response, 'assistant');
       
     } catch (error) {
@@ -309,7 +300,7 @@ const ChatInterface = () => {
       
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: "I'm sorry, I'm having trouble responding right now. Please try again in a moment.",
+        text: "I'm sorry, I'm having trouble responding right now. Please try again in a moment. 😅",
         isBot: true,
         timestamp: new Date()
       };
@@ -332,14 +323,14 @@ const ChatInterface = () => {
     setMessages([
       {
         id: "1",
-        text: "Hello! I'm Nurath.AI, your coding assistant created by NK Technology in Tanzania, co-founded by CEO Khalifa Nadhiru. I'm here to help you learn programming. What would you like to learn today?",
+        text: "Hello! 👋 I'm Nurath.AI, your coding assistant created by NK Technology in Tanzania, co-founded by CEO Khalifa Nadhiru. I'm here to help you learn programming step by step! ✨ What would you like to explore today?",
         isBot: true,
         timestamp: new Date()
       }
     ]);
     setShowSuggestions(true);
     setCurrentConversationId(null);
-    window.history.pushState({}, '', '/');
+    window.history.pushState({}, '', '/chat');
   };
 
   const handleTopicClick = (prompt: string) => {
@@ -347,7 +338,7 @@ const ChatInterface = () => {
   };
 
   const handleConversationClick = (conversationId: string) => {
-    window.history.pushState({}, '', `/?conversation=${conversationId}`);
+    window.history.pushState({}, '', `/chat?conversation=${conversationId}`);
     loadConversation(conversationId);
     setSidebarOpen(false);
   };
@@ -395,101 +386,122 @@ const ChatInterface = () => {
   const groupedConversations = groupConversationsByDate(conversations);
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 relative">
+    <div className="flex h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 relative overflow-hidden">
+      {/* Animated Background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/20 via-purple-900/20 to-pink-900/20">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full mix-blend-multiply filter blur-xl animate-pulse"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-pink-500/10 rounded-full mix-blend-multiply filter blur-xl animate-pulse delay-700"></div>
+        <div className="absolute top-1/2 left-1/2 w-96 h-96 bg-indigo-500/10 rounded-full mix-blend-multiply filter blur-xl animate-pulse delay-1000"></div>
+      </div>
+
       {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-50 w-80 bg-white dark:bg-gray-800 shadow-xl transform transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 lg:shadow-none lg:border-r lg:border-gray-200 dark:lg:border-gray-700`}>
+      <div className={`fixed inset-y-0 left-0 z-50 bg-gradient-to-b from-gray-900/95 via-gray-800/95 to-gray-900/95 backdrop-blur-xl shadow-2xl border-r border-purple-500/20 transform transition-all duration-500 ease-in-out ${sidebarOpen ? 'w-80 translate-x-0' : 'w-16 translate-x-0'} lg:relative lg:translate-x-0`}>
         {/* Sidebar Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center gap-2">
-            <Logo size="sm" />
-            <span className="font-semibold text-lg">Nurath.AI</span>
+        <div className="flex items-center justify-between p-4 border-b border-purple-500/20">
+          <div className={`flex items-center gap-3 transition-all duration-300 ${sidebarOpen ? 'opacity-100' : 'opacity-0'}`}>
+            <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg">
+              <Logo size="sm" showText={false} />
+            </div>
+            <div>
+              <span className="font-bold text-lg bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent">
+                Nurath.AI
+              </span>
+            </div>
           </div>
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setSidebarOpen(false)}
-            className="lg:hidden"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="h-8 w-8 p-0 hover:bg-purple-500/20 text-purple-300 hover:text-white transition-all duration-300"
           >
-            <X className="w-4 h-4" />
+            {sidebarOpen ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
           </Button>
         </div>
         
         {/* Sidebar Content */}
-        <div className="flex-1 overflow-y-auto p-4">
-          {/* New Chat Button */}
-          <Button 
-            onClick={handleNewChat} 
-            className="w-full mb-6 bg-purple-600 hover:bg-purple-700 text-white"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            New Chat
-          </Button>
+        <div className={`flex-1 overflow-y-auto p-4 transition-all duration-300 ${sidebarOpen ? 'opacity-100' : 'opacity-0'}`}>
+          {sidebarOpen && (
+            <>
+              {/* New Chat Button */}
+              <Button 
+                onClick={handleNewChat} 
+                className="w-full mb-6 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                ✨ New Chat
+              </Button>
 
-          {/* Recent Conversations */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-400">Chat History</h3>
-            {Object.keys(groupedConversations).length > 0 ? (
-              Object.entries(groupedConversations).map(([dateGroup, convs]) => (
-                <div key={dateGroup} className="space-y-2">
-                  <h4 className="text-xs font-medium text-gray-500 dark:text-gray-500 uppercase tracking-wide">
-                    {dateGroup}
-                  </h4>
-                  {convs.map((conversation) => (
-                    <div key={conversation.id} className="flex items-center gap-2">
-                      <Button
-                        variant="ghost"
-                        className="flex-1 justify-start text-left h-auto p-3 hover:bg-gray-100 dark:hover:bg-gray-700"
-                        onClick={() => handleConversationClick(conversation.id)}
-                      >
-                        <div className="flex items-start gap-3 w-full overflow-hidden">
-                          <MessageCircle className="h-4 w-4 mt-1 flex-shrink-0 text-gray-400" />
-                          <div className="flex flex-col overflow-hidden">
-                            <span className="text-sm font-medium truncate">{conversation.title}</span>
-                            <span className="text-xs text-gray-500 dark:text-gray-400">
-                              {formatDate(conversation.updated_at)}
-                            </span>
-                          </div>
-                        </div>
-                      </Button>
-                      
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => deleteConversation(conversation.id)}
-                            className="text-red-600 focus:text-red-600"
+              {/* Recent Conversations */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-purple-300">📚 Chat History</h3>
+                {Object.keys(groupedConversations).length > 0 ? (
+                  Object.entries(groupedConversations).map(([dateGroup, convs]) => (
+                    <div key={dateGroup} className="space-y-2">
+                      <h4 className="text-xs font-medium text-purple-400 uppercase tracking-wide flex items-center gap-2">
+                        {dateGroup === "Today" ? "🌟" : dateGroup === "Yesterday" ? "⭐" : "📅"} {dateGroup}
+                      </h4>
+                      {convs.map((conversation) => (
+                        <div key={conversation.id} className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            className="flex-1 justify-start text-left h-auto p-3 hover:bg-purple-500/20 text-gray-300 hover:text-white transition-all duration-300 rounded-xl"
+                            onClick={() => handleConversationClick(conversation.id)}
                           >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                            <div className="flex items-start gap-3 w-full overflow-hidden">
+                              <MessageCircle className="h-4 w-4 mt-1 flex-shrink-0 text-purple-400" />
+                              <div className="flex flex-col overflow-hidden">
+                                <span className="text-sm font-medium truncate">{conversation.title}</span>
+                                <span className="text-xs text-purple-400">
+                                  {formatDate(conversation.updated_at)}
+                                </span>
+                              </div>
+                            </div>
+                          </Button>
+                          
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-purple-500/20 text-purple-400 hover:text-white">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="bg-gray-800 border-purple-500/20">
+                              <DropdownMenuItem
+                                onClick={() => deleteConversation(conversation.id)}
+                                className="text-red-400 focus:text-red-300 hover:bg-red-500/20"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                🗑️ Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              ))
-            ) : (
-              <div className="text-center p-4 text-gray-500 dark:text-gray-400 text-sm">
-                No chat history yet
+                  ))
+                ) : (
+                  <div className="text-center p-6 text-purple-400 text-sm">
+                    💬 No chat history yet
+                    <br />
+                    <span className="text-xs text-purple-500">Start your first conversation!</span>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </>
+          )}
         </div>
 
         {/* Sidebar Footer */}
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-          <Button
-            onClick={() => navigate("/dashboard")}
-            variant="outline"
-            className="w-full"
-          >
-            Back to Dashboard
-          </Button>
-        </div>
+        {sidebarOpen && (
+          <div className="p-4 border-t border-purple-500/20">
+            <Button
+              onClick={() => navigate("/dashboard")}
+              variant="outline"
+              className="w-full border-purple-500/30 text-purple-300 hover:bg-purple-500/20 hover:text-white transition-all duration-300"
+            >
+              🏠 Back to Dashboard
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Sidebar Overlay for mobile */}
@@ -501,26 +513,29 @@ const ChatInterface = () => {
       )}
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 relative z-10">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between p-4 bg-gray-900/80 backdrop-blur-xl border-b border-purple-500/20">
           <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-            >
-              <Menu className="w-5 h-5" />
-            </Button>
+            {!sidebarOpen && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSidebarOpen(true)}
+                className="hover:bg-purple-500/20 text-purple-300 hover:text-white"
+              >
+                <Menu className="w-5 h-5" />
+              </Button>
+            )}
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full flex items-center justify-center">
+              <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-lg animate-pulse">
                 <Logo size="sm" showText={false} />
               </div>
               <div className="hidden sm:block">
-                <h1 className="text-xl font-semibold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
-                  Chat with Nurath.AI
+                <h1 className="text-xl font-bold bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent">
+                  ✨ Chat with Nurath.AI
                 </h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Your intelligent coding companion</p>
+                <p className="text-sm text-purple-400">Your magical coding companion 🚀</p>
               </div>
             </div>
           </div>
@@ -532,33 +547,34 @@ const ChatInterface = () => {
           {showSuggestions && (
             <div className="p-4 md:p-6 animate-fade-in overflow-y-auto">
               <div className="max-w-6xl mx-auto">
-                <div className="text-center mb-6 md:mb-8">
-                  <h2 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent mb-4">
-                    What would you like to learn today?
+                <div className="text-center mb-8 animate-scale-in">
+                  <h2 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-purple-300 via-pink-300 to-purple-300 bg-clip-text text-transparent mb-4 animate-pulse">
+                    🌟 What magical skill would you like to learn today? ✨
                   </h2>
-                  <p className="text-gray-600 dark:text-gray-400 text-base md:text-lg">
-                    Choose a topic below or ask me anything about programming
+                  <p className="text-purple-300 text-base md:text-lg">
+                    Choose a topic below or ask me anything about programming! 🚀
                   </p>
                 </div>
                 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   {learningTopics.map((topic, index) => (
                     <Card 
                       key={index}
-                      className="group cursor-pointer hover:shadow-xl transition-all duration-300 hover:scale-105 bg-white dark:bg-gray-800 border-0 shadow-lg overflow-hidden"
+                      className="group cursor-pointer hover:shadow-2xl transition-all duration-500 hover:scale-110 bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-purple-500/20 shadow-xl overflow-hidden backdrop-blur-xl hover:border-purple-400/40 animate-fade-in"
+                      style={{ animationDelay: `${index * 100}ms` }}
                       onClick={() => handleTopicClick(topic.prompt)}
                     >
-                      <div className={`h-2 bg-gradient-to-r ${topic.color}`} />
-                      <div className="p-4 md:p-6">
-                        <div className="flex items-center gap-3 md:gap-4 mb-4">
-                          <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full bg-gradient-to-r ${topic.color} flex items-center justify-center text-white`}>
+                      <div className={`h-3 bg-gradient-to-r ${topic.gradient} animate-pulse`} />
+                      <div className="p-6">
+                        <div className="flex items-center gap-4 mb-4">
+                          <div className={`w-14 h-14 rounded-2xl bg-gradient-to-r ${topic.gradient} flex items-center justify-center text-white shadow-lg group-hover:animate-bounce`}>
                             {topic.icon}
                           </div>
                           <div>
-                            <h3 className="font-semibold text-base md:text-lg group-hover:text-purple-600 transition-colors">
+                            <h3 className="font-bold text-lg group-hover:text-purple-300 transition-colors text-white">
                               {topic.title}
                             </h3>
-                            <p className="text-gray-600 dark:text-gray-400 text-xs md:text-sm">
+                            <p className="text-purple-400 text-sm">
                               {topic.description}
                             </p>
                           </div>
@@ -573,40 +589,40 @@ const ChatInterface = () => {
 
           {/* Messages Area */}
           <div className="flex-1 overflow-y-auto p-4 md:p-6">
-            <div className="max-w-4xl mx-auto space-y-4 md:space-y-6">
+            <div className="max-w-4xl mx-auto space-y-6">
               {messages.map((message) => (
                 <div
                   key={message.id}
                   className={`flex ${message.isBot ? 'justify-start' : 'justify-end'} animate-fade-in`}
                 >
                   <div
-                    className={`flex items-start gap-3 md:gap-4 max-w-[85%] md:max-w-[80%] ${
+                    className={`flex items-start gap-4 max-w-[85%] md:max-w-[80%] ${
                       message.isBot ? 'flex-row' : 'flex-row-reverse'
                     }`}
                   >
                     <div
-                      className={`flex h-8 w-8 md:h-10 md:w-10 shrink-0 items-center justify-center rounded-full ${
+                      className={`flex h-10 w-10 md:h-12 md:w-12 shrink-0 items-center justify-center rounded-2xl shadow-lg ${
                         message.isBot 
-                          ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white' 
-                          : 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white'
+                          ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white animate-pulse' 
+                          : 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
                       }`}
                     >
                       {message.isBot ? (
                         <Logo size="sm" showText={false} />
                       ) : (
-                        <User className="h-4 w-4 md:h-5 md:w-5" />
+                        <User className="h-5 w-5 md:h-6 md:w-6" />
                       )}
                     </div>
                     <Card
-                      className={`p-4 md:p-6 shadow-lg border-0 ${
+                      className={`p-4 md:p-6 shadow-2xl border-0 backdrop-blur-xl ${
                         message.isBot
-                          ? 'bg-white dark:bg-gray-800'
-                          : 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white'
+                          ? 'bg-gray-800/80 text-white border border-purple-500/20'
+                          : 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
                       }`}
                     >
                       <p className="text-sm md:text-base leading-relaxed whitespace-pre-wrap">{message.text}</p>
                       <span className={`text-xs mt-3 block ${
-                        message.isBot ? 'text-gray-500 dark:text-gray-400' : 'text-purple-100'
+                        message.isBot ? 'text-purple-400' : 'text-purple-200'
                       }`}>
                         {message.timestamp.toLocaleTimeString()}
                       </span>
@@ -617,16 +633,17 @@ const ChatInterface = () => {
               
               {isLoading && (
                 <div className="flex justify-start animate-fade-in">
-                  <div className="flex items-start gap-3 md:gap-4">
-                    <div className="flex h-8 w-8 md:h-10 md:w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white">
+                  <div className="flex items-start gap-4">
+                    <div className="flex h-10 w-10 md:h-12 md:w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-r from-purple-500 to-pink-500 text-white animate-pulse">
                       <Logo size="sm" showText={false} />
                     </div>
-                    <Card className="p-4 md:p-6 bg-white dark:bg-gray-800 shadow-lg border-0">
+                    <Card className="p-4 md:p-6 bg-gray-800/80 shadow-2xl border border-purple-500/20 backdrop-blur-xl">
                       <div className="flex space-x-2">
                         <div className="w-3 h-3 bg-purple-500 rounded-full animate-bounce"></div>
-                        <div className="w-3 h-3 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                        <div className="w-3 h-3 bg-pink-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
                         <div className="w-3 h-3 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                       </div>
+                      <p className="text-purple-300 text-xs mt-2">✨ Nurath.AI is thinking...</p>
                     </Card>
                   </div>
                 </div>
@@ -637,25 +654,25 @@ const ChatInterface = () => {
           </div>
           
           {/* Input Area */}
-          <div className="p-4 md:p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-t border-gray-200 dark:border-gray-700">
+          <div className="p-4 md:p-6 bg-gray-900/80 backdrop-blur-xl border-t border-purple-500/20">
             <div className="max-w-4xl mx-auto">
-              <div className="flex gap-2 md:gap-4 items-end">
+              <div className="flex gap-4 items-end">
                 <div className="flex-1">
                   <Textarea
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
                     onKeyPress={handleKeyPress}
-                    placeholder="Ask me anything about coding... (Press Enter to send, Shift+Enter for new line)"
-                    className="min-h-[80px] md:min-h-[100px] max-h-[150px] md:max-h-[200px] resize-none border-2 border-gray-200 dark:border-gray-600 focus:border-purple-500 dark:focus:border-purple-400 rounded-xl md:rounded-2xl text-sm md:text-base shadow-lg"
+                    placeholder="✨ Ask me anything about coding... (Press Enter to send, Shift+Enter for new line) 🚀"
+                    className="min-h-[100px] md:min-h-[120px] max-h-[200px] resize-none border-2 border-purple-500/30 focus:border-purple-400 rounded-2xl text-sm md:text-base shadow-2xl bg-gray-800/50 backdrop-blur-xl text-white placeholder-purple-400"
                     disabled={isLoading}
                   />
                 </div>
                 <Button 
                   onClick={() => handleSendMessage()}
                   disabled={!inputText.trim() || isLoading}
-                  className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 h-[80px] md:h-[100px] px-4 md:px-6 rounded-xl md:rounded-2xl shadow-lg"
+                  className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 h-[100px] md:h-[120px] px-6 rounded-2xl shadow-2xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50"
                 >
-                  <Send className="h-5 w-5 md:h-6 md:w-6" />
+                  <Send className="h-6 w-6 md:h-7 md:w-7" />
                 </Button>
               </div>
             </div>
