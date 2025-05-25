@@ -3,17 +3,31 @@ import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { Send, Bot, User, Sparkles, Code, Database, Globe, Menu, X } from "lucide-react";
+import { Send, Bot, User, Sparkles, Code, Database, Globe, Menu, X, Plus, MessageCircle, MoreVertical, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { format } from "date-fns";
 import Logo from "@/components/Logo";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface Message {
   id: string;
   text: string;
   isBot: boolean;
   timestamp: Date;
+}
+
+interface Conversation {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
 }
 
 const learningTopics = [
@@ -61,18 +75,11 @@ const learningTopics = [
   }
 ];
 
-const conversationHistory = [
-  { id: "1", title: "HTML Basics Tutorial", time: "2 hours ago" },
-  { id: "2", title: "CSS Flexbox Guide", time: "Yesterday" },
-  { id: "3", title: "JavaScript Functions", time: "2 days ago" },
-  { id: "4", title: "Python Variables", time: "3 days ago" },
-];
-
 const ChatInterface = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
-      text: "Hello! I'm Nurath.AI, your coding assistant created by NK Technology. I'm here to help you learn programming. What would you like to learn today?",
+      text: "Hello! I'm Nurath.AI, your coding assistant created by NK Technology in Tanzania, co-founded by CEO Khalifa Nadhiru. I'm here to help you learn programming. What would you like to learn today?",
       isBot: true,
       timestamp: new Date()
     }
@@ -81,8 +88,12 @@ const ChatInterface = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
+  const [user, setUser] = useState<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -91,6 +102,154 @@ const ChatInterface = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    checkUser();
+    loadConversations();
+    
+    const conversationId = searchParams.get('conversation');
+    if (conversationId) {
+      loadConversation(conversationId);
+    }
+  }, [searchParams]);
+
+  const checkUser = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    setUser(session?.user || null);
+  };
+
+  const loadConversations = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+
+      const { data, error } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .order('updated_at', { ascending: false });
+
+      if (error) throw error;
+      setConversations(data || []);
+    } catch (error) {
+      console.error('Error loading conversations:', error);
+    }
+  };
+
+  const loadConversation = async (conversationId: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .select('*')
+        .eq('conversation_id', conversationId)
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const loadedMessages = data.map(msg => ({
+          id: msg.id,
+          text: msg.content,
+          isBot: msg.role === 'assistant',
+          timestamp: new Date(msg.created_at || '')
+        }));
+        setMessages(loadedMessages);
+        setCurrentConversationId(conversationId);
+        setShowSuggestions(false);
+      }
+    } catch (error) {
+      console.error('Error loading conversation:', error);
+      toast.error("Failed to load conversation");
+    }
+  };
+
+  const saveMessage = async (content: string, role: 'user' | 'assistant', conversationId?: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return null;
+
+      let finalConversationId = conversationId || currentConversationId;
+
+      if (!finalConversationId) {
+        // Create new conversation
+        const { data: newConversation, error: convError } = await supabase
+          .from('conversations')
+          .insert({
+            user_id: session.user.id,
+            title: content.substring(0, 50) + (content.length > 50 ? '...' : '')
+          })
+          .select()
+          .single();
+
+        if (convError) throw convError;
+        finalConversationId = newConversation.id;
+        setCurrentConversationId(finalConversationId);
+      }
+
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .insert({
+          user_id: session.user.id,
+          conversation_id: finalConversationId,
+          content,
+          role
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Update conversation's updated_at
+      await supabase
+        .from('conversations')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', finalConversationId);
+
+      loadConversations();
+      return data;
+    } catch (error) {
+      console.error('Error saving message:', error);
+      return null;
+    }
+  };
+
+  const deleteConversation = async (conversationId: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+
+      // Delete messages first
+      await supabase
+        .from('chat_messages')
+        .delete()
+        .eq('conversation_id', conversationId)
+        .eq('user_id', session.user.id);
+
+      // Delete conversation
+      const { error } = await supabase
+        .from('conversations')
+        .delete()
+        .eq('id', conversationId)
+        .eq('user_id', session.user.id);
+
+      if (error) throw error;
+
+      toast.success("Conversation deleted");
+      loadConversations();
+
+      // If current conversation was deleted, start new chat
+      if (currentConversationId === conversationId) {
+        handleNewChat();
+      }
+    } catch (error) {
+      console.error('Error deleting conversation:', error);
+      toast.error("Failed to delete conversation");
+    }
+  };
 
   const handleSendMessage = async (messageText?: string) => {
     const textToSend = messageText || inputText;
@@ -108,6 +267,9 @@ const ChatInterface = () => {
     setMessages(prev => [...prev, userMessage]);
     if (!messageText) setInputText("");
     setIsLoading(true);
+
+    // Save user message
+    await saveMessage(textToSend, 'user');
 
     try {
       const conversationHistory = messages.map(msg => ({
@@ -138,6 +300,9 @@ const ChatInterface = () => {
       };
 
       setMessages(prev => [...prev, botResponse]);
+
+      // Save assistant message
+      await saveMessage(data.response, 'assistant');
       
     } catch (error) {
       console.error('Error getting AI response:', error);
@@ -167,13 +332,14 @@ const ChatInterface = () => {
     setMessages([
       {
         id: "1",
-        text: "Hello! I'm Nurath.AI, your coding assistant created by NK Technology. I'm here to help you learn programming. What would you like to learn today?",
+        text: "Hello! I'm Nurath.AI, your coding assistant created by NK Technology in Tanzania, co-founded by CEO Khalifa Nadhiru. I'm here to help you learn programming. What would you like to learn today?",
         isBot: true,
         timestamp: new Date()
       }
     ]);
     setShowSuggestions(true);
-    setSidebarOpen(false);
+    setCurrentConversationId(null);
+    window.history.pushState({}, '', '/');
   };
 
   const handleTopicClick = (prompt: string) => {
@@ -181,10 +347,52 @@ const ChatInterface = () => {
   };
 
   const handleConversationClick = (conversationId: string) => {
-    // For now, just close sidebar and show a message
+    window.history.pushState({}, '', `/?conversation=${conversationId}`);
+    loadConversation(conversationId);
     setSidebarOpen(false);
-    toast.info("Loading conversation...");
   };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    
+    if (date.toDateString() === now.toDateString()) {
+      return format(date, "h:mm a");
+    }
+    
+    if (date.getFullYear() === now.getFullYear()) {
+      return format(date, "MMM d");
+    }
+    
+    return format(date, "MMM d, yyyy");
+  };
+
+  const groupConversationsByDate = (conversations: Conversation[]) => {
+    const groups: { [key: string]: Conversation[] } = {};
+    
+    conversations.forEach(conv => {
+      const date = new Date(conv.created_at);
+      const now = new Date();
+      let groupKey;
+      
+      if (date.toDateString() === now.toDateString()) {
+        groupKey = "Today";
+      } else if (date.toDateString() === new Date(now.getTime() - 24 * 60 * 60 * 1000).toDateString()) {
+        groupKey = "Yesterday";
+      } else {
+        groupKey = format(date, "MMMM d, yyyy");
+      }
+      
+      if (!groups[groupKey]) {
+        groups[groupKey] = [];
+      }
+      groups[groupKey].push(conv);
+    });
+    
+    return groups;
+  };
+
+  const groupedConversations = groupConversationsByDate(conversations);
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 relative">
@@ -213,26 +421,62 @@ const ChatInterface = () => {
             onClick={handleNewChat} 
             className="w-full mb-6 bg-purple-600 hover:bg-purple-700 text-white"
           >
-            <Bot className="w-4 h-4 mr-2" />
+            <Plus className="w-4 h-4 mr-2" />
             New Chat
           </Button>
 
           {/* Recent Conversations */}
-          <div className="space-y-2">
-            <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-400 mb-3">Recent Conversations</h3>
-            {conversationHistory.map((conversation) => (
-              <Button
-                key={conversation.id}
-                variant="ghost"
-                className="w-full justify-start text-left h-auto p-3 hover:bg-gray-100 dark:hover:bg-gray-700"
-                onClick={() => handleConversationClick(conversation.id)}
-              >
-                <div className="flex flex-col items-start overflow-hidden">
-                  <span className="text-sm font-medium truncate w-full">{conversation.title}</span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">{conversation.time}</span>
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-400">Chat History</h3>
+            {Object.keys(groupedConversations).length > 0 ? (
+              Object.entries(groupedConversations).map(([dateGroup, convs]) => (
+                <div key={dateGroup} className="space-y-2">
+                  <h4 className="text-xs font-medium text-gray-500 dark:text-gray-500 uppercase tracking-wide">
+                    {dateGroup}
+                  </h4>
+                  {convs.map((conversation) => (
+                    <div key={conversation.id} className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        className="flex-1 justify-start text-left h-auto p-3 hover:bg-gray-100 dark:hover:bg-gray-700"
+                        onClick={() => handleConversationClick(conversation.id)}
+                      >
+                        <div className="flex items-start gap-3 w-full overflow-hidden">
+                          <MessageCircle className="h-4 w-4 mt-1 flex-shrink-0 text-gray-400" />
+                          <div className="flex flex-col overflow-hidden">
+                            <span className="text-sm font-medium truncate">{conversation.title}</span>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              {formatDate(conversation.updated_at)}
+                            </span>
+                          </div>
+                        </div>
+                      </Button>
+                      
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => deleteConversation(conversation.id)}
+                            className="text-red-600 focus:text-red-600"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  ))}
                 </div>
-              </Button>
-            ))}
+              ))
+            ) : (
+              <div className="text-center p-4 text-gray-500 dark:text-gray-400 text-sm">
+                No chat history yet
+              </div>
+            )}
           </div>
         </div>
 
@@ -264,8 +508,7 @@ const ChatInterface = () => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setSidebarOpen(true)}
-              className="lg:hidden"
+              onClick={() => setSidebarOpen(!sidebarOpen)}
             >
               <Menu className="w-5 h-5" />
             </Button>
@@ -403,14 +646,14 @@ const ChatInterface = () => {
                     onChange={(e) => setInputText(e.target.value)}
                     onKeyPress={handleKeyPress}
                     placeholder="Ask me anything about coding... (Press Enter to send, Shift+Enter for new line)"
-                    className="min-h-[60px] md:min-h-[80px] max-h-[150px] md:max-h-[200px] resize-none border-2 border-gray-200 dark:border-gray-600 focus:border-purple-500 dark:focus:border-purple-400 rounded-xl md:rounded-2xl text-sm md:text-base shadow-lg"
+                    className="min-h-[80px] md:min-h-[100px] max-h-[150px] md:max-h-[200px] resize-none border-2 border-gray-200 dark:border-gray-600 focus:border-purple-500 dark:focus:border-purple-400 rounded-xl md:rounded-2xl text-sm md:text-base shadow-lg"
                     disabled={isLoading}
                   />
                 </div>
                 <Button 
                   onClick={() => handleSendMessage()}
                   disabled={!inputText.trim() || isLoading}
-                  className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 h-[60px] md:h-[80px] px-4 md:px-6 rounded-xl md:rounded-2xl shadow-lg"
+                  className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 h-[80px] md:h-[100px] px-4 md:px-6 rounded-xl md:rounded-2xl shadow-lg"
                 >
                   <Send className="h-5 w-5 md:h-6 md:w-6" />
                 </Button>
