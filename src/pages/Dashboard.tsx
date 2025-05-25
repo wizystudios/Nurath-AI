@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -191,7 +190,7 @@ const Dashboard = () => {
           </div>
           <Button 
             className="mt-4 md:mt-0" 
-            onClick={() => navigate("/")}
+            onClick={() => navigate("/chat")}
           >
             <MessageCircle className="mr-2 h-4 w-4" />
             Chat with Nurath

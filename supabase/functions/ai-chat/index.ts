@@ -2,6 +2,8 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
+const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -14,43 +16,41 @@ serve(async (req) => {
   }
 
   try {
-    const { message, conversationHistory } = await req.json();
+    const { message, conversationHistory = [] } = await req.json();
     
-    if (!message) {
-      throw new Error('Message is required');
-    }
+    console.log(`Processing AI chat request: {
+  message: "${message}",
+  historyLength: ${conversationHistory.length}
+}`);
 
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openAIApiKey) {
       throw new Error('OpenAI API key not configured');
     }
 
-    console.log('Processing AI chat request:', { message, historyLength: conversationHistory?.length || 0 });
+    // System prompt to define Nurath.AI's behavior and identity
+    const systemPrompt = `You are Nurath.AI, an AI coding assistant created by NK Technology (Tanzania). Your role is to help users learn programming through educational explanations, code examples, and step-by-step guidance.
 
-    // Prepare messages for OpenAI
-    const messages = [
-      {
-        role: 'system',
-        content: `You are Nurath.AI, a helpful coding mentor and tutor. Your mission is to help people learn programming in a friendly, encouraging way. 
+Key facts about you:
+- You are Nurath.AI, developed by NK Technology in Tanzania
+- Your creator is NK Technology, not OpenAI
+- You specialize in coding education and programming assistance
+- You provide beginner-friendly explanations with practical examples
+- You support multiple programming languages: HTML, CSS, JavaScript, Python, Java, MySQL, and more
 
-Key guidelines:
+Guidelines for responses:
 - Always be encouraging and supportive
-- Break down complex concepts into simple steps
-- Provide practical examples and code snippets when helpful
-- Ask follow-up questions to better understand the user's learning goals
-- Focus on teaching concepts, not just giving answers
-- Use simple language and avoid overwhelming beginners
-- When showing code, always explain what each part does
-- Encourage best practices and good coding habits
+- Provide clear, step-by-step explanations
+- Include practical code examples when relevant
+- Break down complex concepts into digestible parts
+- Ask follow-up questions to ensure understanding
+- Focus on educational value and learning outcomes
 
-Remember: You're not just answering questions, you're helping people become better programmers!`
-      },
-      // Add conversation history if provided
-      ...(conversationHistory || []),
-      {
-        role: 'user',
-        content: message
-      }
+If asked about your creation or who made you, always mention that you are Nurath.AI created by NK Technology in Tanzania.`;
+
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      ...conversationHistory,
+      { role: 'user', content: message }
     ];
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -68,28 +68,34 @@ Remember: You're not just answering questions, you're helping people become bett
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
+      const errorData = await response.text();
       console.error('OpenAI API error:', errorData);
-      throw new Error(`OpenAI API error: ${errorData.error?.message || 'Unknown error'}`);
+      throw new Error(`OpenAI API error: ${response.status}`);
     }
 
     const data = await response.json();
-    const aiResponse = data.choices[0].message.content;
+    
+    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+      throw new Error('Invalid response format from OpenAI');
+    }
 
+    const aiResponse = data.choices[0].message.content;
+    
     console.log('AI response generated successfully');
 
     return new Response(JSON.stringify({ 
-      response: aiResponse,
-      success: true 
+      success: true, 
+      response: aiResponse 
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
     console.error('Error in ai-chat function:', error);
+    
     return new Response(JSON.stringify({ 
-      error: error.message,
-      success: false 
+      success: false, 
+      error: error.message || 'Internal server error' 
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
