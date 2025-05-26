@@ -35,7 +35,7 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({ content }) => {
       parts.push({
         type: 'code',
         content: code.trim(),
-        language: language || 'html',
+        language: language || 'text',
         key: `code-${match.index}`
       });
       
@@ -67,10 +67,19 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({ content }) => {
   };
 
   const formatText = (text: string) => {
-    // Convert line breaks to <br> tags
-    return text.split('\n').map((line, index, array) => (
+    // Convert markdown-style formatting
+    let formattedText = text
+      // Bold text
+      .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-gray-900 dark:text-white">$1</strong>')
+      // Italic text
+      .replace(/\*(.*?)\*/g, '<em class="italic">$1</em>')
+      // Inline code
+      .replace(/`([^`]+)`/g, '<code class="bg-gray-100 dark:bg-gray-800 text-red-600 dark:text-red-400 px-1 py-0.5 rounded text-sm font-mono">$1</code>');
+    
+    // Convert line breaks to <br> tags and return JSX
+    return formattedText.split('\n').map((line, index, array) => (
       <React.Fragment key={index}>
-        {line}
+        <span dangerouslySetInnerHTML={{ __html: line }} />
         {index < array.length - 1 && <br />}
       </React.Fragment>
     ));
@@ -79,7 +88,7 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({ content }) => {
   const parts = parseContent(content);
 
   return (
-    <div className="message-content">
+    <div className="message-content space-y-3">
       {parts.map((part) => {
         if (part.type === 'code') {
           return (
@@ -91,7 +100,7 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({ content }) => {
           );
         } else {
           return (
-            <div key={part.key} className="text-content">
+            <div key={part.key} className="text-content leading-relaxed">
               {formatText(part.content)}
             </div>
           );
