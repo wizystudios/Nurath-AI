@@ -79,7 +79,7 @@ const ChatInterface = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
-      text: "Hello! 👋 I'm **Nurath.AI**, your coding assistant created by **NK Technology** in Tanzania, co-founded by CEO **Khalifa Nadhiru**. I'm here to help you learn programming step by step! ✨ What would you like to explore today?",
+      text: "Hello! 👋 I'm **Nurath.AI**, your coding assistant created by **KN Technology** in Tanzania, co-founded by CEO **Khalifa Nadhiru**. I'm here to help you learn programming step by step! ✨ What would you like to explore today?",
       isBot: true,
       timestamp: new Date()
     }
@@ -352,7 +352,7 @@ const ChatInterface = () => {
     setMessages([
       {
         id: "1",
-        text: "Hello! 👋 I'm **Nurath.AI**, your coding assistant created by **NK Technology** in Tanzania, co-founded by CEO **Khalifa Nadhiru**. I'm here to help you learn programming step by step! ✨ What would you like to explore today?",
+        text: "Hello! 👋 I'm **Nurath.AI**, your coding assistant created by **KN Technology** in Tanzania, co-founded by CEO **Khalifa Nadhiru**. I'm here to help you learn programming step by step! ✨ What would you like to explore today?",
         isBot: true,
         timestamp: new Date()
       }
@@ -429,7 +429,7 @@ const ChatInterface = () => {
             {/* Sidebar Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
+                <div className="w-8 h-8 bg-gradient-to-r from-purple-400 to-pink-400 rounded-lg flex items-center justify-center">
                   <Logo size="sm" showText={false} />
                 </div>
                 <span className="font-bold text-lg bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">

@@ -34,9 +34,6 @@ const Logo: React.FC<LogoProps> = ({ size = "md", showText = true, className = "
           <span className={`${textSizeClasses[size]} font-bold bg-gradient-to-r from-indigo-600 to-purple-800 dark:from-indigo-400 dark:to-purple-600 bg-clip-text text-transparent animate-pulse`}>
             Nurath.AI
           </span>
-          <span className="text-xs text-muted-foreground">
-            Coding with Nurath.AI - Coding Assistance
-          </span>
         </div>
       )}
     </div>
