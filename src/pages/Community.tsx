@@ -224,29 +224,28 @@ const Community = () => {
         .eq('user_id', user.id)
         .single();
 
-if (existingLike) {
-  // Unlike
-  await supabase
-    .from('discussion_likes')
-    .delete()
-    .eq('discussion_id', discussionId)
-    .eq('user_id', user.id);
+      if (existingLike) {
+        // Unlike
+        await supabase
+          .from('discussion_likes')
+          .delete()
+          .eq('discussion_id', discussionId)
+          .eq('user_id', user.id);
 
-  await supabase.rpc('decrement_discussion_likes', { discussion_id: discussionId } as any); // ✅ Fixed
-  toast.success("Removed like");
-} else {
-  // Like
-  await supabase
-    .from('discussion_likes')
-    .insert({
-      discussion_id: discussionId,
-      user_id: user.id
-    });
+        await supabase.rpc('decrement_discussion_likes', { discussion_id: discussionId });
+        toast.success("Removed like");
+      } else {
+        // Like
+        await supabase
+          .from('discussion_likes')
+          .insert({
+            discussion_id: discussionId,
+            user_id: user.id
+          });
 
-  await supabase.rpc('increment_discussion_likes', { discussion_id: discussionId } as any); // ✅ Fixed
-  toast.success("❤️ Liked!");
-}
-
+        await supabase.rpc('increment_discussion_likes', { discussion_id: discussionId });
+        toast.success("❤️ Liked!");
+      }
 
       fetchDiscussions(); // Refresh discussions
     } catch (error) {
