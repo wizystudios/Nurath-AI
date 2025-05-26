@@ -1,10 +1,10 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { ThemeProvider } from "@/components/theme-provider";
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';  // ✅ Correct import
-import { Toaster } from "@/components/ui/sonner";
+import { ThemeProvider } from "@/components/theme-provider"
+import { QueryClient } from 'react-query';
+import { Toaster } from "@/components/ui/sonner"
 
-import { Layout } from '@/components/Layout'; // ✅ Use named import
+import Layout from '@/components/Layout';
 import Index from '@/pages/Index';
 import Chat from '@/pages/Chat';
 import Tutorials from '@/pages/Tutorials';
@@ -16,14 +16,13 @@ import Dashboard from '@/pages/Dashboard';
 import Auth from '@/pages/Auth';
 import Profile from '@/pages/Profile';
 import NotFound from '@/pages/NotFound';
-import TutorialDetails from "@/pages/TutorialDetails";
 
-const queryClient = new QueryClient(); // ✅ Create query client
+import TutorialDetails from "@/pages/TutorialDetails";
 
 function App() {
   return (
     <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
-      <QueryClientProvider client={queryClient}> {/* ✅ Wrap with provider */}
+      <QueryClient>
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Layout />}>
@@ -43,7 +42,7 @@ function App() {
           </Routes>
         </BrowserRouter>
         <Toaster />
-      </QueryClientProvider>
+      </QueryClient>
     </ThemeProvider>
   );
 }
