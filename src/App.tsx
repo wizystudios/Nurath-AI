@@ -44,7 +44,9 @@ const App: React.FC = () => {
         <TooltipProvider>
           <Toaster />
           <Routes>
-            <Route path="/" element={<Index />} />
+            {/* Chat is now the default route */}
+            <Route path="/" element={<Chat />} />
+            <Route path="/home" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route element={<Layout><Outlet /></Layout>}>
               <Route path="/dashboard" element={
@@ -59,9 +61,7 @@ const App: React.FC = () => {
               <Route path="/editor" element={
                 <ProtectedRoute><CodeEditor /></ProtectedRoute>
               } />
-              <Route path="/chat" element={
-                <ProtectedRoute><Chat /></ProtectedRoute>
-              } />
+              <Route path="/chat" element={<Chat />} />
               <Route path="/progress" element={
                 <ProtectedRoute><ProgressTracker /></ProtectedRoute>
               } />
