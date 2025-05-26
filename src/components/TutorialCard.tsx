@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -56,9 +57,7 @@ const TutorialCard: React.FC<TutorialCardProps> = ({ tutorial, progress = 0, has
           <CardTitle className="text-lg line-clamp-2">{tutorial.title}</CardTitle>
           <div className="flex gap-1">
             {hasQuiz && (
-              <span aria-label="Has Quiz">
-                <Trophy className="h-4 w-4 text-yellow-500 flex-shrink-0" />
-              </span>
+              <Trophy className="h-4 w-4 text-yellow-500 flex-shrink-0" title="Has Quiz" />
             )}
           </div>
         </div>
