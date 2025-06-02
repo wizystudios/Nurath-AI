@@ -19,9 +19,6 @@ interface Discussion {
   likes: number;
   replies: number;
   created_at: string;
-  profiles?: {
-    full_name: string;
-  };
 }
 
 interface Reply {
@@ -29,9 +26,6 @@ interface Reply {
   content: string;
   user_id: string;
   created_at: string;
-  profiles?: {
-    full_name: string;
-  };
 }
 
 const Community = () => {
@@ -78,10 +72,7 @@ const Community = () => {
     try {
       const { data, error } = await supabase
         .from('discussions')
-        .select(`
-          *,
-          profiles(full_name)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -98,10 +89,7 @@ const Community = () => {
     try {
       const { data, error } = await supabase
         .from('discussion_replies')
-        .select(`
-          *,
-          profiles(full_name)
-        `)
+        .select('*')
         .eq('discussion_id', discussionId)
         .order('created_at', { ascending: true });
 
@@ -245,6 +233,11 @@ const Community = () => {
     loadReplies(discussion.id);
   };
 
+  const getUserDisplayName = (userId: string) => {
+    // For now, just show user ID. Later we can implement proper user profiles
+    return `User ${userId.slice(0, 8)}`;
+  };
+
   if (isLoading) {
     return (
       <div className="container mx-auto py-6">
@@ -336,10 +329,10 @@ const Community = () => {
                         <div className="flex items-center gap-1">
                           <Avatar className="w-6 h-6">
                             <AvatarFallback className="text-xs">
-                              {discussion.profiles?.full_name?.[0] || 'U'}
+                              {getUserDisplayName(discussion.user_id)[0]}
                             </AvatarFallback>
                           </Avatar>
-                          <span>{discussion.profiles?.full_name || 'Anonymous'}</span>
+                          <span>{getUserDisplayName(discussion.user_id)}</span>
                         </div>
                         
                         <div className="flex items-center gap-1">
@@ -409,11 +402,11 @@ const Community = () => {
                       <div className="flex items-center gap-2 mb-2">
                         <Avatar className="w-6 h-6">
                           <AvatarFallback className="text-xs">
-                            {reply.profiles?.full_name?.[0] || 'U'}
+                            {getUserDisplayName(reply.user_id)[0]}
                           </AvatarFallback>
                         </Avatar>
                         <span className="text-sm font-medium">
-                          {reply.profiles?.full_name || 'Anonymous'}
+                          {getUserDisplayName(reply.user_id)}
                         </span>
                         <span className="text-xs text-gray-500">
                           {new Date(reply.created_at).toLocaleTimeString()}
