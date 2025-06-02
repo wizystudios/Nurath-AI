@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -764,8 +763,8 @@ const MultimodalAI = () => {
       <canvas ref={canvasRef} style={{ display: 'none' }} />
       <audio ref={audioRef} preload="auto" />
 
-      {/* Custom Styles */}
-      <style jsx>{`
+      {/* Custom Styles - Fixed */}
+      <style>{`
         .custom-scrollbar::-webkit-scrollbar {
           width: 6px;
         }
