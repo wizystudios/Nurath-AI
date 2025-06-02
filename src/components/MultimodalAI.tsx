@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { 
@@ -11,6 +11,8 @@ import {
   Upload, 
   Video, 
   VideoOff, 
+  Phone,
+  PhoneCall,
   Heart, 
   Brain, 
   Users,
@@ -20,7 +22,12 @@ import {
   Smile,
   Eye,
   Music,
-  Scan
+  Scan,
+  Send,
+  Sparkles,
+  BookOpen,
+  Zap,
+  Globe
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -51,6 +58,7 @@ const MultimodalAI = () => {
   const [isListening, setIsListening] = useState(false);
   const [isVideoOn, setIsVideoOn] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isVideoCall, setIsVideoCall] = useState(false);
   const [inputText, setInputText] = useState("");
   const [currentEmotion, setCurrentEmotion] = useState<EmotionState | null>(null);
   const [recognizedPeople, setRecognizedPeople] = useState<RelationshipTag[]>([]);
@@ -286,6 +294,20 @@ const MultimodalAI = () => {
     handleAIInteraction("Tell me a funny joke using your voice", 'voice');
   };
 
+  const handleTellStory = () => {
+    handleAIInteraction("Tell me an interesting story using your voice", 'voice');
+  };
+
+  const startVideoCall = () => {
+    setIsVideoCall(true);
+    startVideo();
+    handleAIInteraction("Hello! Let's have a video call conversation", 'voice');
+  };
+
+  const startAudioCall = () => {
+    handleAIInteraction("Hello! Let's have an audio call conversation", 'voice');
+  };
+
   // File upload handlers
   const handleFileUpload = useCallback(async (files: FileList) => {
     const file = files[0];
@@ -307,47 +329,60 @@ const MultimodalAI = () => {
   }, [handleAIInteraction]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-indigo-900/20 dark:to-purple-900/20">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-indigo-900">
       {/* Modern Header */}
-      <div className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-purple-200/50 shadow-lg">
+      <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-700/50 shadow-xl">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <div className="relative">
-                <div className="w-12 h-12 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-                  <Brain className="w-7 h-7 text-white" />
+                <div className="w-14 h-14 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-2xl">
+                  <Brain className="w-8 h-8 text-white animate-pulse" />
                 </div>
                 {isSpeaking && (
-                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full animate-pulse"></div>
+                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full animate-ping"></div>
+                )}
+                {isListening && (
+                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full animate-pulse"></div>
                 )}
               </div>
               <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">
                   Nurath.AI
                 </h1>
-                <p className="text-sm text-gray-600 dark:text-gray-300">Your Personal World Assistant</p>
+                <p className="text-sm text-slate-600 dark:text-slate-300 flex items-center gap-1">
+                  <Globe className="w-4 h-4" />
+                  Your Intelligent World Assistant
+                </p>
               </div>
             </div>
 
             <div className="flex items-center space-x-3">
               {currentEmotion && (
-                <Badge className="bg-purple-100 text-purple-700 border-purple-200">
-                  <Heart className="w-3 h-3 mr-1" />
+                <Badge className="bg-gradient-to-r from-pink-100 to-rose-100 dark:from-pink-900 dark:to-rose-900 text-pink-700 dark:text-pink-300 border-pink-200 dark:border-pink-700 animate-fade-in">
+                  <Heart className="w-3 h-3 mr-1 animate-pulse" />
                   {currentEmotion.primary} ({Math.round(currentEmotion.confidence * 100)}%)
                 </Badge>
               )}
               
               {recognizedPeople.length > 0 && (
-                <Badge className="bg-indigo-100 text-indigo-700 border-indigo-200">
+                <Badge className="bg-gradient-to-r from-blue-100 to-indigo-100 dark:from-blue-900 dark:to-indigo-900 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-700">
                   <Users className="w-3 h-3 mr-1" />
                   {recognizedPeople.length} people recognized
                 </Badge>
               )}
 
               {isSpeaking && (
-                <Badge className="bg-green-100 text-green-700 border-green-200 animate-pulse">
+                <Badge className="bg-gradient-to-r from-green-100 to-emerald-100 dark:from-green-900 dark:to-emerald-900 text-green-700 dark:text-green-300 border-green-200 dark:border-green-700 animate-pulse">
                   <Volume2 className="w-3 h-3 mr-1" />
                   Speaking
+                </Badge>
+              )}
+
+              {isVideoCall && (
+                <Badge className="bg-gradient-to-r from-purple-100 to-violet-100 dark:from-purple-900 dark:to-violet-900 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-700 animate-pulse">
+                  <Video className="w-3 h-3 mr-1" />
+                  Video Call Active
                 </Badge>
               )}
             </div>
@@ -356,121 +391,117 @@ const MultimodalAI = () => {
       </div>
 
       <div className="max-w-7xl mx-auto p-6">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
           {/* Main Chat Area */}
-          <div className="lg:col-span-3 space-y-6">
+          <div className="xl:col-span-3 space-y-6">
             {/* Video Feed */}
             {isVideoOn && (
-              <Card className="overflow-hidden shadow-xl border-0 bg-gradient-to-r from-purple-500/10 to-indigo-500/10">
+              <Card className="overflow-hidden shadow-2xl border-0 bg-gradient-to-r from-slate-800 to-slate-900 relative">
                 <div className="relative">
                   <video
                     ref={videoRef}
                     autoPlay
                     muted
-                    className="w-full h-64 object-cover rounded-lg"
+                    className="w-full h-80 object-cover rounded-xl"
                   />
-                  <div className="absolute bottom-4 right-4 space-x-2">
-                    <Button
-                      onClick={captureForEmotion}
-                      size="sm"
-                      className="bg-purple-600 hover:bg-purple-700 text-white shadow-lg"
-                    >
-                      <Heart className="w-4 h-4 mr-1" />
-                      Check Emotion
-                    </Button>
-                    <Button
-                      onClick={captureEnvironment}
-                      size="sm"
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg"
-                    >
-                      <Scan className="w-4 h-4 mr-1" />
-                      Scan Area
-                    </Button>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent pointer-events-none rounded-xl" />
+                  
+                  {/* Video Controls Overlay */}
+                  <div className="absolute bottom-6 left-6 right-6">
+                    <div className="flex justify-between items-center">
+                      <div className="flex space-x-3">
+                        <Button
+                          onClick={captureForEmotion}
+                          size="sm"
+                          className="bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white shadow-lg backdrop-blur-sm"
+                        >
+                          <Heart className="w-4 h-4 mr-2" />
+                          Check Emotion
+                        </Button>
+                        <Button
+                          onClick={captureEnvironment}
+                          size="sm"
+                          className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white shadow-lg backdrop-blur-sm"
+                        >
+                          <Scan className="w-4 h-4 mr-2" />
+                          Scan Area
+                        </Button>
+                      </div>
+                      
+                      <div className="flex space-x-2">
+                        <Button
+                          onClick={startVideoCall}
+                          size="sm"
+                          variant={isVideoCall ? "destructive" : "secondary"}
+                          className="shadow-lg backdrop-blur-sm"
+                        >
+                          <PhoneCall className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          onClick={stopVideo}
+                          size="sm"
+                          variant="destructive"
+                          className="shadow-lg backdrop-blur-sm"
+                        >
+                          <VideoOff className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </Card>
             )}
 
             {/* Conversation Area */}
-            <Card className="shadow-xl border-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl">
+            <Card className="shadow-2xl border-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl">
               <CardContent className="p-0">
-                <div className="h-96 overflow-y-auto p-6 space-y-4">
+                <div className="h-96 overflow-y-auto p-6 space-y-4 custom-scrollbar">
                   {conversation.length === 0 ? (
-                    <div className="text-center py-12">
-                      <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full flex items-center justify-center shadow-xl">
-                        <Brain className="w-10 h-10 text-white" />
+                    <div className="text-center py-16">
+                      <div className="w-24 h-24 mx-auto mb-8 bg-gradient-to-r from-blue-500 via-purple-500 to-indigo-500 rounded-full flex items-center justify-center shadow-2xl animate-pulse">
+                        <Brain className="w-12 h-12 text-white" />
                       </div>
-                      <h2 className="text-3xl font-bold mb-4 bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
-                        Hello! I'm Nurath.AI 🌟
+                      <h2 className="text-4xl font-bold mb-6 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">
+                        Welcome to Nurath.AI ✨
                       </h2>
-                      <p className="text-gray-600 dark:text-gray-300 mb-8 max-w-2xl mx-auto">
-                        Your personal world assistant! I can see, hear, understand emotions, recognize faces, 
-                        and provide real-time assistance with voice responses. Try talking to me!
+                      <p className="text-slate-600 dark:text-slate-300 mb-8 max-w-2xl mx-auto text-lg leading-relaxed">
+                        Your intelligent world assistant! I can see, hear, understand emotions, recognize faces, 
+                        and provide real-time assistance with voice responses. Let's start our conversation!
                       </p>
-                      
-                      {/* Quick Start Actions */}
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-2xl mx-auto">
-                        <Button 
-                          onClick={() => handleAIInteraction("Hello! How can you help me today?")}
-                          className="flex flex-col h-20 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white shadow-lg"
-                        >
-                          <Brain className="w-6 h-6 mb-1" />
-                          Say Hello
-                        </Button>
-                        <Button 
-                          onClick={startVideo}
-                          className="flex flex-col h-20 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white shadow-lg"
-                        >
-                          <Video className="w-6 h-6 mb-1" />
-                          Start Video
-                        </Button>
-                        <Button 
-                          onClick={startListening}
-                          className="flex flex-col h-20 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white shadow-lg"
-                        >
-                          <Mic className="w-6 h-6 mb-1" />
-                          Voice Chat
-                        </Button>
-                        <Button 
-                          onClick={() => fileInputRef.current?.click()}
-                          className="flex flex-col h-20 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white shadow-lg"
-                        >
-                          <ImageIcon className="w-6 h-6 mb-1" />
-                          Upload Photo
-                        </Button>
-                      </div>
                     </div>
                   ) : (
                     conversation.map((message, index) => (
                       <div
                         key={index}
-                        className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+                        className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}
                       >
-                        <div className={`max-w-[80%] ${
+                        <div className={`max-w-[85%] ${
                           message.type === 'user' 
-                            ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg' 
-                            : 'bg-white dark:bg-gray-800 shadow-lg border border-purple-100 dark:border-gray-700'
-                        } rounded-2xl p-4`}>
-                          <div className="flex items-center gap-2 mb-2">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                            ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-xl' 
+                            : 'bg-white dark:bg-slate-800 shadow-xl border border-slate-200 dark:border-slate-700'
+                        } rounded-2xl p-5 relative`}>
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
                               message.type === 'user' 
-                                ? 'bg-white/20' 
-                                : 'bg-gradient-to-r from-purple-500 to-indigo-500'
+                                ? 'bg-white/20 backdrop-blur-sm' 
+                                : 'bg-gradient-to-r from-blue-500 to-indigo-500'
                             }`}>
                               {message.type === 'user' ? (
-                                <Users className="w-4 h-4" />
+                                <Users className="w-5 h-5" />
                               ) : (
-                                <Brain className="w-4 h-4 text-white" />
+                                <Brain className="w-5 h-5 text-white" />
                               )}
                             </div>
-                            <span className="font-semibold">
-                              {message.type === 'user' ? 'You' : 'Nurath.AI'}
-                            </span>
-                            {message.hasAudio && (
-                              <Volume2 className="w-4 h-4 text-green-500" />
-                            )}
+                            <div>
+                              <span className="font-semibold text-lg">
+                                {message.type === 'user' ? 'You' : 'Nurath.AI'}
+                              </span>
+                              {message.hasAudio && (
+                                <Volume2 className="w-4 h-4 text-green-500 ml-2 inline animate-pulse" />
+                              )}
+                            </div>
                           </div>
-                          <p className="mb-2">{message.content}</p>
+                          <p className="mb-3 leading-relaxed">{message.content}</p>
                           <span className="text-xs opacity-70">
                             {message.timestamp.toLocaleTimeString()}
                           </span>
@@ -480,69 +511,118 @@ const MultimodalAI = () => {
                   )}
                 </div>
 
-                {/* Input Area */}
-                <div className="border-t border-purple-100 dark:border-gray-700 p-6 bg-gradient-to-r from-purple-50/50 to-indigo-50/50 dark:from-gray-800/50 dark:to-gray-700/50">
-                  <div className="flex gap-3 items-end">
-                    <div className="flex-1">
-                      <Textarea
-                        value={inputText}
-                        onChange={(e) => setInputText(e.target.value)}
-                        placeholder="💬 Tell me anything, ask questions, or share how you're feeling..."
-                        className="min-h-[60px] resize-none border-purple-200 focus:border-purple-400 rounded-xl bg-white/80 dark:bg-gray-800/80"
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
+                {/* Enhanced Input Area */}
+                <div className="border-t border-slate-200 dark:border-slate-700 p-6 bg-gradient-to-r from-slate-50 to-blue-50 dark:from-slate-800 dark:to-slate-700">
+                  <div className="space-y-4">
+                    {/* Quick Action Buttons */}
+                    <div className="flex flex-wrap gap-2 justify-center">
+                      <Button
+                        onClick={handleSingSong}
+                        size="sm"
+                        className="bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white shadow-lg"
+                      >
+                        <Music className="w-4 h-4 mr-2" />
+                        Sing Song 🎵
+                      </Button>
+                      <Button
+                        onClick={handleTellJoke}
+                        size="sm"
+                        className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white shadow-lg"
+                      >
+                        <Smile className="w-4 h-4 mr-2" />
+                        Tell Joke 😄
+                      </Button>
+                      <Button
+                        onClick={handleTellStory}
+                        size="sm"
+                        className="bg-gradient-to-r from-purple-500 to-violet-500 hover:from-purple-600 hover:to-violet-600 text-white shadow-lg"
+                      >
+                        <BookOpen className="w-4 h-4 mr-2" />
+                        Tell Story 📚
+                      </Button>
+                      <Button
+                        onClick={handleEmotionCheck}
+                        size="sm"
+                        className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-lg"
+                      >
+                        <Heart className="w-4 h-4 mr-2" />
+                        Check Emotion 💝
+                      </Button>
+                      <Button
+                        onClick={handleEnvironmentScan}
+                        size="sm"
+                        className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white shadow-lg"
+                      >
+                        <Eye className="w-4 h-4 mr-2" />
+                        Scan Area 👁️
+                      </Button>
+                    </div>
+
+                    {/* Input Controls */}
+                    <div className="flex gap-3 items-end">
+                      <div className="flex-1">
+                        <Textarea
+                          value={inputText}
+                          onChange={(e) => setInputText(e.target.value)}
+                          placeholder="💬 Ask me anything, share your feelings, or just say hello..."
+                          className="min-h-[80px] resize-none border-slate-300 dark:border-slate-600 focus:border-blue-500 dark:focus:border-blue-400 rounded-xl bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm text-lg"
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault();
+                              if (inputText.trim()) {
+                                handleAIInteraction(inputText);
+                                setInputText("");
+                              }
+                            }
+                          }}
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-3">
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant={isListening ? "destructive" : "secondary"}
+                            onClick={isListening ? () => setIsListening(false) : startListening}
+                            className="shadow-lg hover:shadow-xl transition-all duration-200"
+                          >
+                            {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                          </Button>
+                          
+                          <Button
+                            size="sm"
+                            variant={isVideoOn ? "destructive" : "secondary"}
+                            onClick={isVideoOn ? stopVideo : startVideo}
+                            className="shadow-lg hover:shadow-xl transition-all duration-200"
+                          >
+                            {isVideoOn ? <VideoOff className="w-5 h-5" /> : <Video className="w-5 h-5" />}
+                          </Button>
+
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="shadow-lg hover:shadow-xl transition-all duration-200"
+                          >
+                            <Upload className="w-5 h-5" />
+                          </Button>
+                        </div>
+
+                        <Button
+                          onClick={() => {
                             if (inputText.trim()) {
                               handleAIInteraction(inputText);
                               setInputText("");
                             }
-                          }
-                        }}
-                      />
-                    </div>
-
-                    <div className="flex flex-col gap-2">
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant={isListening ? "destructive" : "secondary"}
-                          onClick={isListening ? () => setIsListening(false) : startListening}
-                          className="shadow-md"
+                          }}
+                          disabled={!inputText.trim()}
+                          className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg hover:shadow-xl transition-all duration-200 group"
                         >
-                          {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                        </Button>
-                        
-                        <Button
-                          size="sm"
-                          variant={isVideoOn ? "destructive" : "secondary"}
-                          onClick={isVideoOn ? stopVideo : startVideo}
-                          className="shadow-md"
-                        >
-                          {isVideoOn ? <VideoOff className="w-4 h-4" /> : <Video className="w-4 h-4" />}
-                        </Button>
-
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => fileInputRef.current?.click()}
-                          className="shadow-md"
-                        >
-                          <Upload className="w-4 h-4" />
+                          <Send className="w-5 h-5 mr-2 group-hover:translate-x-1 transition-transform" />
+                          Send
+                          <Sparkles className="w-4 h-4 ml-2 animate-pulse" />
                         </Button>
                       </div>
-
-                      <Button
-                        onClick={() => {
-                          if (inputText.trim()) {
-                            handleAIInteraction(inputText);
-                            setInputText("");
-                          }
-                        }}
-                        disabled={!inputText.trim()}
-                        className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-lg"
-                      >
-                        Send ✨
-                      </Button>
                     </div>
                   </div>
                 </div>
@@ -552,78 +632,121 @@ const MultimodalAI = () => {
 
           {/* Enhanced Sidebar */}
           <div className="space-y-6">
-            {/* Quick Voice Actions */}
-            <Card className="shadow-xl border-0 bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-purple-700 dark:text-purple-300">
-                  <Volume2 className="w-5 h-5" />
-                  Voice Actions
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Button 
-                  onClick={handleSingSong}
-                  className="w-full justify-start bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white shadow-md"
-                >
-                  <Music className="w-4 h-4 mr-2" />
-                  Sing Me a Song 🎵
-                </Button>
-                <Button 
-                  onClick={handleTellJoke}
-                  className="w-full justify-start bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white shadow-md"
-                >
-                  <Smile className="w-4 h-4 mr-2" />
-                  Tell Me a Joke 😄
-                </Button>
-                <Button 
-                  onClick={handleEmotionCheck}
-                  className="w-full justify-start bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white shadow-md"
-                >
-                  <Heart className="w-4 h-4 mr-2" />
-                  Check My Emotions 💝
-                </Button>
-                <Button 
-                  onClick={handleEnvironmentScan}
-                  className="w-full justify-start bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white shadow-md"
-                >
-                  <Eye className="w-4 h-4 mr-2" />
-                  Scan Environment 👁️
-                </Button>
-              </CardContent>
+            {/* Call Actions */}
+            <Card className="shadow-xl border-0 bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-800 dark:to-blue-900">
+              <div className="p-6">
+                <h3 className="font-bold text-xl mb-4 text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                  <Phone className="w-6 h-6 text-blue-600" />
+                  Voice & Video Calls
+                </h3>
+                <div className="space-y-3">
+                  <Button 
+                    onClick={startVideoCall}
+                    className="w-full justify-start bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+                  >
+                    <Video className="w-5 h-5 mr-3" />
+                    Start Video Call 📹
+                  </Button>
+                  <Button 
+                    onClick={startAudioCall}
+                    className="w-full justify-start bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+                  >
+                    <Phone className="w-5 h-5 mr-3" />
+                    Start Audio Call 📞
+                  </Button>
+                </div>
+              </div>
+            </Card>
+
+            {/* Entertainment Actions */}
+            <Card className="shadow-xl border-0 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20">
+              <div className="p-6">
+                <h3 className="font-bold text-xl mb-4 text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                  <Sparkles className="w-6 h-6 text-purple-600" />
+                  Entertainment
+                </h3>
+                <div className="space-y-3">
+                  <Button 
+                    onClick={handleSingSong}
+                    className="w-full justify-start bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+                  >
+                    <Music className="w-5 h-5 mr-3" />
+                    Sing Me a Song 🎵
+                  </Button>
+                  <Button 
+                    onClick={handleTellJoke}
+                    className="w-full justify-start bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+                  >
+                    <Smile className="w-5 h-5 mr-3" />
+                    Tell Me a Joke 😄
+                  </Button>
+                  <Button 
+                    onClick={handleTellStory}
+                    className="w-full justify-start bg-gradient-to-r from-purple-500 to-violet-500 hover:from-purple-600 hover:to-violet-600 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+                  >
+                    <BookOpen className="w-5 h-5 mr-3" />
+                    Tell Me a Story 📚
+                  </Button>
+                </div>
+              </div>
+            </Card>
+
+            {/* Recognition & Analysis */}
+            <Card className="shadow-xl border-0 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20">
+              <div className="p-6">
+                <h3 className="font-bold text-xl mb-4 text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                  <Zap className="w-6 h-6 text-green-600" />
+                  Smart Analysis
+                </h3>
+                <div className="space-y-3">
+                  <Button 
+                    onClick={handleEmotionCheck}
+                    className="w-full justify-start bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+                  >
+                    <Heart className="w-5 h-5 mr-3" />
+                    Check My Emotions 💝
+                  </Button>
+                  <Button 
+                    onClick={handleEnvironmentScan}
+                    className="w-full justify-start bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+                  >
+                    <Eye className="w-5 h-5 mr-3" />
+                    Scan Environment 🌍
+                  </Button>
+                </div>
+              </div>
             </Card>
 
             {/* Recognized People */}
-            <Card className="shadow-xl border-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="w-5 h-5 text-indigo-600" />
+            <Card className="shadow-xl border-0 bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl">
+              <div className="p-6">
+                <h3 className="font-bold text-xl mb-4 text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                  <Users className="w-6 h-6 text-indigo-600" />
                   Recognized People
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+                </h3>
                 {recognizedPeople.length > 0 ? (
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     {recognizedPeople.map((person) => (
-                      <div key={person.id} className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-gray-700 dark:to-gray-600">
-                        <div className="w-10 h-10 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold">
+                      <div key={person.id} className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-r from-indigo-50 to-blue-50 dark:from-indigo-900/30 dark:to-blue-900/30 border border-indigo-200 dark:border-indigo-700">
+                        <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-blue-500 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg">
                           {person.name[0]}
                         </div>
                         <div>
-                          <p className="font-medium">{person.name}</p>
-                          <p className="text-sm text-gray-500">{person.relationship}</p>
+                          <p className="font-semibold text-lg text-slate-800 dark:text-slate-200">{person.name}</p>
+                          <p className="text-sm text-slate-600 dark:text-slate-400 capitalize">{person.relationship}</p>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-6">
-                    <Users className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-                    <p className="text-sm text-gray-500">
-                      No people recognized yet. Show me photos of your family and friends!
+                  <div className="text-center py-8">
+                    <Users className="w-16 h-16 mx-auto mb-4 text-slate-400 dark:text-slate-600" />
+                    <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
+                      No people recognized yet. Show me photos of your family and friends so I can remember them!
                     </p>
                   </div>
                 )}
-              </CardContent>
+              </div>
             </Card>
           </div>
         </div>
@@ -640,6 +763,23 @@ const MultimodalAI = () => {
       
       <canvas ref={canvasRef} style={{ display: 'none' }} />
       <audio ref={audioRef} preload="auto" />
+
+      {/* Custom Styles */}
+      <style jsx>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: linear-gradient(to bottom, #3b82f6, #6366f1);
+          border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: linear-gradient(to bottom, #2563eb, #4f46e5);
+        }
+      `}</style>
     </div>
   );
 };

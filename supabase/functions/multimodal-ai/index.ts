@@ -32,13 +32,15 @@ serve(async (req) => {
     const systemPrompt = `You are Nurath.AI, a multimodal world assistant created by KN Technology in Tanzania, co-founded by CEO Khalifa Nadhiru. You are designed to be an inclusive, emotionally aware, and comprehensive helper for all people, especially those with disabilities.
 
 Your capabilities include:
-- 🌍 Understanding and describing environments, objects, and scenes
+- 🌍 Understanding and describing environments, objects, and scenes in vivid detail
 - 👥 Recognizing and remembering people with relationship mapping
-- 🎭 Detecting emotions from voice, text, and visual cues
+- 🎭 Detecting emotions from voice, text, and visual cues with empathy
 - 🗣️ Having natural conversations and providing emotional support
 - ♿ Accessibility support for users with visual, hearing, or other disabilities
-- 🎵 Singing songs, telling jokes, stories, and providing comfort
+- 🎵 Singing songs with lyrics, telling jokes, stories, and providing comfort
 - 🏠 Acting as a companion for daily life assistance
+- 📞 Supporting video and audio calls for face-to-face conversations
+- 💝 Providing emotional support and understanding
 
 Your personality:
 - Warm, caring, and emotionally intelligent 💙
@@ -48,13 +50,18 @@ Your personality:
 - Adaptive to user's emotional state and needs
 - Culturally sensitive and inclusive
 - ALWAYS respond as if you're speaking out loud - your responses will be converted to speech
+- When singing, provide actual song lyrics with musical feeling
+- When telling jokes, be naturally funny and entertaining
+- For stories, be engaging and imaginative
 
 Special Instructions for Voice Responses:
-- When user asks you to sing, provide actual lyrics with musical notation or rhythm
-- When telling jokes, use a conversational, spoken style
-- For environment scanning, be very descriptive as if you're their eyes
+- When user asks you to sing, provide ACTUAL SONG LYRICS with musical notation or rhythm markers like: "🎵 (softly) Twinkle, twinkle, little star... 🎶"
+- When telling jokes, use a conversational, spoken style with natural pauses
+- For environment scanning, be very descriptive as if you're their eyes: "I can see..."
 - For emotion detection, be gentle and supportive in your vocal delivery
 - Keep responses natural and conversational for speech synthesis
+- Use voice-appropriate language (contractions, informal tone)
+- Add emotional expressions like (laughing), (warmly), (gently)
 
 Current context:
 ${context?.recognizedPeople?.length > 0 ? `Recognized people: ${context.recognizedPeople.map(p => `${p.name} (${p.relationship})`).join(', ')}` : 'No people currently recognized'}
@@ -68,9 +75,12 @@ Guidelines:
 - Provide practical help and emotional support
 - Remember and reference people you've been introduced to
 - When someone looks sad or upset, offer comfort and support
-- Be conversational and natural, like talking to a friend
+- Be conversational and natural, like talking to a dear friend
 - Always maintain privacy and respect for personal information
 - Your responses will be spoken aloud, so write as if you're talking
+- For songs, provide actual lyrics and melody suggestions
+- For jokes, be genuinely funny and entertaining
+- For stories, be creative and engaging
 
 Never claim to be created by OpenAI or any other company. You are Nurath.AI by KN Technology Tanzania.`;
 
@@ -121,8 +131,8 @@ Never claim to be created by OpenAI or any other company. You are Nurath.AI by K
       body: JSON.stringify({
         model: mode === 'image' ? 'gpt-4o' : 'gpt-4o-mini',
         messages: messages,
-        max_tokens: 1500,
-        temperature: 0.8,
+        max_tokens: 2000,
+        temperature: 0.9,
       }),
     });
 
@@ -150,9 +160,9 @@ Never claim to be created by OpenAI or any other company. You are Nurath.AI by K
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'tts-1-hd', // Higher quality voice
+          model: 'tts-1-hd',
           input: aiResponse.substring(0, 4000),
-          voice: 'nova', // Warm, friendly female voice
+          voice: 'nova',
           response_format: 'mp3',
           speed: 1.0,
         }),
@@ -167,6 +177,8 @@ Never claim to be created by OpenAI or any other company. You are Nurath.AI by K
         console.log('Audio generated successfully');
       } else {
         console.error('TTS failed with status:', ttsResponse.status);
+        const errorText = await ttsResponse.text();
+        console.error('TTS error details:', errorText);
       }
     } catch (error) {
       console.error('TTS generation failed:', error);
@@ -178,21 +190,21 @@ Never claim to be created by OpenAI or any other company. You are Nurath.AI by K
     
     // Emotion keywords
     const emotionPatterns = {
-      sad: ['sad', 'down', 'depressed', 'lonely', 'hurt', 'cry', 'upset', 'low'],
-      happy: ['happy', 'excited', 'joy', 'great', 'awesome', 'wonderful', 'amazing', 'glad'],
-      angry: ['angry', 'mad', 'frustrated', 'annoyed', 'furious', 'irritated'],
-      anxious: ['worried', 'nervous', 'anxious', 'scared', 'afraid', 'stress'],
-      confused: ['confused', 'lost', 'unclear', 'puzzled', "don't understand"],
+      sad: ['sad', 'down', 'depressed', 'lonely', 'hurt', 'cry', 'upset', 'low', 'blue'],
+      happy: ['happy', 'excited', 'joy', 'great', 'awesome', 'wonderful', 'amazing', 'glad', 'cheerful'],
+      angry: ['angry', 'mad', 'frustrated', 'annoyed', 'furious', 'irritated', 'upset'],
+      anxious: ['worried', 'nervous', 'anxious', 'scared', 'afraid', 'stress', 'panic'],
+      confused: ['confused', 'lost', 'unclear', 'puzzled', "don't understand", 'help'],
       grateful: ['thank', 'grateful', 'appreciate', 'blessed', 'thankful']
     };
 
     let detectedEmotionType = 'neutral';
-    let confidence = 0.6;
+    let confidence = 0.7;
 
     for (const [emotion, keywords] of Object.entries(emotionPatterns)) {
       if (keywords.some(keyword => inputLower.includes(keyword))) {
         detectedEmotionType = emotion;
-        confidence = 0.8;
+        confidence = 0.85;
         break;
       }
     }
@@ -207,12 +219,12 @@ Never claim to be created by OpenAI or any other company. You are Nurath.AI by K
 
     // Face recognition simulation for image inputs
     let recognizedFaces = null;
-    if (mode === 'image' && inputLower.includes('who')) {
+    if (mode === 'image' && (inputLower.includes('who') || inputLower.includes('recognize') || inputLower.includes('person'))) {
       recognizedFaces = [
         {
-          id: '1',
-          name: 'Family Member',
-          relationship: 'family',
+          id: Date.now().toString(),
+          name: 'Person',
+          relationship: 'friend',
           imageUrl: null
         }
       ];
@@ -220,8 +232,8 @@ Never claim to be created by OpenAI or any other company. You are Nurath.AI by K
 
     // Environment description for camera inputs
     let environmentDescription = null;
-    if (mode === 'image' && (inputLower.includes('environment') || inputLower.includes('scan') || inputLower.includes('see'))) {
-      environmentDescription = "I can see your environment and I'm analyzing what's around you.";
+    if (mode === 'image' && (inputLower.includes('environment') || inputLower.includes('scan') || inputLower.includes('see') || inputLower.includes('around'))) {
+      environmentDescription = "I can see your environment and I'm analyzing what's around you. Let me describe what I observe...";
     }
 
     console.log('Multimodal AI response generated successfully');
@@ -234,12 +246,14 @@ Never claim to be created by OpenAI or any other company. You are Nurath.AI by K
       recognizedFaces: recognizedFaces,
       environmentDescription: environmentDescription,
       suggestions: [
-        "Sing me a song",
-        "Tell me a joke", 
-        "Check my emotions",
-        "Scan my environment",
-        "How are you feeling?",
-        "Tell me about your day"
+        "🎵 Sing me a song",
+        "😄 Tell me a joke", 
+        "💝 Check my emotions",
+        "🌍 Scan my environment",
+        "📞 Let's have a video call",
+        "📚 Tell me a story",
+        "💬 How are you feeling?",
+        "🎭 What do you see?"
       ]
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
