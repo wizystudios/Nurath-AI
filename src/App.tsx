@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { BrowserRouter, Routes, Route, Outlet, Navigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
 import { TooltipProvider } from "@/components/ui/tooltip"
@@ -17,6 +18,8 @@ import NotFound from './pages/NotFound';
 import { Layout } from './components/Layout';
 import NewDiscussion from './pages/NewDiscussion';
 import { supabase } from '@/integrations/supabase/client';
+
+const queryClient = new QueryClient();
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = React.useState(true);
@@ -39,47 +42,49 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 const App: React.FC = () => {
   return (
-    <BrowserRouter>
-      <ThemeProvider defaultTheme="system" storageKey="nurath-ui-theme">
-        <TooltipProvider>
-          <Toaster />
-          <Routes>
-            {/* Chat is now the default route */}
-            <Route path="/" element={<Chat />} />
-            <Route path="/home" element={<Index />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route element={<Layout><Outlet /></Layout>}>
-              <Route path="/dashboard" element={
-                <ProtectedRoute><Dashboard /></ProtectedRoute>
-              } />
-              <Route path="/tutorials" element={
-                <ProtectedRoute><Tutorials /></ProtectedRoute>
-              } />
-              <Route path="/code-editor" element={
-                <ProtectedRoute><CodeEditor /></ProtectedRoute>
-              } />
-              <Route path="/editor" element={
-                <ProtectedRoute><CodeEditor /></ProtectedRoute>
-              } />
-              <Route path="/chat" element={<Chat />} />
-              <Route path="/progress" element={
-                <ProtectedRoute><ProgressTracker /></ProtectedRoute>
-              } />
-              <Route path="/community" element={
-                <ProtectedRoute><Community /></ProtectedRoute>
-              } />
-              <Route path="/community/new-discussion" element={
-                <ProtectedRoute><NewDiscussion /></ProtectedRoute>
-              } />
-              <Route path="/profile" element={
-                <ProtectedRoute><Profile /></ProtectedRoute>
-              } />
-            </Route>
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </TooltipProvider>
-      </ThemeProvider>
-    </BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <ThemeProvider defaultTheme="system" storageKey="nurath-ui-theme">
+          <TooltipProvider>
+            <Toaster />
+            <Routes>
+              {/* Chat is now the default route */}
+              <Route path="/" element={<Chat />} />
+              <Route path="/home" element={<Index />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route element={<Layout><Outlet /></Layout>}>
+                <Route path="/dashboard" element={
+                  <ProtectedRoute><Dashboard /></ProtectedRoute>
+                } />
+                <Route path="/tutorials" element={
+                  <ProtectedRoute><Tutorials /></ProtectedRoute>
+                } />
+                <Route path="/code-editor" element={
+                  <ProtectedRoute><CodeEditor /></ProtectedRoute>
+                } />
+                <Route path="/editor" element={
+                  <ProtectedRoute><CodeEditor /></ProtectedRoute>
+                } />
+                <Route path="/chat" element={<Chat />} />
+                <Route path="/progress" element={
+                  <ProtectedRoute><ProgressTracker /></ProtectedRoute>
+                } />
+                <Route path="/community" element={
+                  <ProtectedRoute><Community /></ProtectedRoute>
+                } />
+                <Route path="/community/new-discussion" element={
+                  <ProtectedRoute><NewDiscussion /></ProtectedRoute>
+                } />
+                <Route path="/profile" element={
+                  <ProtectedRoute><Profile /></ProtectedRoute>
+                } />
+              </Route>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </TooltipProvider>
+        </ThemeProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 };
 

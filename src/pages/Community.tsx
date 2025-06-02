@@ -1,351 +1,463 @@
 
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ThumbsUp, MessageSquare, Plus, Send } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { MessageCircle, Heart, Plus, Send, Users } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/components/ui/sonner";
-import { Discussion, ChatMessage } from "@/types/community";
-import NKTechLogo from "@/components/NKTechLogo";
+import { useNavigate } from "react-router-dom";
+
+interface Discussion {
+  id: string;
+  title: string;
+  content: string;
+  user_id: string;
+  likes: number;
+  replies: number;
+  created_at: string;
+  profiles?: {
+    full_name: string;
+  };
+}
+
+interface Reply {
+  id: string;
+  content: string;
+  user_id: string;
+  created_at: string;
+  profiles?: {
+    full_name: string;
+  };
+}
 
 const Community = () => {
-  const navigate = useNavigate();
   const [discussions, setDiscussions] = useState<Discussion[]>([]);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [messageInput, setMessageInput] = useState("");
+  const [selectedDiscussion, setSelectedDiscussion] = useState<Discussion | null>(null);
+  const [replies, setReplies] = useState<Reply[]>([]);
+  const [newReply, setNewReply] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
+  const navigate = useNavigate();
 
-  // Fetch discussions and messages when component mounts
+  // New discussion form
+  const [showNewDiscussion, setShowNewDiscussion] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newContent, setNewContent] = useState("");
+
   useEffect(() => {
-    const fetchCommunityData = async () => {
-      setLoading(true);
-      try {
-        // Fetch chat messages
-        const { data: messagesData, error: messagesError } = await supabase
-          .from('chat_messages')
-          .select(`
-            id,
-            content,
-            created_at,
-            profiles(id, full_name, avatar_url)
-          `)
-          .order('created_at', { ascending: false })
-          .limit(20);
-          
-        if (messagesError) throw messagesError;
-        
-        // Format the messages data
-        const formattedMessages: ChatMessage[] = messagesData?.map((msg: any) => ({
-          id: msg.id,
-          content: msg.content,
-          user: {
-            id: msg.profiles?.id || "",
-            name: msg.profiles?.full_name || "Unknown User",
-            role: "Community Member", // Default role since it's not in the profile table
-            avatarUrl: msg.profiles?.avatar_url
-          },
-          createdAt: new Date(msg.created_at)
-        })) || [];
-        
-        setMessages(formattedMessages);
-
-        // For now, use sample discussions until the migrations are in place
-        const sampleDiscussions: Discussion[] = [
-          {
-            id: '1',
-            title: 'Best practice for React state management?',
-            content: 'I\'m building a medium-sized React application and I\'m wondering what\'s the current best approach for state management. Should I use Redux, Context API, or something else?',
-            author: {
-              id: '101',
-              name: 'Maria Johnson',
-              role: 'React Developer',
-              avatarUrl: null
-            },
-            createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-            likes: 5,
-            replies: 3
-          },
-          {
-            id: '2',
-            title: 'Resources for learning TypeScript',
-            content: 'Can anyone recommend good resources for learning TypeScript? I\'m comfortable with JavaScript but want to add type safety to my projects.',
-            author: {
-              id: '102',
-              name: 'Ahmed Hassan',
-              role: 'Full Stack Developer',
-              avatarUrl: null
-            },
-            createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000), // 5 hours ago
-            likes: 8,
-            replies: 6
-          }
-        ];
-        
-        setDiscussions(sampleDiscussions);
-      } catch (error) {
-        console.error("Error fetching community data:", error);
-        toast.error("Failed to load community data");
-      } finally {
-        setLoading(false);
-      }
-    };
+    checkUser();
+    loadDiscussions();
     
-    fetchCommunityData();
-    
-    // Set up real-time subscription for chat messages
-    const messageSubscription = supabase
-      .channel('community_chat')
-      .on('postgres_changes', 
-          { event: 'INSERT', schema: 'public', table: 'chat_messages' }, 
-          handleNewMessage)
+    // Set up real-time subscription for discussions
+    const discussionsSubscription = supabase
+      .channel('discussions_changes')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'discussions'
+      }, () => {
+        loadDiscussions();
+      })
       .subscribe();
-      
+
     return () => {
-      supabase.removeChannel(messageSubscription);
+      supabase.removeChannel(discussionsSubscription);
     };
   }, []);
-  
-  // Handle new chat messages from the real-time subscription
-  const handleNewMessage = async (payload: any) => {
-    // Fetch user profile for the new message
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('id, full_name, avatar_url')
-      .eq('id', payload.new.user_id)
-      .single();
-      
-    const newMessage: ChatMessage = {
-      id: payload.new.id,
-      content: payload.new.content,
-      user: {
-        id: payload.new.user_id,
-        name: profileData?.full_name || "Unknown User",
-        role: "Community Member", // Default role
-        avatarUrl: profileData?.avatar_url
-      },
-      createdAt: new Date(payload.new.created_at)
-    };
-    
-    setMessages(prev => [newMessage, ...prev]);
+
+  const checkUser = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    setUser(session?.user || null);
   };
-  
-  // Format date to relative time (e.g., "2 hours ago")
-  const formatRelativeTime = (date: Date) => {
-    const now = new Date();
-    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-    
-    if (diffInSeconds < 60) {
-      return "Just now";
-    } else if (diffInSeconds < 3600) {
-      const minutes = Math.floor(diffInSeconds / 60);
-      return `${minutes} ${minutes === 1 ? "minute" : "minutes"} ago`;
-    } else if (diffInSeconds < 86400) {
-      const hours = Math.floor(diffInSeconds / 3600);
-      return `${hours} ${hours === 1 ? "hour" : "hours"} ago`;
-    } else {
-      const days = Math.floor(diffInSeconds / 86400);
-      return `${days} ${days === 1 ? "day" : "days"} ago`;
+
+  const loadDiscussions = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('discussions')
+        .select(`
+          *,
+          profiles(full_name)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setDiscussions(data || []);
+    } catch (error) {
+      console.error('Error loading discussions:', error);
+      toast.error("Failed to load discussions");
+    } finally {
+      setIsLoading(false);
     }
   };
-  
-  // Send a new chat message
-  const sendMessage = async () => {
-    if (!messageInput.trim()) return;
-    
-    const { data: sessionData } = await supabase.auth.getSession();
-    if (!sessionData?.session?.user) {
-      toast.error("You must be logged in to send messages");
+
+  const loadReplies = async (discussionId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('discussion_replies')
+        .select(`
+          *,
+          profiles(full_name)
+        `)
+        .eq('discussion_id', discussionId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      setReplies(data || []);
+    } catch (error) {
+      console.error('Error loading replies:', error);
+      toast.error("Failed to load replies");
+    }
+  };
+
+  const createDiscussion = async () => {
+    if (!user) {
+      toast.error("Please sign in to create discussions");
+      navigate("/auth");
       return;
     }
-    
+
+    if (!newTitle.trim() || !newContent.trim()) {
+      toast.error("Please fill in both title and content");
+      return;
+    }
+
     try {
       const { error } = await supabase
-        .from('chat_messages')
+        .from('discussions')
         .insert({
-          content: messageInput,
-          user_id: sessionData.session.user.id,
-          role: 'user' // Add required role field
+          title: newTitle.trim(),
+          content: newContent.trim(),
+          user_id: user.id
         });
-        
+
       if (error) throw error;
-      
-      setMessageInput("");
+
+      toast.success("Discussion created! 🎉");
+      setNewTitle("");
+      setNewContent("");
+      setShowNewDiscussion(false);
+      loadDiscussions();
     } catch (error) {
-      console.error("Error sending message:", error);
-      toast.error("Failed to send message");
+      console.error('Error creating discussion:', error);
+      toast.error("Failed to create discussion");
     }
   };
-  
-  // Create a new discussion
-  const createNewDiscussion = () => {
-    navigate("/community/new-discussion");
+
+  const addReply = async () => {
+    if (!user) {
+      toast.error("Please sign in to reply");
+      navigate("/auth");
+      return;
+    }
+
+    if (!newReply.trim() || !selectedDiscussion) return;
+
+    try {
+      const { error } = await supabase
+        .from('discussion_replies')
+        .insert({
+          discussion_id: selectedDiscussion.id,
+          content: newReply.trim(),
+          user_id: user.id
+        });
+
+      if (error) throw error;
+
+      // Update reply count
+      await supabase
+        .from('discussions')
+        .update({ replies: selectedDiscussion.replies + 1 })
+        .eq('id', selectedDiscussion.id);
+
+      setNewReply("");
+      loadReplies(selectedDiscussion.id);
+      loadDiscussions(); // Refresh to update reply count
+      toast.success("Reply added! 💬");
+    } catch (error) {
+      console.error('Error adding reply:', error);
+      toast.error("Failed to add reply");
+    }
   };
-  
-  // Get initials from name for avatar fallback
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(part => part[0])
-      .join('')
-      .toUpperCase()
-      .substring(0, 2);
+
+  const likeDiscussion = async (discussionId: string) => {
+    if (!user) {
+      toast.error("Please sign in to like discussions");
+      return;
+    }
+
+    try {
+      // Check if already liked
+      const { data: existingLike } = await supabase
+        .from('discussion_likes')
+        .select('id')
+        .eq('discussion_id', discussionId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (existingLike) {
+        // Unlike
+        await supabase
+          .from('discussion_likes')
+          .delete()
+          .eq('discussion_id', discussionId)
+          .eq('user_id', user.id);
+
+        // Decrease like count
+        const discussion = discussions.find(d => d.id === discussionId);
+        if (discussion) {
+          await supabase
+            .from('discussions')
+            .update({ likes: Math.max(0, discussion.likes - 1) })
+            .eq('id', discussionId);
+        }
+      } else {
+        // Like
+        await supabase
+          .from('discussion_likes')
+          .insert({
+            discussion_id: discussionId,
+            user_id: user.id
+          });
+
+        // Increase like count
+        const discussion = discussions.find(d => d.id === discussionId);
+        if (discussion) {
+          await supabase
+            .from('discussions')
+            .update({ likes: discussion.likes + 1 })
+            .eq('id', discussionId);
+        }
+      }
+
+      loadDiscussions();
+    } catch (error) {
+      console.error('Error toggling like:', error);
+      toast.error("Failed to update like");
+    }
   };
+
+  const openDiscussion = (discussion: Discussion) => {
+    setSelectedDiscussion(discussion);
+    loadReplies(discussion.id);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto py-6">
+        <div className="text-center">Loading community discussions...</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="container mx-auto py-6 space-y-8">
-      <div className="flex flex-col space-y-2">
-        <h1 className="text-3xl font-bold">Community Hub</h1>
-        <p className="text-muted-foreground">Connect with other learners and mentors</p>
+    <div className="container mx-auto py-6 max-w-6xl">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <Users className="w-8 h-8 text-purple-600" />
+            🌟 Community Hub
+          </h1>
+          <p className="text-gray-600 dark:text-gray-300 mt-2">
+            Connect, share, and learn together with the Nurath.AI community!
+          </p>
+        </div>
+        
+        <Button
+          onClick={() => setShowNewDiscussion(!showNewDiscussion)}
+          className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          New Discussion
+        </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Left Column: Discussions */}
-        <div className="md:col-span-2 space-y-6">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold">Recent Discussions</h2>
-            <Button onClick={createNewDiscussion}>
-              <Plus className="h-4 w-4 mr-2" /> New Discussion
-            </Button>
-          </div>
-          <p className="text-sm text-muted-foreground">Join conversations or start a new topic</p>
-          
-          {loading ? (
-            <div className="space-y-4">
-              {[1, 2, 3].map(i => (
-                <Card key={i} className="animate-pulse">
-                  <CardHeader className="pb-3">
-                    <div className="h-5 w-3/4 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                    <div className="flex items-center mt-2">
-                      <div className="h-10 w-10 rounded-full bg-gray-200 dark:bg-gray-700"></div>
-                      <div className="ml-3">
-                        <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                        <div className="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded mt-1"></div>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-4 w-full bg-gray-200 dark:bg-gray-700 rounded"></div>
-                    <div className="h-4 w-5/6 bg-gray-200 dark:bg-gray-700 rounded mt-2"></div>
-                  </CardContent>
-                </Card>
-              ))}
+      {/* New Discussion Form */}
+      {showNewDiscussion && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>✨ Start a New Discussion</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Input
+              placeholder="💭 What's your discussion about?"
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+            />
+            <Textarea
+              placeholder="💬 Share your thoughts, questions, or insights..."
+              value={newContent}
+              onChange={(e) => setNewContent(e.target.value)}
+              className="min-h-[120px]"
+            />
+            <div className="flex gap-2">
+              <Button
+                onClick={createDiscussion}
+                disabled={!newTitle.trim() || !newContent.trim()}
+                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+              >
+                🚀 Create Discussion
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowNewDiscussion(false)}
+              >
+                Cancel
+              </Button>
             </div>
-          ) : discussions.length > 0 ? (
-            <div className="space-y-4">
-              {discussions.map((discussion) => (
-                <Card key={discussion.id} className="transition-all hover:shadow-md cursor-pointer">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg font-bold">{discussion.title}</CardTitle>
-                    <div className="flex items-center mt-1">
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={discussion.author.avatarUrl || undefined} />
-                        <AvatarFallback>{getInitials(discussion.author.name)}</AvatarFallback>
-                      </Avatar>
-                      <div className="ml-2">
-                        <p className="text-sm font-medium">{discussion.author.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {discussion.author.role} · {formatRelativeTime(discussion.createdAt)}
-                        </p>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Discussions List */}
+        <div className="lg:col-span-2 space-y-4">
+          {discussions.length > 0 ? (
+            discussions.map((discussion) => (
+              <Card 
+                key={discussion.id} 
+                className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02]"
+                onClick={() => openDiscussion(discussion)}
+              >
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">
+                        {discussion.title}
+                      </h3>
+                      <p className="text-gray-600 dark:text-gray-300 mb-3 line-clamp-2">
+                        {discussion.content}
+                      </p>
+                      
+                      <div className="flex items-center gap-4 text-sm text-gray-500">
+                        <div className="flex items-center gap-1">
+                          <Avatar className="w-6 h-6">
+                            <AvatarFallback className="text-xs">
+                              {discussion.profiles?.full_name?.[0] || 'U'}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span>{discussion.profiles?.full_name || 'Anonymous'}</span>
+                        </div>
+                        
+                        <div className="flex items-center gap-1">
+                          <Heart className="w-4 h-4" />
+                          <span>{discussion.likes}</span>
+                        </div>
+                        
+                        <div className="flex items-center gap-1">
+                          <MessageCircle className="w-4 h-4" />
+                          <span>{discussion.replies}</span>
+                        </div>
+                        
+                        <span>
+                          {new Date(discussion.created_at).toLocaleDateString()}
+                        </span>
                       </div>
                     </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground line-clamp-2">{discussion.content}</p>
-                    <div className="flex items-center mt-4 space-x-6">
-                      <div className="flex items-center text-sm text-muted-foreground">
-                        <ThumbsUp className="h-4 w-4 mr-1" />
-                        <span>{discussion.likes}</span>
-                      </div>
-                      <div className="flex items-center text-sm text-muted-foreground">
-                        <MessageSquare className="h-4 w-4 mr-1" />
-                        <span>{discussion.replies}</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                    
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        likeDiscussion(discussion.id);
+                      }}
+                      className="ml-4"
+                    >
+                      <Heart className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
           ) : (
-            <Card className="p-8 text-center">
-              <p className="text-muted-foreground mb-4">No discussions yet. Be the first to start a conversation!</p>
-              <Button onClick={createNewDiscussion}>Start a Discussion</Button>
+            <Card>
+              <CardContent className="text-center py-12">
+                <MessageCircle className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                <h3 className="text-lg font-medium mb-2">No discussions yet</h3>
+                <p className="text-gray-500 mb-4">
+                  Be the first to start a conversation in our community!
+                </p>
+                <Button
+                  onClick={() => setShowNewDiscussion(true)}
+                  className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                >
+                  🚀 Start First Discussion
+                </Button>
+              </CardContent>
             </Card>
           )}
         </div>
-        
-        {/* Right Column: Chat */}
-        <div>
-          <Card className="h-[600px] flex flex-col">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg">Live Community Chat</CardTitle>
-              <p className="text-sm text-muted-foreground">Ask questions and get help in real-time</p>
-            </CardHeader>
-            <div className="flex-1 overflow-y-auto px-4 space-y-4">
-              {loading ? (
-                <div className="space-y-4 py-2">
-                  {[1, 2, 3].map(i => (
-                    <div key={i} className="flex items-start animate-pulse">
-                      <div className="h-8 w-8 rounded-full bg-gray-200 dark:bg-gray-700"></div>
-                      <div className="ml-2 space-y-1">
-                        <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                        <div className="h-12 w-48 bg-gray-200 dark:bg-gray-700 rounded"></div>
+
+        {/* Discussion Detail / Chat */}
+        <div className="lg:col-span-1">
+          {selectedDiscussion ? (
+            <Card className="sticky top-4">
+              <CardHeader>
+                <CardTitle className="text-lg">{selectedDiscussion.title}</CardTitle>
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  {selectedDiscussion.content}
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3 max-h-96 overflow-y-auto mb-4">
+                  {replies.map((reply) => (
+                    <div key={reply.id} className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Avatar className="w-6 h-6">
+                          <AvatarFallback className="text-xs">
+                            {reply.profiles?.full_name?.[0] || 'U'}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm font-medium">
+                          {reply.profiles?.full_name || 'Anonymous'}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {new Date(reply.created_at).toLocaleTimeString()}
+                        </span>
                       </div>
+                      <p className="text-sm">{reply.content}</p>
                     </div>
                   ))}
                 </div>
-              ) : messages.length > 0 ? (
-                messages.map((message) => (
-                  <div key={message.id} className="flex items-start">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={message.user.avatarUrl || undefined} />
-                      <AvatarFallback>{getInitials(message.user.name)}</AvatarFallback>
-                    </Avatar>
-                    <div className="ml-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">{message.user.name}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {formatRelativeTime(message.createdAt)}
-                        </span>
-                      </div>
-                      <p className="text-sm mt-1 bg-muted p-2 rounded-md">{message.content}</p>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="h-full flex items-center justify-center">
-                  <p className="text-center text-muted-foreground">
-                    No messages yet. Be the first to say hello!
-                  </p>
+                
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="💬 Add a reply..."
+                    value={newReply}
+                    onChange={(e) => setNewReply(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        addReply();
+                      }
+                    }}
+                  />
+                  <Button
+                    size="sm"
+                    onClick={addReply}
+                    disabled={!newReply.trim()}
+                  >
+                    <Send className="w-4 h-4" />
+                  </Button>
                 </div>
-              )}
-            </div>
-            <div className="p-4 border-t">
-              <div className="flex gap-2">
-                <Input 
-                  value={messageInput}
-                  onChange={(e) => setMessageInput(e.target.value)}
-                  placeholder="Type your message..."
-                  onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-                />
-                <Button onClick={sendMessage} variant="default" size="icon">
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </Card>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="text-center py-12">
+                <MessageCircle className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                <h3 className="text-lg font-medium mb-2">Select a Discussion</h3>
+                <p className="text-gray-500">
+                  Click on any discussion to join the conversation!
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </div>
-      </div>
-      
-      <div className="p-4 mt-8 border-t text-center text-sm text-muted-foreground">
-        <div className="flex items-center justify-center mb-2">
-          <NKTechLogo size="sm" />
-        </div>
-        <p>© 2025 Nurath.AI by NK Technology (Tanzania)</p>
       </div>
     </div>
   );
