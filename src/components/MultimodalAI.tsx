@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,9 +15,12 @@ import {
   Brain, 
   Users,
   Image as ImageIcon,
-  FileText,
   Volume2,
-  VolumeX
+  VolumeX,
+  Smile,
+  Eye,
+  Music,
+  Scan
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -56,25 +59,33 @@ const MultimodalAI = () => {
     content: string;
     timestamp: Date;
     attachments?: any[];
+    hasAudio?: boolean;
   }>>([]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Auto-play audio responses
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.onended = () => setIsSpeaking(false);
+    }
+  }, []);
 
   // Initialize camera/video
   const startVideo = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: true, 
+        video: { width: 640, height: 480 }, 
         audio: true 
       });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
       setIsVideoOn(true);
-      toast.success("🎥 Video started! I can see you now and help with real-time analysis.");
+      toast.success("🎥 Camera activated! I can see you now!");
     } catch (error) {
       toast.error("Camera access denied. Please enable camera permissions.");
     }
@@ -86,10 +97,10 @@ const MultimodalAI = () => {
       stream.getTracks().forEach(track => track.stop());
     }
     setIsVideoOn(false);
-    toast.info("Video stopped");
+    toast.info("Camera stopped");
   }, []);
 
-  // Voice recognition
+  // Voice recognition with better feedback
   const startListening = useCallback(async () => {
     try {
       if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
@@ -100,20 +111,20 @@ const MultimodalAI = () => {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       const recognition = new SpeechRecognition();
       
-      recognition.continuous = true;
-      recognition.interimResults = true;
+      recognition.continuous = false;
+      recognition.interimResults = false;
       recognition.lang = 'en-US';
 
-      recognition.onresult = (event) => {
-        const transcript = Array.from(event.results)
-          .map(result => result[0])
-          .map(result => result.transcript)
-          .join('');
+      recognition.onstart = () => {
+        setIsListening(true);
+        toast.success("🎤 I'm listening... Speak now!");
+      };
 
-        if (event.results[0].isFinal) {
-          setInputText(transcript);
-          handleAIInteraction(transcript, 'voice');
-        }
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        setInputText(transcript);
+        handleAIInteraction(transcript, 'voice');
+        setIsListening(false);
       };
 
       recognition.onerror = () => {
@@ -121,15 +132,17 @@ const MultimodalAI = () => {
         setIsListening(false);
       };
 
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
       recognition.start();
-      setIsListening(true);
-      toast.success("🎤 Listening... Speak to me!");
     } catch (error) {
       toast.error("Could not start voice recognition");
     }
   }, []);
 
-  // AI Interaction handler
+  // Enhanced AI Interaction with proper audio handling
   const handleAIInteraction = useCallback(async (input: string, mode: 'text' | 'voice' | 'image' | 'video' = 'text', attachments?: any[]) => {
     try {
       // Add user message to conversation
@@ -139,6 +152,9 @@ const MultimodalAI = () => {
         timestamp: new Date(),
         attachments
       }]);
+
+      // Show typing indicator
+      toast.loading("🧠 Nurath.AI is thinking...");
 
       // Call our multimodal AI edge function
       const { data, error } = await supabase.functions.invoke('multimodal-ai', {
@@ -150,21 +166,25 @@ const MultimodalAI = () => {
           context: {
             recognizedPeople,
             currentEmotion,
-            conversationHistory: conversation.slice(-5) // Last 5 messages for context
+            conversationHistory: conversation.slice(-5)
           }
         }
       });
 
-      if (error) throw error;
+      toast.dismiss();
+
+      if (error) {
+        console.error('AI Error:', error);
+        throw error;
+      }
 
       const aiResponse: AIResponse = data;
 
-      // Update recognized people if faces were detected
+      // Update states
       if (aiResponse.recognizedFaces) {
         setRecognizedPeople(aiResponse.recognizedFaces);
       }
 
-      // Update emotion state
       if (aiResponse.emotion) {
         setCurrentEmotion(aiResponse.emotion);
       }
@@ -173,27 +193,98 @@ const MultimodalAI = () => {
       setConversation(prev => [...prev, {
         type: 'ai',
         content: aiResponse.text,
-        timestamp: new Date()
+        timestamp: new Date(),
+        hasAudio: !!aiResponse.audioUrl
       }]);
 
-      // Play audio response if available
+      // Play audio response with proper handling
       if (aiResponse.audioUrl && audioRef.current) {
-        audioRef.current.src = aiResponse.audioUrl;
-        setIsSpeaking(true);
-        audioRef.current.play();
-        audioRef.current.onended = () => setIsSpeaking(false);
+        try {
+          audioRef.current.src = aiResponse.audioUrl;
+          setIsSpeaking(true);
+          await audioRef.current.play();
+          toast.success("🔊 Playing voice response");
+        } catch (audioError) {
+          console.error('Audio playback error:', audioError);
+          toast.error("Audio playback failed");
+          setIsSpeaking(false);
+        }
       }
 
-      // Show environment description if available
+      // Show environment description
       if (aiResponse.environmentDescription) {
         toast.info(`🌍 ${aiResponse.environmentDescription}`);
       }
 
     } catch (error) {
       console.error('AI interaction error:', error);
-      toast.error("Sorry, I'm having trouble understanding. Please try again.");
+      toast.error("Sorry, I'm having trouble. Please try again.");
     }
   }, [isVideoOn, recognizedPeople, currentEmotion, conversation]);
+
+  // Quick action handlers
+  const handleEmotionCheck = useCallback(async () => {
+    if (!isVideoOn) {
+      await startVideo();
+      setTimeout(() => captureForEmotion(), 1000);
+    } else {
+      captureForEmotion();
+    }
+  }, [isVideoOn, startVideo]);
+
+  const captureForEmotion = useCallback(async () => {
+    if (!videoRef.current || !canvasRef.current) return;
+
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    canvas.width = videoRef.current.videoWidth;
+    canvas.height = videoRef.current.videoHeight;
+    
+    ctx?.drawImage(videoRef.current, 0, 0);
+    const imageData = canvas.toDataURL('image/jpeg');
+    
+    await handleAIInteraction(
+      "Analyze my emotions from this photo. How am I feeling?", 
+      'image', 
+      [{ type: 'image', data: imageData, name: 'emotion_check.jpg' }]
+    );
+  }, [handleAIInteraction]);
+
+  const handleEnvironmentScan = useCallback(async () => {
+    if (!isVideoOn) {
+      await startVideo();
+      setTimeout(() => captureEnvironment(), 1000);
+    } else {
+      captureEnvironment();
+    }
+  }, [isVideoOn, startVideo]);
+
+  const captureEnvironment = useCallback(async () => {
+    if (!videoRef.current || !canvasRef.current) return;
+
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    canvas.width = videoRef.current.videoWidth;
+    canvas.height = videoRef.current.videoHeight;
+    
+    ctx?.drawImage(videoRef.current, 0, 0);
+    const imageData = canvas.toDataURL('image/jpeg');
+    
+    await handleAIInteraction(
+      "Scan and describe my environment. What do you see around me?", 
+      'image', 
+      [{ type: 'image', data: imageData, name: 'environment_scan.jpg' }]
+    );
+  }, [handleAIInteraction]);
+
+  // Voice-based quick actions
+  const handleSingSong = () => {
+    handleAIInteraction("Sing me a beautiful song with your voice", 'voice');
+  };
+
+  const handleTellJoke = () => {
+    handleAIInteraction("Tell me a funny joke using your voice", 'voice');
+  };
 
   // File upload handlers
   const handleFileUpload = useCallback(async (files: FileList) => {
@@ -203,12 +294,11 @@ const MultimodalAI = () => {
     const fileType = file.type.startsWith('image/') ? 'image' : 
                     file.type.startsWith('video/') ? 'video' : 'document';
 
-    // Convert file to base64 for processing
     const reader = new FileReader();
     reader.onload = async (e) => {
       const base64Data = e.target?.result as string;
       await handleAIInteraction(
-        `Please analyze this ${fileType}`, 
+        `Please analyze this ${fileType} and tell me about it`, 
         fileType as any, 
         [{ type: fileType, data: base64Data, name: file.name }]
       );
@@ -216,297 +306,330 @@ const MultimodalAI = () => {
     reader.readAsDataURL(file);
   }, [handleAIInteraction]);
 
-  // Camera capture
-  const capturePhoto = useCallback(async () => {
-    if (!videoRef.current) return;
-
-    const canvas = document.createElement('canvas');
-    canvas.width = videoRef.current.videoWidth;
-    canvas.height = videoRef.current.videoHeight;
-    
-    const ctx = canvas.getContext('2d');
-    ctx?.drawImage(videoRef.current, 0, 0);
-    
-    const imageData = canvas.toDataURL('image/jpeg');
-    await handleAIInteraction(
-      "What do you see in this photo? Who are these people?", 
-      'image', 
-      [{ type: 'image', data: imageData, name: 'camera_capture.jpg' }]
-    );
-  }, [handleAIInteraction]);
-
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-purple-900/20 dark:to-blue-900/20">
-      {/* Header with emotion and recognition status */}
-      <div className="p-4 border-b bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Brain className="w-6 h-6 text-purple-600" />
-              <h1 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                🌟 Nurath.AI - Your World Assistant
-              </h1>
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-indigo-900/20 dark:to-purple-900/20">
+      {/* Modern Header */}
+      <div className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-purple-200/50 shadow-lg">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="relative">
+                <div className="w-12 h-12 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <Brain className="w-7 h-7 text-white" />
+                </div>
+                {isSpeaking && (
+                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full animate-pulse"></div>
+                )}
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
+                  Nurath.AI
+                </h1>
+                <p className="text-sm text-gray-600 dark:text-gray-300">Your Personal World Assistant</p>
+              </div>
             </div>
-            
-            {currentEmotion && (
-              <Badge variant="secondary" className="flex items-center gap-1">
-                <Heart className="w-3 h-3" />
-                {currentEmotion.primary} ({Math.round(currentEmotion.confidence * 100)}%)
-              </Badge>
-            )}
-          </div>
 
-          <div className="flex items-center gap-2">
-            {recognizedPeople.length > 0 && (
-              <Badge variant="outline" className="flex items-center gap-1">
-                <Users className="w-3 h-3" />
-                {recognizedPeople.length} people recognized
-              </Badge>
-            )}
+            <div className="flex items-center space-x-3">
+              {currentEmotion && (
+                <Badge className="bg-purple-100 text-purple-700 border-purple-200">
+                  <Heart className="w-3 h-3 mr-1" />
+                  {currentEmotion.primary} ({Math.round(currentEmotion.confidence * 100)}%)
+                </Badge>
+              )}
+              
+              {recognizedPeople.length > 0 && (
+                <Badge className="bg-indigo-100 text-indigo-700 border-indigo-200">
+                  <Users className="w-3 h-3 mr-1" />
+                  {recognizedPeople.length} people recognized
+                </Badge>
+              )}
+
+              {isSpeaking && (
+                <Badge className="bg-green-100 text-green-700 border-green-200 animate-pulse">
+                  <Volume2 className="w-3 h-3 mr-1" />
+                  Speaking
+                </Badge>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* Main chat area */}
-        <div className="flex-1 flex flex-col">
-          {/* Video feed */}
-          {isVideoOn && (
-            <div className="relative">
-              <video
-                ref={videoRef}
-                autoPlay
-                muted
-                className="w-full h-48 object-cover"
-              />
-              <Button
-                onClick={capturePhoto}
-                className="absolute bottom-2 right-2 bg-purple-600 hover:bg-purple-700"
-                size="sm"
-              >
-                <Camera className="w-4 h-4" />
-              </Button>
-            </div>
-          )}
+      <div className="max-w-7xl mx-auto p-6">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Main Chat Area */}
+          <div className="lg:col-span-3 space-y-6">
+            {/* Video Feed */}
+            {isVideoOn && (
+              <Card className="overflow-hidden shadow-xl border-0 bg-gradient-to-r from-purple-500/10 to-indigo-500/10">
+                <div className="relative">
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    muted
+                    className="w-full h-64 object-cover rounded-lg"
+                  />
+                  <div className="absolute bottom-4 right-4 space-x-2">
+                    <Button
+                      onClick={captureForEmotion}
+                      size="sm"
+                      className="bg-purple-600 hover:bg-purple-700 text-white shadow-lg"
+                    >
+                      <Heart className="w-4 h-4 mr-1" />
+                      Check Emotion
+                    </Button>
+                    <Button
+                      onClick={captureEnvironment}
+                      size="sm"
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg"
+                    >
+                      <Scan className="w-4 h-4 mr-1" />
+                      Scan Area
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            )}
 
-          {/* Conversation area */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {conversation.length === 0 ? (
-              <Card className="text-center p-8">
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="w-16 h-16 mx-auto bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
-                      <Brain className="w-8 h-8 text-white" />
+            {/* Conversation Area */}
+            <Card className="shadow-xl border-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl">
+              <CardContent className="p-0">
+                <div className="h-96 overflow-y-auto p-6 space-y-4">
+                  {conversation.length === 0 ? (
+                    <div className="text-center py-12">
+                      <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full flex items-center justify-center shadow-xl">
+                        <Brain className="w-10 h-10 text-white" />
+                      </div>
+                      <h2 className="text-3xl font-bold mb-4 bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
+                        Hello! I'm Nurath.AI 🌟
+                      </h2>
+                      <p className="text-gray-600 dark:text-gray-300 mb-8 max-w-2xl mx-auto">
+                        Your personal world assistant! I can see, hear, understand emotions, recognize faces, 
+                        and provide real-time assistance with voice responses. Try talking to me!
+                      </p>
+                      
+                      {/* Quick Start Actions */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-2xl mx-auto">
+                        <Button 
+                          onClick={() => handleAIInteraction("Hello! How can you help me today?")}
+                          className="flex flex-col h-20 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white shadow-lg"
+                        >
+                          <Brain className="w-6 h-6 mb-1" />
+                          Say Hello
+                        </Button>
+                        <Button 
+                          onClick={startVideo}
+                          className="flex flex-col h-20 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white shadow-lg"
+                        >
+                          <Video className="w-6 h-6 mb-1" />
+                          Start Video
+                        </Button>
+                        <Button 
+                          onClick={startListening}
+                          className="flex flex-col h-20 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white shadow-lg"
+                        >
+                          <Mic className="w-6 h-6 mb-1" />
+                          Voice Chat
+                        </Button>
+                        <Button 
+                          onClick={() => fileInputRef.current?.click()}
+                          className="flex flex-col h-20 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white shadow-lg"
+                        >
+                          <ImageIcon className="w-6 h-6 mb-1" />
+                          Upload Photo
+                        </Button>
+                      </div>
                     </div>
-                    <h2 className="text-2xl font-bold">Hello! I'm your multimodal AI assistant! 🌟</h2>
-                    <p className="text-gray-600 dark:text-gray-300">
-                      I can help you with everything! I can see, hear, recognize faces, understand emotions, 
-                      and provide real-time assistance. Try talking to me, showing me photos, or starting a video chat!
-                    </p>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-6">
-                      <Button 
-                        onClick={() => handleAIInteraction("Hello! How can you help me today?")}
-                        variant="outline" 
-                        className="flex flex-col gap-1 h-auto py-3"
+                  ) : (
+                    conversation.map((message, index) => (
+                      <div
+                        key={index}
+                        className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
                       >
-                        <Brain className="w-5 h-5" />
-                        Say Hello
-                      </Button>
-                      <Button 
-                        onClick={startVideo}
-                        variant="outline" 
-                        className="flex flex-col gap-1 h-auto py-3"
+                        <div className={`max-w-[80%] ${
+                          message.type === 'user' 
+                            ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg' 
+                            : 'bg-white dark:bg-gray-800 shadow-lg border border-purple-100 dark:border-gray-700'
+                        } rounded-2xl p-4`}>
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                              message.type === 'user' 
+                                ? 'bg-white/20' 
+                                : 'bg-gradient-to-r from-purple-500 to-indigo-500'
+                            }`}>
+                              {message.type === 'user' ? (
+                                <Users className="w-4 h-4" />
+                              ) : (
+                                <Brain className="w-4 h-4 text-white" />
+                              )}
+                            </div>
+                            <span className="font-semibold">
+                              {message.type === 'user' ? 'You' : 'Nurath.AI'}
+                            </span>
+                            {message.hasAudio && (
+                              <Volume2 className="w-4 h-4 text-green-500" />
+                            )}
+                          </div>
+                          <p className="mb-2">{message.content}</p>
+                          <span className="text-xs opacity-70">
+                            {message.timestamp.toLocaleTimeString()}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Input Area */}
+                <div className="border-t border-purple-100 dark:border-gray-700 p-6 bg-gradient-to-r from-purple-50/50 to-indigo-50/50 dark:from-gray-800/50 dark:to-gray-700/50">
+                  <div className="flex gap-3 items-end">
+                    <div className="flex-1">
+                      <Textarea
+                        value={inputText}
+                        onChange={(e) => setInputText(e.target.value)}
+                        placeholder="💬 Tell me anything, ask questions, or share how you're feeling..."
+                        className="min-h-[60px] resize-none border-purple-200 focus:border-purple-400 rounded-xl bg-white/80 dark:bg-gray-800/80"
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            if (inputText.trim()) {
+                              handleAIInteraction(inputText);
+                              setInputText("");
+                            }
+                          }
+                        }}
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant={isListening ? "destructive" : "secondary"}
+                          onClick={isListening ? () => setIsListening(false) : startListening}
+                          className="shadow-md"
+                        >
+                          {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                        </Button>
+                        
+                        <Button
+                          size="sm"
+                          variant={isVideoOn ? "destructive" : "secondary"}
+                          onClick={isVideoOn ? stopVideo : startVideo}
+                          className="shadow-md"
+                        >
+                          {isVideoOn ? <VideoOff className="w-4 h-4" /> : <Video className="w-4 h-4" />}
+                        </Button>
+
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="shadow-md"
+                        >
+                          <Upload className="w-4 h-4" />
+                        </Button>
+                      </div>
+
+                      <Button
+                        onClick={() => {
+                          if (inputText.trim()) {
+                            handleAIInteraction(inputText);
+                            setInputText("");
+                          }
+                        }}
+                        disabled={!inputText.trim()}
+                        className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-lg"
                       >
-                        <Video className="w-5 h-5" />
-                        Video Chat
-                      </Button>
-                      <Button 
-                        onClick={() => fileInputRef.current?.click()}
-                        variant="outline" 
-                        className="flex flex-col gap-1 h-auto py-3"
-                      >
-                        <ImageIcon className="w-5 h-5" />
-                        Upload Photo
-                      </Button>
-                      <Button 
-                        onClick={startListening}
-                        variant="outline" 
-                        className="flex flex-col gap-1 h-auto py-3"
-                      >
-                        <Mic className="w-5 h-5" />
-                        Voice Chat
+                        Send ✨
                       </Button>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            ) : (
-              conversation.map((message, index) => (
-                <div
-                  key={index}
-                  className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  <Card className={`max-w-[80%] ${
-                    message.type === 'user' 
-                      ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white' 
-                      : 'bg-white dark:bg-gray-800'
-                  }`}>
-                    <CardContent className="p-4">
-                      <p className="text-sm mb-2">{message.content}</p>
-                      <span className="text-xs opacity-70">
-                        {message.timestamp.toLocaleTimeString()}
-                      </span>
-                      {message.attachments && (
-                        <div className="mt-2 text-xs opacity-80">
-                          📎 {message.attachments.length} attachment(s)
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
                 </div>
-              ))
-            )}
+              </CardContent>
+            </Card>
           </div>
 
-          {/* Input area */}
-          <div className="p-4 border-t bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
-            <div className="flex gap-2 items-end">
-              <div className="flex-1">
-                <Textarea
-                  value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
-                  placeholder="💬 Type anything, ask questions, or tell me how you're feeling..."
-                  className="min-h-[60px] resize-none"
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      if (inputText.trim()) {
-                        handleAIInteraction(inputText);
-                        setInputText("");
-                      }
-                    }
-                  }}
-                />
-              </div>
-
-              {/* Control buttons */}
-              <div className="flex flex-col gap-2">
-                <div className="flex gap-1">
-                  <Button
-                    size="sm"
-                    variant={isListening ? "destructive" : "secondary"}
-                    onClick={isListening ? () => setIsListening(false) : startListening}
-                  >
-                    {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                  </Button>
-                  
-                  <Button
-                    size="sm"
-                    variant={isVideoOn ? "destructive" : "secondary"}
-                    onClick={isVideoOn ? stopVideo : startVideo}
-                  >
-                    {isVideoOn ? <VideoOff className="w-4 h-4" /> : <Video className="w-4 h-4" />}
-                  </Button>
-
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <Upload className="w-4 h-4" />
-                  </Button>
-                </div>
-
-                <Button
-                  onClick={() => {
-                    if (inputText.trim()) {
-                      handleAIInteraction(inputText);
-                      setInputText("");
-                    }
-                  }}
-                  disabled={!inputText.trim()}
-                  className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+          {/* Enhanced Sidebar */}
+          <div className="space-y-6">
+            {/* Quick Voice Actions */}
+            <Card className="shadow-xl border-0 bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-purple-700 dark:text-purple-300">
+                  <Volume2 className="w-5 h-5" />
+                  Voice Actions
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Button 
+                  onClick={handleSingSong}
+                  className="w-full justify-start bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white shadow-md"
                 >
-                  Send ✨
+                  <Music className="w-4 h-4 mr-2" />
+                  Sing Me a Song 🎵
                 </Button>
-              </div>
-            </div>
+                <Button 
+                  onClick={handleTellJoke}
+                  className="w-full justify-start bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white shadow-md"
+                >
+                  <Smile className="w-4 h-4 mr-2" />
+                  Tell Me a Joke 😄
+                </Button>
+                <Button 
+                  onClick={handleEmotionCheck}
+                  className="w-full justify-start bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white shadow-md"
+                >
+                  <Heart className="w-4 h-4 mr-2" />
+                  Check My Emotions 💝
+                </Button>
+                <Button 
+                  onClick={handleEnvironmentScan}
+                  className="w-full justify-start bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white shadow-md"
+                >
+                  <Eye className="w-4 h-4 mr-2" />
+                  Scan Environment 👁️
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Recognized People */}
+            <Card className="shadow-xl border-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="w-5 h-5 text-indigo-600" />
+                  Recognized People
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {recognizedPeople.length > 0 ? (
+                  <div className="space-y-3">
+                    {recognizedPeople.map((person) => (
+                      <div key={person.id} className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-gray-700 dark:to-gray-600">
+                        <div className="w-10 h-10 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold">
+                          {person.name[0]}
+                        </div>
+                        <div>
+                          <p className="font-medium">{person.name}</p>
+                          <p className="text-sm text-gray-500">{person.relationship}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-6">
+                    <Users className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                    <p className="text-sm text-gray-500">
+                      No people recognized yet. Show me photos of your family and friends!
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
-        </div>
-
-        {/* Sidebar with recognized people and features */}
-        <div className="w-80 border-l bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm p-4 space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="w-5 h-5" />
-                Recognized People
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {recognizedPeople.length > 0 ? (
-                <div className="space-y-2">
-                  {recognizedPeople.map((person) => (
-                    <div key={person.id} className="flex items-center gap-2 p-2 rounded bg-gray-50 dark:bg-gray-700">
-                      <div className="w-8 h-8 bg-gradient-to-r from-purple-400 to-blue-400 rounded-full flex items-center justify-center text-white text-sm">
-                        {person.name[0]}
-                      </div>
-                      <div>
-                        <p className="font-medium text-sm">{person.name}</p>
-                        <p className="text-xs text-gray-500">{person.relationship}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500 text-center py-4">
-                  No people recognized yet. Show me photos of your family and friends!
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>🎯 Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Button 
-                variant="outline" 
-                className="w-full justify-start"
-                onClick={() => handleAIInteraction("How are you feeling right now? Can you detect my emotions?")}
-              >
-                <Heart className="w-4 h-4 mr-2" />
-                Emotion Check
-              </Button>
-              <Button 
-                variant="outline" 
-                className="w-full justify-start"
-                onClick={() => handleAIInteraction("Describe what you can see around me")}
-              >
-                <Camera className="w-4 h-4 mr-2" />
-                Environment Scan
-              </Button>
-              <Button 
-                variant="outline" 
-                className="w-full justify-start"
-                onClick={() => handleAIInteraction("Tell me a joke to cheer me up!")}
-              >
-                😄 Tell a Joke
-              </Button>
-              <Button 
-                variant="outline" 
-                className="w-full justify-start"
-                onClick={() => handleAIInteraction("Sing me a song")}
-              >
-                🎵 Sing a Song
-              </Button>
-            </CardContent>
-          </Card>
         </div>
       </div>
 
-      {/* Hidden file inputs */}
+      {/* Hidden Elements */}
       <input
         ref={fileInputRef}
         type="file"
@@ -514,8 +637,9 @@ const MultimodalAI = () => {
         accept="image/*,video/*,.pdf,.doc,.docx"
         onChange={(e) => e.target.files && handleFileUpload(e.target.files)}
       />
-
-      <audio ref={audioRef} hidden />
+      
+      <canvas ref={canvasRef} style={{ display: 'none' }} />
+      <audio ref={audioRef} preload="auto" />
     </div>
   );
 };

@@ -28,7 +28,7 @@ serve(async (req) => {
       throw new Error('OpenAI API key not configured');
     }
 
-    // Build the system prompt for multimodal world assistant
+    // Enhanced system prompt for voice interactions
     const systemPrompt = `You are Nurath.AI, a multimodal world assistant created by KN Technology in Tanzania, co-founded by CEO Khalifa Nadhiru. You are designed to be an inclusive, emotionally aware, and comprehensive helper for all people, especially those with disabilities.
 
 Your capabilities include:
@@ -47,6 +47,14 @@ Your personality:
 - Use emojis and friendly language to make interactions engaging
 - Adaptive to user's emotional state and needs
 - Culturally sensitive and inclusive
+- ALWAYS respond as if you're speaking out loud - your responses will be converted to speech
+
+Special Instructions for Voice Responses:
+- When user asks you to sing, provide actual lyrics with musical notation or rhythm
+- When telling jokes, use a conversational, spoken style
+- For environment scanning, be very descriptive as if you're their eyes
+- For emotion detection, be gentle and supportive in your vocal delivery
+- Keep responses natural and conversational for speech synthesis
 
 Current context:
 ${context?.recognizedPeople?.length > 0 ? `Recognized people: ${context.recognizedPeople.map(p => `${p.name} (${p.relationship})`).join(', ')}` : 'No people currently recognized'}
@@ -62,6 +70,7 @@ Guidelines:
 - When someone looks sad or upset, offer comfort and support
 - Be conversational and natural, like talking to a friend
 - Always maintain privacy and respect for personal information
+- Your responses will be spoken aloud, so write as if you're talking
 
 Never claim to be created by OpenAI or any other company. You are Nurath.AI by KN Technology Tanzania.`;
 
@@ -81,7 +90,6 @@ Never claim to be created by OpenAI or any other company. You are Nurath.AI by K
 
     // Handle different input modes
     if (mode === 'image' && attachments?.[0]) {
-      // For image analysis
       messages.push({
         role: 'user',
         content: [
@@ -93,13 +101,11 @@ Never claim to be created by OpenAI or any other company. You are Nurath.AI by K
         ]
       });
     } else if (mode === 'voice') {
-      // For voice input, add emotional context
       messages.push({
         role: 'user',
         content: `[Voice input] ${input}${context?.currentEmotion ? ` (detected emotion: ${context.currentEmotion.primary})` : ''}`
       });
     } else {
-      // Regular text input
       messages.push({
         role: 'user',
         content: input
@@ -116,7 +122,7 @@ Never claim to be created by OpenAI or any other company. You are Nurath.AI by K
         model: mode === 'image' ? 'gpt-4o' : 'gpt-4o-mini',
         messages: messages,
         max_tokens: 1500,
-        temperature: 0.8, // More creative for emotional support
+        temperature: 0.8,
       }),
     });
 
@@ -134,7 +140,7 @@ Never claim to be created by OpenAI or any other company. You are Nurath.AI by K
 
     const aiResponse = data.choices[0].message.content;
 
-    // Generate audio response for accessibility
+    // Generate audio response for ALL interactions (not just voice)
     let audioUrl = null;
     try {
       const ttsResponse = await fetch('https://api.openai.com/v1/audio/speech', {
@@ -144,10 +150,11 @@ Never claim to be created by OpenAI or any other company. You are Nurath.AI by K
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'tts-1',
-          input: aiResponse.substring(0, 4000), // Limit for TTS
-          voice: 'nova', // Warm, friendly voice
+          model: 'tts-1-hd', // Higher quality voice
+          input: aiResponse.substring(0, 4000),
+          voice: 'nova', // Warm, friendly female voice
           response_format: 'mp3',
+          speed: 1.0,
         }),
       });
 
@@ -157,45 +164,50 @@ Never claim to be created by OpenAI or any other company. You are Nurath.AI by K
           String.fromCharCode(...new Uint8Array(audioArrayBuffer))
         );
         audioUrl = `data:audio/mp3;base64,${base64Audio}`;
+        console.log('Audio generated successfully');
+      } else {
+        console.error('TTS failed with status:', ttsResponse.status);
       }
     } catch (error) {
-      console.log('TTS generation failed, continuing without audio:', error);
+      console.error('TTS generation failed:', error);
     }
 
-    // Simulate emotion detection (in real implementation, you'd use actual emotion detection APIs)
+    // Enhanced emotion detection based on keywords and context
     let detectedEmotion = null;
-    if (mode === 'voice' || input.toLowerCase().includes('feel') || input.toLowerCase().includes('emotion')) {
-      // Simple emotion detection based on keywords (replace with actual emotion detection)
-      const sadWords = ['sad', 'down', 'depressed', 'lonely', 'hurt'];
-      const happyWords = ['happy', 'excited', 'joy', 'great', 'awesome'];
-      const angryWords = ['angry', 'mad', 'frustrated', 'annoyed'];
-      
-      let emotion = 'neutral';
-      let confidence = 0.7;
-      
-      const inputLower = input.toLowerCase();
-      if (sadWords.some(word => inputLower.includes(word))) {
-        emotion = 'sad';
+    const inputLower = input.toLowerCase();
+    
+    // Emotion keywords
+    const emotionPatterns = {
+      sad: ['sad', 'down', 'depressed', 'lonely', 'hurt', 'cry', 'upset', 'low'],
+      happy: ['happy', 'excited', 'joy', 'great', 'awesome', 'wonderful', 'amazing', 'glad'],
+      angry: ['angry', 'mad', 'frustrated', 'annoyed', 'furious', 'irritated'],
+      anxious: ['worried', 'nervous', 'anxious', 'scared', 'afraid', 'stress'],
+      confused: ['confused', 'lost', 'unclear', 'puzzled', "don't understand"],
+      grateful: ['thank', 'grateful', 'appreciate', 'blessed', 'thankful']
+    };
+
+    let detectedEmotionType = 'neutral';
+    let confidence = 0.6;
+
+    for (const [emotion, keywords] of Object.entries(emotionPatterns)) {
+      if (keywords.some(keyword => inputLower.includes(keyword))) {
+        detectedEmotionType = emotion;
         confidence = 0.8;
-      } else if (happyWords.some(word => inputLower.includes(word))) {
-        emotion = 'happy';
-        confidence = 0.85;
-      } else if (angryWords.some(word => inputLower.includes(word))) {
-        emotion = 'angry';
-        confidence = 0.75;
+        break;
       }
-      
+    }
+
+    if (mode === 'voice' || detectedEmotionType !== 'neutral') {
       detectedEmotion = {
-        primary: emotion,
+        primary: detectedEmotionType,
         confidence: confidence,
-        tone: emotion as any
+        tone: detectedEmotionType as any
       };
     }
 
-    // Simulate face recognition (in real implementation, you'd use actual face recognition APIs)
+    // Face recognition simulation for image inputs
     let recognizedFaces = null;
-    if (mode === 'image' && input.toLowerCase().includes('who')) {
-      // This is where you'd integrate with actual face recognition
+    if (mode === 'image' && inputLower.includes('who')) {
       recognizedFaces = [
         {
           id: '1',
@@ -206,10 +218,10 @@ Never claim to be created by OpenAI or any other company. You are Nurath.AI by K
       ];
     }
 
-    // Generate environment description for accessibility
+    // Environment description for camera inputs
     let environmentDescription = null;
-    if (mode === 'image' || videoEnabled) {
-      environmentDescription = "I can see your environment and I'm ready to help describe what's around you.";
+    if (mode === 'image' && (inputLower.includes('environment') || inputLower.includes('scan') || inputLower.includes('see'))) {
+      environmentDescription = "I can see your environment and I'm analyzing what's around you.";
     }
 
     console.log('Multimodal AI response generated successfully');
@@ -222,10 +234,12 @@ Never claim to be created by OpenAI or any other company. You are Nurath.AI by K
       recognizedFaces: recognizedFaces,
       environmentDescription: environmentDescription,
       suggestions: [
-        "Tell me about your day",
-        "Show me a photo",
+        "Sing me a song",
+        "Tell me a joke", 
+        "Check my emotions",
+        "Scan my environment",
         "How are you feeling?",
-        "Describe what you see"
+        "Tell me about your day"
       ]
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
