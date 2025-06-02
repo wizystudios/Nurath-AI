@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -26,7 +27,10 @@ import {
   Sparkles,
   BookOpen,
   Zap,
-  Globe
+  Globe,
+  Play,
+  Pause,
+  Settings
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -328,60 +332,45 @@ const MultimodalAI = () => {
   }, [handleAIInteraction]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-indigo-900">
-      {/* Modern Header */}
-      <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-700/50 shadow-xl">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+    <div className="min-h-screen bg-slate-950 text-white">
+      {/* Top Navigation Bar - Bolt Style */}
+      <div className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-xl">
+        <div className="max-w-7xl mx-auto px-6 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <div className="relative">
-                <div className="w-14 h-14 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-2xl">
-                  <Brain className="w-8 h-8 text-white animate-pulse" />
+                <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
+                  <Brain className="w-6 h-6 text-white" />
                 </div>
                 {isSpeaking && (
-                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full animate-ping"></div>
-                )}
-                {isListening && (
-                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full animate-pulse"></div>
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-ping"></div>
                 )}
               </div>
               <div>
-                <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">
-                  Nurath.AI
-                </h1>
-                <p className="text-sm text-slate-600 dark:text-slate-300 flex items-center gap-1">
-                  <Globe className="w-4 h-4" />
-                  Your Intelligent World Assistant
-                </p>
+                <h1 className="text-xl font-semibold text-white">Nurath.AI</h1>
+                <p className="text-xs text-slate-400">Intelligent World Assistant</p>
               </div>
             </div>
 
             <div className="flex items-center space-x-3">
               {currentEmotion && (
-                <Badge className="bg-gradient-to-r from-pink-100 to-rose-100 dark:from-pink-900 dark:to-rose-900 text-pink-700 dark:text-pink-300 border-pink-200 dark:border-pink-700 animate-fade-in">
-                  <Heart className="w-3 h-3 mr-1 animate-pulse" />
-                  {currentEmotion.primary} ({Math.round(currentEmotion.confidence * 100)}%)
+                <Badge className="bg-pink-600/20 text-pink-300 border-pink-600/30">
+                  <Heart className="w-3 h-3 mr-1" />
+                  {currentEmotion.primary}
                 </Badge>
               )}
               
               {recognizedPeople.length > 0 && (
-                <Badge className="bg-gradient-to-r from-blue-100 to-indigo-100 dark:from-blue-900 dark:to-indigo-900 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-700">
+                <Badge className="bg-blue-600/20 text-blue-300 border-blue-600/30">
                   <Users className="w-3 h-3 mr-1" />
-                  {recognizedPeople.length} people recognized
+                  {recognizedPeople.length} people
                 </Badge>
               )}
 
               {isSpeaking && (
-                <Badge className="bg-gradient-to-r from-green-100 to-emerald-100 dark:from-green-900 dark:to-emerald-900 text-green-700 dark:text-green-300 border-green-200 dark:border-green-700 animate-pulse">
+                <Badge className="bg-green-600/20 text-green-300 border-green-600/30 animate-pulse">
                   <Volume2 className="w-3 h-3 mr-1" />
                   Speaking
-                </Badge>
-              )}
-
-              {isVideoCall && (
-                <Badge className="bg-gradient-to-r from-purple-100 to-violet-100 dark:from-purple-900 dark:to-violet-900 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-700 animate-pulse">
-                  <Video className="w-3 h-3 mr-1" />
-                  Video Call Active
                 </Badge>
               )}
             </div>
@@ -390,61 +379,49 @@ const MultimodalAI = () => {
       </div>
 
       <div className="max-w-7xl mx-auto p-6">
-        <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Main Chat Area */}
-          <div className="xl:col-span-3 space-y-6">
+          <div className="lg:col-span-3 space-y-6">
             {/* Video Feed */}
             {isVideoOn && (
-              <Card className="overflow-hidden shadow-2xl border-0 bg-gradient-to-r from-slate-800 to-slate-900 relative">
+              <Card className="bg-slate-900/50 border-slate-700 overflow-hidden">
                 <div className="relative">
                   <video
                     ref={videoRef}
                     autoPlay
                     muted
-                    className="w-full h-80 object-cover rounded-xl"
+                    className="w-full h-80 object-cover rounded-lg"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent pointer-events-none rounded-xl" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent pointer-events-none" />
                   
-                  {/* Video Controls Overlay */}
-                  <div className="absolute bottom-6 left-6 right-6">
+                  <div className="absolute bottom-4 left-4 right-4">
                     <div className="flex justify-between items-center">
-                      <div className="flex space-x-3">
+                      <div className="flex space-x-2">
                         <Button
                           onClick={captureForEmotion}
                           size="sm"
-                          className="bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white shadow-lg backdrop-blur-sm"
+                          className="bg-pink-600 hover:bg-pink-700 text-white"
                         >
                           <Heart className="w-4 h-4 mr-2" />
-                          Check Emotion
+                          Emotion
                         </Button>
                         <Button
                           onClick={captureEnvironment}
                           size="sm"
-                          className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white shadow-lg backdrop-blur-sm"
+                          className="bg-blue-600 hover:bg-blue-700 text-white"
                         >
                           <Scan className="w-4 h-4 mr-2" />
-                          Scan Area
+                          Scan
                         </Button>
                       </div>
                       
-                      <div className="flex space-x-2">
-                        <Button
-                          onClick={startVideoCall}
-                          size="sm"
-                          variant={isVideoCall ? "destructive" : "secondary"}
-                          className="shadow-lg backdrop-blur-sm"
-                        >
-                          <PhoneCall className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          onClick={stopVideo}
-                          size="sm"
-                          variant="destructive"
-                          className="shadow-lg backdrop-blur-sm"
-                        >
-                          <VideoOff className="w-4 h-4" />
-                        </Button>
-                      </div>
+                      <Button
+                        onClick={stopVideo}
+                        size="sm"
+                        variant="destructive"
+                      >
+                        <VideoOff className="w-4 h-4" />
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -452,56 +429,53 @@ const MultimodalAI = () => {
             )}
 
             {/* Conversation Area */}
-            <Card className="shadow-2xl border-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl">
+            <Card className="bg-slate-900/50 border-slate-700">
               <CardContent className="p-0">
-                <div className="h-96 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+                <div className="h-96 overflow-y-auto p-6 space-y-4">
                   {conversation.length === 0 ? (
                     <div className="text-center py-16">
-                      <div className="w-24 h-24 mx-auto mb-8 bg-gradient-to-r from-blue-500 via-purple-500 to-indigo-500 rounded-full flex items-center justify-center shadow-2xl animate-pulse">
-                        <Brain className="w-12 h-12 text-white" />
+                      <div className="w-20 h-20 mx-auto mb-6 bg-blue-600 rounded-full flex items-center justify-center">
+                        <Brain className="w-10 h-10 text-white" />
                       </div>
-                      <h2 className="text-4xl font-bold mb-6 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">
-                        Welcome to Nurath.AI ✨
+                      <h2 className="text-2xl font-bold mb-4 text-white">
+                        What do you want to build?
                       </h2>
-                      <p className="text-slate-600 dark:text-slate-300 mb-8 max-w-2xl mx-auto text-lg leading-relaxed">
-                        Your intelligent world assistant! I can see, hear, understand emotions, recognize faces, 
-                        and provide real-time assistance with voice responses. Let's start our conversation!
+                      <p className="text-slate-400 mb-6 max-w-md mx-auto">
+                        Prompt, run, edit, and deploy your intelligent AI assistant with voice, vision, and emotion recognition.
                       </p>
                     </div>
                   ) : (
                     conversation.map((message, index) => (
                       <div
                         key={index}
-                        className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}
+                        className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
                       >
-                        <div className={`max-w-[85%] ${
+                        <div className={`max-w-[80%] ${
                           message.type === 'user' 
-                            ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-xl' 
-                            : 'bg-white dark:bg-slate-800 shadow-xl border border-slate-200 dark:border-slate-700'
-                        } rounded-2xl p-5 relative`}>
-                          <div className="flex items-center gap-3 mb-3">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                            ? 'bg-blue-600 text-white' 
+                            : 'bg-slate-800 text-slate-100 border border-slate-700'
+                        } rounded-lg p-4`}>
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
                               message.type === 'user' 
-                                ? 'bg-white/20 backdrop-blur-sm' 
-                                : 'bg-gradient-to-r from-blue-500 to-indigo-500'
+                                ? 'bg-white/20' 
+                                : 'bg-blue-600'
                             }`}>
                               {message.type === 'user' ? (
-                                <Users className="w-5 h-5" />
+                                <Users className="w-4 h-4" />
                               ) : (
-                                <Brain className="w-5 h-5 text-white" />
+                                <Brain className="w-4 h-4 text-white" />
                               )}
                             </div>
-                            <div>
-                              <span className="font-semibold text-lg">
-                                {message.type === 'user' ? 'You' : 'Nurath.AI'}
-                              </span>
-                              {message.hasAudio && (
-                                <Volume2 className="w-4 h-4 text-green-500 ml-2 inline animate-pulse" />
-                              )}
-                            </div>
+                            <span className="font-medium text-sm">
+                              {message.type === 'user' ? 'You' : 'Nurath.AI'}
+                            </span>
+                            {message.hasAudio && (
+                              <Volume2 className="w-4 h-4 text-green-400" />
+                            )}
                           </div>
-                          <p className="mb-3 leading-relaxed">{message.content}</p>
-                          <span className="text-xs opacity-70">
+                          <p className="text-sm leading-relaxed">{message.content}</p>
+                          <span className="text-xs opacity-70 mt-2 block">
                             {message.timestamp.toLocaleTimeString()}
                           </span>
                         </div>
@@ -510,118 +484,92 @@ const MultimodalAI = () => {
                   )}
                 </div>
 
-                {/* Enhanced Input Area */}
-                <div className="border-t border-slate-200 dark:border-slate-700 p-6 bg-gradient-to-r from-slate-50 to-blue-50 dark:from-slate-800 dark:to-slate-700">
-                  <div className="space-y-4">
-                    {/* Quick Action Buttons */}
-                    <div className="flex flex-wrap gap-2 justify-center">
-                      <Button
-                        onClick={handleSingSong}
-                        size="sm"
-                        className="bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white shadow-lg"
-                      >
-                        <Music className="w-4 h-4 mr-2" />
-                        Sing Song 🎵
-                      </Button>
-                      <Button
-                        onClick={handleTellJoke}
-                        size="sm"
-                        className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white shadow-lg"
-                      >
-                        <Smile className="w-4 h-4 mr-2" />
-                        Tell Joke 😄
-                      </Button>
-                      <Button
-                        onClick={handleTellStory}
-                        size="sm"
-                        className="bg-gradient-to-r from-purple-500 to-violet-500 hover:from-purple-600 hover:to-violet-600 text-white shadow-lg"
-                      >
-                        <BookOpen className="w-4 h-4 mr-2" />
-                        Tell Story 📚
-                      </Button>
-                      <Button
-                        onClick={handleEmotionCheck}
-                        size="sm"
-                        className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-lg"
-                      >
-                        <Heart className="w-4 h-4 mr-2" />
-                        Check Emotion 💝
-                      </Button>
-                      <Button
-                        onClick={handleEnvironmentScan}
-                        size="sm"
-                        className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white shadow-lg"
-                      >
-                        <Eye className="w-4 h-4 mr-2" />
-                        Scan Area 👁️
-                      </Button>
-                    </div>
+                {/* Input Area */}
+                <div className="border-t border-slate-700 p-6 bg-slate-900/30">
+                  {/* Quick Actions */}
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    <Button onClick={handleSingSong} size="sm" className="bg-pink-600/20 text-pink-300 border-pink-600/30 hover:bg-pink-600/30">
+                      <Music className="w-4 h-4 mr-2" />
+                      Sing Song
+                    </Button>
+                    <Button onClick={handleTellJoke} size="sm" className="bg-yellow-600/20 text-yellow-300 border-yellow-600/30 hover:bg-yellow-600/30">
+                      <Smile className="w-4 h-4 mr-2" />
+                      Tell Joke
+                    </Button>
+                    <Button onClick={handleTellStory} size="sm" className="bg-purple-600/20 text-purple-300 border-purple-600/30 hover:bg-purple-600/30">
+                      <BookOpen className="w-4 h-4 mr-2" />
+                      Tell Story
+                    </Button>
+                    <Button onClick={handleEmotionCheck} size="sm" className="bg-green-600/20 text-green-300 border-green-600/30 hover:bg-green-600/30">
+                      <Heart className="w-4 h-4 mr-2" />
+                      Check Emotion
+                    </Button>
+                    <Button onClick={handleEnvironmentScan} size="sm" className="bg-blue-600/20 text-blue-300 border-blue-600/30 hover:bg-blue-600/30">
+                      <Eye className="w-4 h-4 mr-2" />
+                      Scan Area
+                    </Button>
+                  </div>
 
-                    {/* Input Controls */}
-                    <div className="flex gap-3 items-end">
-                      <div className="flex-1">
-                        <Textarea
-                          value={inputText}
-                          onChange={(e) => setInputText(e.target.value)}
-                          placeholder="💬 Ask me anything, share your feelings, or just say hello..."
-                          className="min-h-[80px] resize-none border-slate-300 dark:border-slate-600 focus:border-blue-500 dark:focus:border-blue-400 rounded-xl bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm text-lg"
-                          onKeyPress={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                              e.preventDefault();
-                              if (inputText.trim()) {
-                                handleAIInteraction(inputText);
-                                setInputText("");
-                              }
-                            }
-                          }}
-                        />
-                      </div>
-
-                      <div className="flex flex-col gap-3">
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant={isListening ? "destructive" : "secondary"}
-                            onClick={isListening ? () => setIsListening(false) : startListening}
-                            className="shadow-lg hover:shadow-xl transition-all duration-200"
-                          >
-                            {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-                          </Button>
-                          
-                          <Button
-                            size="sm"
-                            variant={isVideoOn ? "destructive" : "secondary"}
-                            onClick={isVideoOn ? stopVideo : startVideo}
-                            className="shadow-lg hover:shadow-xl transition-all duration-200"
-                          >
-                            {isVideoOn ? <VideoOff className="w-5 h-5" /> : <Video className="w-5 h-5" />}
-                          </Button>
-
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => fileInputRef.current?.click()}
-                            className="shadow-lg hover:shadow-xl transition-all duration-200"
-                          >
-                            <Upload className="w-5 h-5" />
-                          </Button>
-                        </div>
-
-                        <Button
-                          onClick={() => {
+                  {/* Input Controls */}
+                  <div className="flex gap-3 items-end">
+                    <div className="flex-1">
+                      <Textarea
+                        value={inputText}
+                        onChange={(e) => setInputText(e.target.value)}
+                        placeholder="How can Nurath.AI help you today?"
+                        className="min-h-[60px] resize-none bg-slate-800 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500"
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
                             if (inputText.trim()) {
                               handleAIInteraction(inputText);
                               setInputText("");
                             }
-                          }}
-                          disabled={!inputText.trim()}
-                          className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg hover:shadow-xl transition-all duration-200 group"
-                        >
-                          <Send className="w-5 h-5 mr-2 group-hover:translate-x-1 transition-transform" />
-                          Send
-                          <Sparkles className="w-4 h-4 ml-2 animate-pulse" />
-                        </Button>
-                      </div>
+                          }
+                        }}
+                      />
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant={isListening ? "destructive" : "secondary"}
+                        onClick={isListening ? () => setIsListening(false) : startListening}
+                        className="bg-slate-700 hover:bg-slate-600 border-slate-600"
+                      >
+                        {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                      </Button>
+                      
+                      <Button
+                        size="sm"
+                        variant={isVideoOn ? "destructive" : "secondary"}
+                        onClick={isVideoOn ? stopVideo : startVideo}
+                        className="bg-slate-700 hover:bg-slate-600 border-slate-600"
+                      >
+                        {isVideoOn ? <VideoOff className="w-4 h-4" /> : <Video className="w-4 h-4" />}
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="bg-slate-700 hover:bg-slate-600 border-slate-600"
+                      >
+                        <Upload className="w-4 h-4" />
+                      </Button>
+
+                      <Button
+                        onClick={() => {
+                          if (inputText.trim()) {
+                            handleAIInteraction(inputText);
+                            setInputText("");
+                          }
+                        }}
+                        disabled={!inputText.trim()}
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                      >
+                        <Send className="w-4 h-4" />
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -629,121 +577,51 @@ const MultimodalAI = () => {
             </Card>
           </div>
 
-          {/* Enhanced Sidebar */}
-          <div className="space-y-6">
+          {/* Sidebar */}
+          <div className="space-y-4">
             {/* Call Actions */}
-            <Card className="shadow-xl border-0 bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-800 dark:to-blue-900">
-              <div className="p-6">
-                <h3 className="font-bold text-xl mb-4 text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                  <Phone className="w-6 h-6 text-blue-600" />
-                  Voice & Video Calls
-                </h3>
-                <div className="space-y-3">
+            <Card className="bg-slate-900/50 border-slate-700">
+              <div className="p-4">
+                <h3 className="font-semibold text-white mb-3 text-sm">Voice & Video</h3>
+                <div className="space-y-2">
                   <Button 
                     onClick={startVideoCall}
-                    className="w-full justify-start bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+                    className="w-full justify-start bg-blue-600/20 text-blue-300 border-blue-600/30 hover:bg-blue-600/30 text-sm"
                   >
-                    <Video className="w-5 h-5 mr-3" />
-                    Start Video Call 📹
+                    <Video className="w-4 h-4 mr-2" />
+                    Video Call
                   </Button>
                   <Button 
                     onClick={startAudioCall}
-                    className="w-full justify-start bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+                    className="w-full justify-start bg-green-600/20 text-green-300 border-green-600/30 hover:bg-green-600/30 text-sm"
                   >
-                    <Phone className="w-5 h-5 mr-3" />
-                    Start Audio Call 📞
+                    <Phone className="w-4 h-4 mr-2" />
+                    Audio Call
                   </Button>
                 </div>
               </div>
             </Card>
 
-            {/* Entertainment Actions */}
-            <Card className="shadow-xl border-0 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20">
-              <div className="p-6">
-                <h3 className="font-bold text-xl mb-4 text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                  <Sparkles className="w-6 h-6 text-purple-600" />
-                  Entertainment
-                </h3>
-                <div className="space-y-3">
-                  <Button 
-                    onClick={handleSingSong}
-                    className="w-full justify-start bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white shadow-lg hover:shadow-xl transition-all duration-200"
-                  >
-                    <Music className="w-5 h-5 mr-3" />
-                    Sing Me a Song 🎵
-                  </Button>
-                  <Button 
-                    onClick={handleTellJoke}
-                    className="w-full justify-start bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white shadow-lg hover:shadow-xl transition-all duration-200"
-                  >
-                    <Smile className="w-5 h-5 mr-3" />
-                    Tell Me a Joke 😄
-                  </Button>
-                  <Button 
-                    onClick={handleTellStory}
-                    className="w-full justify-start bg-gradient-to-r from-purple-500 to-violet-500 hover:from-purple-600 hover:to-violet-600 text-white shadow-lg hover:shadow-xl transition-all duration-200"
-                  >
-                    <BookOpen className="w-5 h-5 mr-3" />
-                    Tell Me a Story 📚
-                  </Button>
-                </div>
-              </div>
-            </Card>
-
-            {/* Recognition & Analysis */}
-            <Card className="shadow-xl border-0 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20">
-              <div className="p-6">
-                <h3 className="font-bold text-xl mb-4 text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                  <Zap className="w-6 h-6 text-green-600" />
-                  Smart Analysis
-                </h3>
-                <div className="space-y-3">
-                  <Button 
-                    onClick={handleEmotionCheck}
-                    className="w-full justify-start bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-lg hover:shadow-xl transition-all duration-200"
-                  >
-                    <Heart className="w-5 h-5 mr-3" />
-                    Check My Emotions 💝
-                  </Button>
-                  <Button 
-                    onClick={handleEnvironmentScan}
-                    className="w-full justify-start bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white shadow-lg hover:shadow-xl transition-all duration-200"
-                  >
-                    <Eye className="w-5 h-5 mr-3" />
-                    Scan Environment 🌍
-                  </Button>
-                </div>
-              </div>
-            </Card>
-
-            {/* Recognized People */}
-            <Card className="shadow-xl border-0 bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl">
-              <div className="p-6">
-                <h3 className="font-bold text-xl mb-4 text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                  <Users className="w-6 h-6 text-indigo-600" />
-                  Recognized People
-                </h3>
+            {/* Recognition Status */}
+            <Card className="bg-slate-900/50 border-slate-700">
+              <div className="p-4">
+                <h3 className="font-semibold text-white mb-3 text-sm">Recognition</h3>
                 {recognizedPeople.length > 0 ? (
-                  <div className="space-y-4">
+                  <div className="space-y-2">
                     {recognizedPeople.map((person) => (
-                      <div key={person.id} className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-r from-indigo-50 to-blue-50 dark:from-indigo-900/30 dark:to-blue-900/30 border border-indigo-200 dark:border-indigo-700">
-                        <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-blue-500 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg">
+                      <div key={person.id} className="flex items-center gap-3 p-2 rounded bg-slate-800/50">
+                        <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-medium text-xs">
                           {person.name[0]}
                         </div>
                         <div>
-                          <p className="font-semibold text-lg text-slate-800 dark:text-slate-200">{person.name}</p>
-                          <p className="text-sm text-slate-600 dark:text-slate-400 capitalize">{person.relationship}</p>
+                          <p className="text-white text-sm font-medium">{person.name}</p>
+                          <p className="text-slate-400 text-xs">{person.relationship}</p>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-8">
-                    <Users className="w-16 h-16 mx-auto mb-4 text-slate-400 dark:text-slate-600" />
-                    <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
-                      No people recognized yet. Show me photos of your family and friends so I can remember them!
-                    </p>
-                  </div>
+                  <p className="text-slate-400 text-sm">No people recognized yet</p>
                 )}
               </div>
             </Card>
@@ -762,23 +640,6 @@ const MultimodalAI = () => {
       
       <canvas ref={canvasRef} style={{ display: 'none' }} />
       <audio ref={audioRef} preload="auto" />
-
-      {/* Custom Styles - Fixed */}
-      <style>{`
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 6px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: linear-gradient(to bottom, #3b82f6, #6366f1);
-          border-radius: 3px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: linear-gradient(to bottom, #2563eb, #4f46e5);
-        }
-      `}</style>
     </div>
   );
 };
