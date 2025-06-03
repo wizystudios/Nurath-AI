@@ -235,23 +235,12 @@ const MultimodalAI = () => {
     reader.readAsDataURL(file);
   }, [handleAIInteraction]);
 
-  const nurathaAIActions = [
-    { name: "Voice conversation", icon: <MessageCircle className="w-4 h-4" />, action: () => handleAIInteraction("Let's have a voice conversation", 'voice') },
-    { name: "Emotion detection", icon: <Heart className="w-4 h-4" />, action: startVideo },
-    { name: "Environment scanning", icon: <Eye className="w-4 h-4" />, action: () => handleAIInteraction("Scan my environment and tell me what you see", 'image') },
-    { name: "Smart assistance", icon: <Brain className="w-4 h-4" />, action: () => handleAIInteraction("Help me with smart AI assistance") },
-    { name: "Voice interactions", icon: <Mic className="w-4 h-4" />, action: startListening },
-    { name: "AI capabilities", icon: <Zap className="w-4 h-4" />, action: () => handleAIInteraction("Show me your AI capabilities") }
-  ];
-
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white">
-      {/* Header with gradient */}
-      <header className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-blue-600/20 via-purple-600/20 to-blue-600/20 backdrop-blur-sm border-b border-gray-800/50">
+    <div className="min-h-screen bg-[#1e1e1e] text-white flex flex-col">
+      {/* Header - minimal like Bolt */}
+      <header className="flex items-center justify-between px-6 py-4 bg-[#1e1e1e] border-b border-gray-800/50">
         <div className="flex items-center space-x-4">
-          <div className="text-white font-bold text-xl">
-            Nurath.AI
-          </div>
+          <div className="text-white font-bold text-xl">Nurath.AI</div>
           {currentEmotion && (
             <Badge variant="outline" className="border-pink-500/30 text-pink-400 bg-pink-500/10">
               <Heart className="w-3 h-3 mr-1" />
@@ -267,31 +256,30 @@ const MultimodalAI = () => {
         </div>
       </header>
 
-      {/* Main Content */}
-      <div className="flex items-center justify-center min-h-[calc(100vh-140px)] px-6">
+      {/* Main Content - Exact Bolt Layout */}
+      <div className="flex-1 flex items-center justify-center px-6 py-16">
         {conversation.length === 0 ? (
-          // Welcome Screen - Exact Bolt.new Style
-          <div className="max-w-4xl w-full text-center">
+          <div className="w-full max-w-2xl text-center space-y-12">
             {/* Main Heading */}
-            <div className="mb-12">
-              <h1 className="text-5xl md:text-6xl font-bold text-white mb-6 leading-tight">
+            <div className="space-y-6">
+              <h1 className="text-5xl font-bold text-white leading-tight">
                 What can I help you with?
               </h1>
-              <p className="text-xl text-gray-400 leading-relaxed">
+              <p className="text-lg text-gray-400">
                 Voice conversations, emotion detection, environment scanning, and smart AI assistance.
               </p>
             </div>
 
-            {/* Input Area - 3D Look exactly like Bolt */}
-            <div className="mb-12">
-              <div className="relative max-w-3xl mx-auto">
-                <div className="bg-[#1a1a1a] border border-gray-700/50 rounded-2xl p-1 shadow-2xl">
-                  <div className="bg-[#0f0f0f] rounded-xl border border-gray-600/20 p-4 shadow-inner">
+            {/* Main Input Area - 3D like Bolt */}
+            <div className="space-y-6">
+              <div className="relative">
+                <div className="bg-[#2a2a2a] border border-gray-600/50 rounded-xl p-1 shadow-2xl">
+                  <div className="bg-[#1a1a1a] rounded-lg border border-gray-700/30 p-4">
                     <Textarea
                       value={inputText}
                       onChange={(e) => setInputText(e.target.value)}
                       placeholder="Ask Nurath.AI anything..."
-                      className="w-full min-h-[100px] bg-transparent border-none text-white placeholder-gray-500 resize-none text-base focus:outline-none focus:ring-0"
+                      className="w-full min-h-[80px] bg-transparent border-none text-white placeholder-gray-500 resize-none text-lg focus:outline-none focus:ring-0"
                       onKeyPress={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
@@ -302,13 +290,13 @@ const MultimodalAI = () => {
                         }
                       }}
                     />
-                    <div className="flex items-center justify-between mt-4">
+                    <div className="flex items-center justify-between mt-3">
                       <div className="flex items-center space-x-2">
                         <Button
                           size="sm"
                           variant="ghost"
                           onClick={() => fileInputRef.current?.click()}
-                          className="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-gray-800/50"
+                          className="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-gray-700/50"
                         >
                           <Paperclip className="w-4 h-4" />
                         </Button>
@@ -316,7 +304,7 @@ const MultimodalAI = () => {
                           size="sm"
                           variant={isListening ? "destructive" : "ghost"}
                           onClick={isListening ? () => setIsListening(false) : startListening}
-                          className="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-gray-800/50"
+                          className="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-gray-700/50"
                         >
                           {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                         </Button>
@@ -338,64 +326,70 @@ const MultimodalAI = () => {
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Quick Actions - Semi-rounded like Bolt */}
-            <div className="mb-12">
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-w-4xl mx-auto">
-                {nurathaAIActions.map((action, index) => (
-                  <Button
-                    key={index}
-                    variant="outline"
-                    size="sm"
-                    onClick={action.action}
-                    className="bg-[#1a1a1a] border-gray-700/50 text-gray-300 hover:text-white hover:border-gray-600 hover:bg-gray-800/50 rounded-lg p-4 h-auto flex flex-col items-center space-y-2 transition-all duration-200"
-                  >
-                    {action.icon}
-                    <span className="text-sm">{action.name}</span>
-                  </Button>
-                ))}
+              {/* Quick Actions Grid - Semi-rounded like Bolt */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <Button
+                  onClick={() => handleAIInteraction("Sing me a beautiful song with your voice", 'voice')}
+                  variant="outline"
+                  className="bg-[#2a2a2a] border-gray-600/50 text-gray-300 hover:text-white hover:border-gray-500 hover:bg-gray-700/50 rounded-lg p-4 h-auto flex flex-col items-center space-y-2"
+                >
+                  <Music className="w-5 h-5" />
+                  <span className="text-sm">Sing Song</span>
+                </Button>
+                <Button
+                  onClick={() => handleAIInteraction("Tell me a funny joke using your voice", 'voice')}
+                  variant="outline"
+                  className="bg-[#2a2a2a] border-gray-600/50 text-gray-300 hover:text-white hover:border-gray-500 hover:bg-gray-700/50 rounded-lg p-4 h-auto flex flex-col items-center space-y-2"
+                >
+                  <Smile className="w-5 h-5" />
+                  <span className="text-sm">Tell Joke</span>
+                </Button>
+                <Button
+                  onClick={() => handleAIInteraction("Tell me an interesting story using your voice", 'voice')}
+                  variant="outline"
+                  className="bg-[#2a2a2a] border-gray-600/50 text-gray-300 hover:text-white hover:border-gray-500 hover:bg-gray-700/50 rounded-lg p-4 h-auto flex flex-col items-center space-y-2"
+                >
+                  <BookOpen className="w-5 h-5" />
+                  <span className="text-sm">Tell Story</span>
+                </Button>
+                <Button
+                  onClick={startVideo}
+                  variant="outline"
+                  className="bg-[#2a2a2a] border-gray-600/50 text-gray-300 hover:text-white hover:border-gray-500 hover:bg-gray-700/50 rounded-lg p-4 h-auto flex flex-col items-center space-y-2"
+                >
+                  <Heart className="w-5 h-5" />
+                  <span className="text-sm">Emotion</span>
+                </Button>
               </div>
-            </div>
 
-            {/* AI Features */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-2xl mx-auto">
-              <Button
-                onClick={() => handleAIInteraction("Sing me a beautiful song with your voice", 'voice')}
-                variant="outline"
-                size="sm"
-                className="bg-pink-900/20 border-pink-500/30 text-pink-400 hover:bg-pink-500/10 rounded-lg"
-              >
-                <Music className="w-4 h-4 mr-2" />
-                Sing Song
-              </Button>
-              <Button
-                onClick={() => handleAIInteraction("Tell me a funny joke using your voice", 'voice')}
-                variant="outline"
-                size="sm"
-                className="bg-yellow-900/20 border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10 rounded-lg"
-              >
-                <Smile className="w-4 h-4 mr-2" />
-                Tell Joke
-              </Button>
-              <Button
-                onClick={() => handleAIInteraction("Tell me an interesting story using your voice", 'voice')}
-                variant="outline"
-                size="sm"
-                className="bg-purple-900/20 border-purple-500/30 text-purple-400 hover:bg-purple-500/10 rounded-lg"
-              >
-                <BookOpen className="w-4 h-4 mr-2" />
-                Tell Story
-              </Button>
-              <Button
-                onClick={startVideo}
-                variant="outline"
-                size="sm"
-                className="bg-green-900/20 border-green-500/30 text-green-400 hover:bg-green-500/10 rounded-lg"
-              >
-                <Heart className="w-4 h-4 mr-2" />
-                Emotion
-              </Button>
+              {/* Main Action Buttons */}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <Button
+                  onClick={() => handleAIInteraction("Let's have a voice conversation", 'voice')}
+                  variant="outline"
+                  className="bg-[#2a2a2a] border-gray-600/50 text-gray-300 hover:text-white hover:border-gray-500 hover:bg-gray-700/50 rounded-lg p-3 flex items-center space-x-2"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  <span>Voice Chat</span>
+                </Button>
+                <Button
+                  onClick={() => handleAIInteraction("Scan my environment and tell me what you see", 'image')}
+                  variant="outline"
+                  className="bg-[#2a2a2a] border-gray-600/50 text-gray-300 hover:text-white hover:border-gray-500 hover:bg-gray-700/50 rounded-lg p-3 flex items-center space-x-2"
+                >
+                  <Eye className="w-4 h-4" />
+                  <span>Environment Scan</span>
+                </Button>
+                <Button
+                  onClick={() => handleAIInteraction("Help me with smart AI assistance")}
+                  variant="outline"
+                  className="bg-[#2a2a2a] border-gray-600/50 text-gray-300 hover:text-white hover:border-gray-500 hover:bg-gray-700/50 rounded-lg p-3 flex items-center space-x-2"
+                >
+                  <Brain className="w-4 h-4" />
+                  <span>Smart Assistant</span>
+                </Button>
+              </div>
             </div>
           </div>
         ) : (
