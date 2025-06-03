@@ -74,11 +74,11 @@
   body {
     @apply bg-background text-foreground;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-    background: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%);
+    background: #0a0a0a;
   }
 }
 
-/* Clean, minimal design with 3D effects */
+/* Clean, minimal design with exact Bolt.new styling */
 * {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -101,24 +101,18 @@
   background: #718096;
 }
 
-/* 3D button effects */
-.btn-3d {
-  background: linear-gradient(145deg, #2a2a2a, #1a1a1a);
-  box-shadow: 
-    20px 20px 60px #0a0a0a,
-    -20px -20px 60px #2a2a2a,
-    inset 0 0 0 1px rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
-  transform-style: preserve-3d;
+/* Semi-rounded buttons exactly like Bolt.new */
+.semi-rounded {
+  border-radius: 8px;
 }
 
-.btn-3d:hover {
-  background: linear-gradient(145deg, #3a3a3a, #2a2a2a);
-  transform: translateY(-2px);
+/* 3D input effect like Bolt.new */
+.input-3d {
+  background: linear-gradient(145deg, #1a1a1a, #0f0f0f);
   box-shadow: 
-    25px 25px 80px #0a0a0a,
-    -25px -25px 80px #3a3a3a,
-    inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+    inset 4px 4px 8px rgba(0, 0, 0, 0.3),
+    inset -4px -4px 8px rgba(40, 40, 40, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 /* Gradient text effects */
@@ -164,18 +158,4 @@
   background: rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-/* Semi-rounded buttons like Bolt.new */
-.semi-rounded {
-  border-radius: 12px;
-}
-
-/* Card with 3D depth */
-.card-3d {
-  background: linear-gradient(145deg, #1e1e1e, #141414);
-  box-shadow: 
-    15px 15px 30px rgba(0, 0, 0, 0.5),
-    -15px -15px 30px rgba(40, 40, 40, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.05);
 }

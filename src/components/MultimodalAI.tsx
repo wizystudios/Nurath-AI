@@ -245,11 +245,11 @@ const MultimodalAI = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white">
-      {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4 bg-gray-900/50 backdrop-blur-sm border-b border-gray-800/50">
+    <div className="min-h-screen bg-[#0a0a0a] text-white">
+      {/* Header with gradient */}
+      <header className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-blue-600/20 via-purple-600/20 to-blue-600/20 backdrop-blur-sm border-b border-gray-800/50">
         <div className="flex items-center space-x-4">
-          <div className="text-white font-bold text-xl bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+          <div className="text-white font-bold text-xl">
             Nurath.AI
           </div>
           {currentEmotion && (
@@ -270,28 +270,28 @@ const MultimodalAI = () => {
       {/* Main Content */}
       <div className="flex items-center justify-center min-h-[calc(100vh-140px)] px-6">
         {conversation.length === 0 ? (
-          // Welcome Screen - Bolt.new Style
+          // Welcome Screen - Exact Bolt.new Style
           <div className="max-w-4xl w-full text-center">
             {/* Main Heading */}
             <div className="mb-12">
               <h1 className="text-5xl md:text-6xl font-bold text-white mb-6 leading-tight">
-                What do you want to build?
+                What can I help you with?
               </h1>
               <p className="text-xl text-gray-400 leading-relaxed">
-                Chat, create, and interact with <span className="text-blue-400 font-semibold">advanced AI capabilities</span>.
+                Voice conversations, emotion detection, environment scanning, and smart AI assistance.
               </p>
             </div>
 
-            {/* Input Area - 3D Look */}
+            {/* Input Area - 3D Look exactly like Bolt */}
             <div className="mb-12">
               <div className="relative max-w-3xl mx-auto">
-                <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-2xl p-6 shadow-2xl backdrop-blur-sm">
-                  <div className="bg-gray-900/50 rounded-xl border border-gray-600/30 p-4">
+                <div className="bg-[#1a1a1a] border border-gray-700/50 rounded-2xl p-1 shadow-2xl">
+                  <div className="bg-[#0f0f0f] rounded-xl border border-gray-600/20 p-4 shadow-inner">
                     <Textarea
                       value={inputText}
                       onChange={(e) => setInputText(e.target.value)}
-                      placeholder="How can Nurath.AI help you today?"
-                      className="w-full min-h-[100px] bg-transparent border-none text-white placeholder-gray-500 resize-none text-base focus:outline-none"
+                      placeholder="Ask Nurath.AI anything..."
+                      className="w-full min-h-[100px] bg-transparent border-none text-white placeholder-gray-500 resize-none text-base focus:outline-none focus:ring-0"
                       onKeyPress={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
@@ -308,7 +308,7 @@ const MultimodalAI = () => {
                           size="sm"
                           variant="ghost"
                           onClick={() => fileInputRef.current?.click()}
-                          className="text-gray-400 hover:text-white p-2 rounded-xl"
+                          className="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-gray-800/50"
                         >
                           <Paperclip className="w-4 h-4" />
                         </Button>
@@ -316,7 +316,7 @@ const MultimodalAI = () => {
                           size="sm"
                           variant={isListening ? "destructive" : "ghost"}
                           onClick={isListening ? () => setIsListening(false) : startListening}
-                          className="text-gray-400 hover:text-white p-2 rounded-xl"
+                          className="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-gray-800/50"
                         >
                           {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                         </Button>
@@ -329,7 +329,7 @@ const MultimodalAI = () => {
                           }
                         }}
                         disabled={!inputText.trim()}
-                        className="bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 px-6 rounded-xl"
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-6 rounded-lg"
                       >
                         <Send className="w-4 h-4 mr-2" />
                         Send
@@ -340,7 +340,7 @@ const MultimodalAI = () => {
               </div>
             </div>
 
-            {/* Quick Actions - Semi-rounded style like Bolt */}
+            {/* Quick Actions - Semi-rounded like Bolt */}
             <div className="mb-12">
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-w-4xl mx-auto">
                 {nurathaAIActions.map((action, index) => (
@@ -349,7 +349,7 @@ const MultimodalAI = () => {
                     variant="outline"
                     size="sm"
                     onClick={action.action}
-                    className="bg-gray-800/50 border-gray-700 text-gray-300 hover:text-white hover:border-gray-600 hover:bg-gray-700/50 rounded-xl p-4 h-auto flex flex-col items-center space-y-2 transition-all duration-200"
+                    className="bg-[#1a1a1a] border-gray-700/50 text-gray-300 hover:text-white hover:border-gray-600 hover:bg-gray-800/50 rounded-lg p-4 h-auto flex flex-col items-center space-y-2 transition-all duration-200"
                   >
                     {action.icon}
                     <span className="text-sm">{action.name}</span>
@@ -364,7 +364,7 @@ const MultimodalAI = () => {
                 onClick={() => handleAIInteraction("Sing me a beautiful song with your voice", 'voice')}
                 variant="outline"
                 size="sm"
-                className="bg-pink-900/20 border-pink-500/30 text-pink-400 hover:bg-pink-500/10 rounded-xl"
+                className="bg-pink-900/20 border-pink-500/30 text-pink-400 hover:bg-pink-500/10 rounded-lg"
               >
                 <Music className="w-4 h-4 mr-2" />
                 Sing Song
@@ -373,7 +373,7 @@ const MultimodalAI = () => {
                 onClick={() => handleAIInteraction("Tell me a funny joke using your voice", 'voice')}
                 variant="outline"
                 size="sm"
-                className="bg-yellow-900/20 border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10 rounded-xl"
+                className="bg-yellow-900/20 border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10 rounded-lg"
               >
                 <Smile className="w-4 h-4 mr-2" />
                 Tell Joke
@@ -382,7 +382,7 @@ const MultimodalAI = () => {
                 onClick={() => handleAIInteraction("Tell me an interesting story using your voice", 'voice')}
                 variant="outline"
                 size="sm"
-                className="bg-purple-900/20 border-purple-500/30 text-purple-400 hover:bg-purple-500/10 rounded-xl"
+                className="bg-purple-900/20 border-purple-500/30 text-purple-400 hover:bg-purple-500/10 rounded-lg"
               >
                 <BookOpen className="w-4 h-4 mr-2" />
                 Tell Story
@@ -391,7 +391,7 @@ const MultimodalAI = () => {
                 onClick={startVideo}
                 variant="outline"
                 size="sm"
-                className="bg-green-900/20 border-green-500/30 text-green-400 hover:bg-green-500/10 rounded-xl"
+                className="bg-green-900/20 border-green-500/30 text-green-400 hover:bg-green-500/10 rounded-lg"
               >
                 <Heart className="w-4 h-4 mr-2" />
                 Emotion
@@ -403,22 +403,22 @@ const MultimodalAI = () => {
           <div className="max-w-4xl w-full">
             {/* Video Feed */}
             {isVideoOn && (
-              <Card className="bg-gray-800/50 border-gray-700 mb-6 rounded-xl">
+              <Card className="bg-gray-800/50 border-gray-700 mb-6 rounded-lg">
                 <div className="relative">
                   <video
                     ref={videoRef}
                     autoPlay
                     muted
-                    className="w-full h-64 object-cover rounded-xl"
+                    className="w-full h-64 object-cover rounded-lg"
                   />
                   <div className="absolute bottom-4 left-4 right-4 flex justify-between items-center">
                     <div className="flex space-x-2">
-                      <Button size="sm" className="bg-pink-600 hover:bg-pink-700 rounded-xl">
+                      <Button size="sm" className="bg-pink-600 hover:bg-pink-700 rounded-lg">
                         <Heart className="w-4 h-4 mr-2" />
                         Emotion
                       </Button>
                     </div>
-                    <Button onClick={stopVideo} size="sm" variant="destructive" className="rounded-xl">
+                    <Button onClick={stopVideo} size="sm" variant="destructive" className="rounded-lg">
                       <VideoOff className="w-4 h-4" />
                     </Button>
                   </div>
@@ -427,12 +427,12 @@ const MultimodalAI = () => {
             )}
 
             {/* Conversation */}
-            <Card className="bg-gray-800/50 border-gray-700 mb-6 rounded-xl">
+            <Card className="bg-gray-800/50 border-gray-700 mb-6 rounded-lg">
               <CardContent className="p-6">
                 <div className="space-y-4 max-h-96 overflow-y-auto">
                   {conversation.map((message, index) => (
                     <div key={index} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[80%] rounded-xl p-4 ${
+                      <div className={`max-w-[80%] rounded-lg p-4 ${
                         message.type === 'user' 
                           ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white' 
                           : 'bg-gray-700/50 text-gray-100'
@@ -456,7 +456,7 @@ const MultimodalAI = () => {
             </Card>
 
             {/* Input Area */}
-            <Card className="bg-gray-800/50 border-gray-700 rounded-xl">
+            <Card className="bg-gray-800/50 border-gray-700 rounded-lg">
               <CardContent className="p-4">
                 <div className="flex gap-3 items-end">
                   <div className="flex-1">
@@ -464,7 +464,7 @@ const MultimodalAI = () => {
                       value={inputText}
                       onChange={(e) => setInputText(e.target.value)}
                       placeholder="Continue the conversation..."
-                      className="min-h-[60px] resize-none bg-gray-900/50 border-gray-600 text-white placeholder-gray-400 rounded-xl"
+                      className="min-h-[60px] resize-none bg-gray-900/50 border-gray-600 text-white placeholder-gray-400 rounded-lg"
                       onKeyPress={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
@@ -481,7 +481,7 @@ const MultimodalAI = () => {
                       size="sm"
                       variant={isListening ? "destructive" : "secondary"}
                       onClick={isListening ? () => setIsListening(false) : startListening}
-                      className="rounded-xl"
+                      className="rounded-lg"
                     >
                       {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                     </Button>
@@ -489,7 +489,7 @@ const MultimodalAI = () => {
                       size="sm"
                       variant={isVideoOn ? "destructive" : "secondary"}
                       onClick={isVideoOn ? stopVideo : startVideo}
-                      className="rounded-xl"
+                      className="rounded-lg"
                     >
                       {isVideoOn ? <VideoOff className="w-4 h-4" /> : <Video className="w-4 h-4" />}
                     </Button>
@@ -501,7 +501,7 @@ const MultimodalAI = () => {
                         }
                       }}
                       disabled={!inputText.trim()}
-                      className="bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 rounded-xl"
+                      className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
                     >
                       <Send className="w-4 h-4" />
                     </Button>
