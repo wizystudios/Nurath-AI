@@ -10,29 +10,16 @@ import {
   MicOff, 
   Upload, 
   Video, 
-  VideoOff, 
-  Phone,
-  PhoneCall,
+  VideoOff,
   Heart, 
   Brain, 
   Users,
-  Image as ImageIcon,
   Volume2,
-  VolumeX,
   Smile,
-  Eye,
   Music,
-  Scan,
   Send,
-  Sparkles,
   BookOpen,
-  Zap,
-  Globe,
-  Play,
-  Pause,
-  Settings,
   Paperclip,
-  MessageSquare,
   X
 } from "lucide-react";
 import { toast } from "sonner";
@@ -64,7 +51,6 @@ const MultimodalAI = () => {
   const [isListening, setIsListening] = useState(false);
   const [isVideoOn, setIsVideoOn] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [isVideoCall, setIsVideoCall] = useState(false);
   const [inputText, setInputText] = useState("");
   const [currentEmotion, setCurrentEmotion] = useState<EmotionState | null>(null);
   const [recognizedPeople, setRecognizedPeople] = useState<RelationshipTag[]>([]);
@@ -219,7 +205,7 @@ const MultimodalAI = () => {
           await audioRef.current.play();
           toast.success("🔊 Playing voice response");
         } catch (audioError) {
-          console.error('Audio playback error:', audioError);
+          console.error('Audio playbook error:', audioError);
           toast.error("Audio playback failed");
           setIsSpeaking(false);
         }
@@ -257,35 +243,17 @@ const MultimodalAI = () => {
   }, [handleAIInteraction]);
 
   const quickActions = [
-    { name: "Build a mobile app with Expo", icon: "📱" },
-    { name: "Start a blog with Astro", icon: "📝" },
-    { name: "Create a docs site with Vitepress", icon: "📚" },
-    { name: "Scaffold UI with shadcn", icon: "🎨" },
-    { name: "Draft a presentation with Slidev", icon: "📊" }
-  ];
-
-  const techStacks = [
-    { name: "Angular", icon: "🅰️" },
-    { name: "Vue", icon: "💚" },
-    { name: "Nuxt", icon: "🔷" },
-    { name: "Next.js", icon: "⚫" },
-    { name: "Astro", icon: "🚀" },
-    { name: "SvelteKit", icon: "🧡" },
-    { name: "Remix", icon: "💿" },
-    { name: "SolidStart", icon: "🔵" },
-    { name: "Qwik", icon: "⚡" },
-    { name: "Laravel", icon: "🔴" },
-    { name: "Django", icon: "🐍" },
-    { name: "Flask", icon: "🌶️" },
-    { name: "Spring", icon: "🍃" },
-    { name: "Express", icon: "🚂" },
-    { name: "Fastify", icon: "⚡" }
+    { name: "Create a mobile app", icon: "📱" },
+    { name: "Build a website", icon: "🌐" },
+    { name: "Generate creative content", icon: "✨" },
+    { name: "Analyze images", icon: "🖼️" },
+    { name: "Voice interaction", icon: "🎤" }
   ];
 
   return (
-    <div className="min-h-screen bg-[#1a1a1a] text-white">
+    <div className="min-h-screen bg-[#0a0a0a] text-white">
       {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4 bg-[#1a1a1a] border-b border-gray-800">
+      <header className="flex items-center justify-between px-6 py-4 bg-[#0a0a0a]">
         <div className="flex items-center space-x-4">
           <div className="text-white font-semibold text-lg">Nurath.AI</div>
           {currentEmotion && (
@@ -301,41 +269,27 @@ const MultimodalAI = () => {
             </Badge>
           )}
         </div>
-
-        <div className="flex items-center space-x-3">
-          <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
-            Sign In
-          </Button>
-          <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
-            Get Started
-          </Button>
-        </div>
       </header>
 
       {/* Main Content */}
       <div className="flex items-center justify-center min-h-[calc(100vh-140px)] px-6">
         {conversation.length === 0 ? (
-          // Welcome Screen - Exact Bolt.new Style
+          // Welcome Screen - Clean Bolt.new Style
           <div className="max-w-4xl w-full text-center">
-            {/* Hackathon Banner */}
-            <div className="mb-8">
-              <p className="text-sm text-gray-500 mb-4">Join the world's largest hackathon!</p>
-            </div>
-
             {/* Main Heading */}
             <div className="mb-12">
               <h1 className="text-5xl md:text-6xl font-bold text-white mb-6 leading-tight">
                 What do you want to build?
               </h1>
               <p className="text-xl text-gray-400 leading-relaxed">
-                Prompt, run, edit, and deploy full-stack <span className="text-white font-medium">web</span> and <span className="text-white font-medium">mobile</span> apps.
+                Chat, create, and interact with advanced AI capabilities.
               </p>
             </div>
 
             {/* Input Area */}
             <div className="mb-12">
               <div className="relative max-w-3xl mx-auto">
-                <div className="bg-[#2d2d2d] border border-gray-700 rounded-lg p-6">
+                <div className="bg-[#1a1a1a] border border-gray-800 rounded-lg p-6">
                   <Textarea
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
@@ -378,26 +332,13 @@ const MultimodalAI = () => {
                         }
                       }}
                       disabled={!inputText.trim()}
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-6"
+                      className="bg-white text-black hover:bg-gray-200 px-6"
                     >
                       <Send className="w-4 h-4 mr-2" />
                       Send
                     </Button>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            {/* Import Options */}
-            <div className="mb-12">
-              <p className="text-sm text-gray-500 mb-6">or import from</p>
-              <div className="flex items-center justify-center space-x-6">
-                <Button variant="ghost" className="text-gray-400 hover:text-white">
-                  <span className="mr-2 text-lg">🎨</span> Figma
-                </Button>
-                <Button variant="ghost" className="text-gray-400 hover:text-white">
-                  <span className="mr-2 text-lg">⚫</span> GitHub
-                </Button>
               </div>
             </div>
 
@@ -414,25 +355,6 @@ const MultimodalAI = () => {
                   >
                     <span className="mr-2">{action.icon}</span>
                     {action.name}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            {/* Tech Stack */}
-            <div className="mb-12">
-              <p className="text-sm text-gray-500 mb-8">or start a blank app with your favorite stack</p>
-              <div className="grid grid-cols-8 gap-4 max-w-2xl mx-auto mb-8">
-                {techStacks.slice(0, 16).map((tech, index) => (
-                  <Button
-                    key={index}
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleAIInteraction(`Create a new project with ${tech.name}`)}
-                    className="w-12 h-12 rounded-lg border border-gray-700 text-gray-400 hover:text-white hover:border-gray-600 p-0"
-                    title={tech.name}
-                  >
-                    <span className="text-lg">{tech.icon}</span>
                   </Button>
                 ))}
               </div>
@@ -483,7 +405,7 @@ const MultimodalAI = () => {
           <div className="max-w-4xl w-full">
             {/* Video Feed */}
             {isVideoOn && (
-              <Card className="bg-[#2d2d2d] border-gray-700 mb-6">
+              <Card className="bg-[#1a1a1a] border-gray-800 mb-6">
                 <div className="relative">
                   <video
                     ref={videoRef}
@@ -497,10 +419,6 @@ const MultimodalAI = () => {
                         <Heart className="w-4 h-4 mr-2" />
                         Emotion
                       </Button>
-                      <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
-                        <Scan className="w-4 h-4 mr-2" />
-                        Scan
-                      </Button>
                     </div>
                     <Button onClick={stopVideo} size="sm" variant="destructive">
                       <VideoOff className="w-4 h-4" />
@@ -511,15 +429,15 @@ const MultimodalAI = () => {
             )}
 
             {/* Conversation */}
-            <Card className="bg-[#2d2d2d] border-gray-700 mb-6">
+            <Card className="bg-[#1a1a1a] border-gray-800 mb-6">
               <CardContent className="p-6">
                 <div className="space-y-4 max-h-96 overflow-y-auto">
                   {conversation.map((message, index) => (
                     <div key={index} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
                       <div className={`max-w-[80%] rounded-lg p-4 ${
                         message.type === 'user' 
-                          ? 'bg-blue-600 text-white' 
-                          : 'bg-gray-700 text-gray-100'
+                          ? 'bg-white text-black' 
+                          : 'bg-gray-800 text-gray-100'
                       }`}>
                         <div className="flex items-center gap-2 mb-2">
                           {message.type === 'user' ? <Users className="w-4 h-4" /> : <Brain className="w-4 h-4" />}
@@ -540,7 +458,7 @@ const MultimodalAI = () => {
             </Card>
 
             {/* Input Area */}
-            <Card className="bg-[#2d2d2d] border-gray-700">
+            <Card className="bg-[#1a1a1a] border-gray-800">
               <CardContent className="p-4">
                 <div className="flex gap-3 items-end">
                   <div className="flex-1">
@@ -548,7 +466,7 @@ const MultimodalAI = () => {
                       value={inputText}
                       onChange={(e) => setInputText(e.target.value)}
                       placeholder="Continue the conversation..."
-                      className="min-h-[60px] resize-none bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                      className="min-h-[60px] resize-none bg-gray-800 border-gray-700 text-white placeholder-gray-400"
                       onKeyPress={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
@@ -590,7 +508,7 @@ const MultimodalAI = () => {
                         }
                       }}
                       disabled={!inputText.trim()}
-                      className="bg-blue-600 hover:bg-blue-700"
+                      className="bg-white text-black hover:bg-gray-200"
                     >
                       <Send className="w-4 h-4" />
                     </Button>
@@ -601,23 +519,6 @@ const MultimodalAI = () => {
           </div>
         )}
       </div>
-
-      {/* Footer */}
-      <footer className="border-t border-gray-800 px-6 py-4">
-        <div className="flex items-center justify-between text-sm text-gray-500">
-          <div className="flex items-center space-x-6">
-            <span>We're hiring! •</span>
-            <span>Help Center</span>
-            <span>Pricing</span>
-            <span>Terms</span>
-            <span>Privacy</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Zap className="w-4 h-4" />
-            <span>StackBlitz</span>
-          </div>
-        </div>
-      </footer>
 
       {/* Hidden Elements */}
       <input
