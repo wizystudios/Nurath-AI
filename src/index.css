@@ -95,31 +95,12 @@
   }
 }
 
-/* Bolt.new inspired gradients and animations */
-@keyframes gradient-shift {
-  0%, 100% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-}
-
-.gradient-text {
-  background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
-  background-size: 400% 400%;
-  animation: gradient-shift 15s ease infinite;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-/* Smooth transitions */
+/* Clean, minimal design inspired by modern interfaces */
 * {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Custom scrollbar for dark theme */
+/* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
 }
@@ -129,28 +110,17 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #475569;
+  background: #4a5568;
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
-}
-
-/* Glassmorphism effects */
-.glass {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: #718096;
 }
 
 /* Button hover effects */
-.btn-glow {
-  transition: all 0.3s ease;
-}
-
 .btn-glow:hover {
-  box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
   transform: translateY(-1px);
 }
 
