@@ -1,6 +1,6 @@
+
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -25,7 +25,12 @@ import {
   StopCircle,
   Palette,
   Zap,
-  MapPin
+  MapPin,
+  Menu,
+  Plus,
+  Search,
+  Settings,
+  Share
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -59,6 +64,7 @@ const MultimodalAI = () => {
   const [inputText, setInputText] = useState("");
   const [currentEmotion, setCurrentEmotion] = useState<EmotionState | null>(null);
   const [recognizedPeople, setRecognizedPeople] = useState<RelationshipTag[]>([]);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [conversation, setConversation] = useState<Array<{
     type: 'user' | 'ai';
     content: string;
@@ -313,309 +319,284 @@ const MultimodalAI = () => {
     }, 'image/jpeg', 0.8);
   }, [isVideoOn, handleAIInteraction]);
 
+  const chatHistory = [
+    "AI Voice and Emotion Interaction",
+    "Telehealth App Requirements", 
+    "TunzaTech E-Waste Solution",
+    "XSS and CSRF Attacks",
+    "Health Industry App Ideas"
+  ];
+
   return (
-    <div className="min-h-screen relative overflow-hidden">
-      {/* Magical animated background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=\"60\" height=\"60\" viewBox=\"0 0 60 60\" xmlns=\"http://www.w3.org/2000/svg\"%3E%3Cg fill=\"none\" fill-rule=\"evenodd\"%3E%3Cg fill=\"%239C92AC\" fill-opacity=\"0.1\"%3E%3Ccircle cx=\"30\" cy=\"30\" r=\"1\"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] animate-pulse"></div>
-        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-pink-500/10 via-purple-500/10 to-cyan-500/10 animate-pulse"></div>
+    <div className="flex h-screen bg-white dark:bg-gray-900">
+      {/* Sidebar - Matching ChatGPT exactly */}
+      <div className={`${isSidebarOpen ? 'w-64' : 'w-0'} transition-all duration-300 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden`}>
+        {isSidebarOpen && (
+          <>
+            {/* Sidebar Header */}
+            <div className="p-3 border-b border-gray-200 dark:border-gray-700">
+              <Button 
+                className="w-full justify-start bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-900 dark:text-white"
+                onClick={() => {
+                  setConversation([]);
+                  setInputText("");
+                }}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                New chat
+              </Button>
+            </div>
+
+            {/* Chat History */}
+            <div className="flex-1 overflow-y-auto p-2">
+              <div className="space-y-1">
+                <div className="text-xs font-medium text-gray-500 dark:text-gray-400 px-2 py-1">Today</div>
+                {chatHistory.map((chat, index) => (
+                  <button
+                    key={index}
+                    className="w-full text-left p-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md truncate"
+                  >
+                    {chat}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Sidebar Footer */}
+            <div className="p-2 border-t border-gray-200 dark:border-gray-700 space-y-1">
+              <Button variant="ghost" className="w-full justify-start text-gray-700 dark:text-gray-300">
+                <Settings className="w-4 h-4 mr-2" />
+                Settings
+              </Button>
+            </div>
+          </>
+        )}
       </div>
 
-      {/* Header */}
-      <header className="relative z-10 flex items-center justify-between px-6 py-4 bg-black/20 backdrop-blur-lg border-b border-white/10">
-        <div className="flex items-center space-x-4">
-          <div className="text-white font-bold text-xl bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-            Nurath.AI
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col">
+        {/* Top Header - Matching ChatGPT */}
+        <header className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+          <div className="flex items-center space-x-4">
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="text-gray-600 dark:text-gray-400"
+            >
+              <Menu className="w-5 h-5" />
+            </Button>
+            <div className="font-semibold text-gray-900 dark:text-white">Nurath.AI</div>
+            {currentEmotion && (
+              <Badge variant="outline" className="border-pink-500/30 text-pink-400 bg-pink-500/10">
+                <Heart className="w-3 h-3 mr-1" />
+                {currentEmotion.primary}
+              </Badge>
+            )}
+            {isSpeaking && (
+              <Badge variant="outline" className="border-green-500/30 text-green-400 bg-green-500/10 animate-pulse">
+                <Volume2 className="w-3 h-3 mr-1" />
+                Speaking
+              </Badge>
+            )}
+            {isListening && (
+              <Badge variant="outline" className="border-red-500/30 text-red-400 bg-red-500/10 animate-pulse">
+                <Mic className="w-3 h-3 mr-1" />
+                Listening
+              </Badge>
+            )}
           </div>
-          {currentEmotion && (
-            <Badge variant="outline" className="border-pink-500/30 text-pink-400 bg-pink-500/10">
-              <Heart className="w-3 h-3 mr-1" />
-              {currentEmotion.primary}
-            </Badge>
-          )}
-          {isSpeaking && (
-            <Badge variant="outline" className="border-green-500/30 text-green-400 bg-green-500/10 animate-pulse">
-              <Volume2 className="w-3 h-3 mr-1" />
-              Speaking
-            </Badge>
-          )}
-          {isListening && (
-            <Badge variant="outline" className="border-red-500/30 text-red-400 bg-red-500/10 animate-pulse">
-              <Mic className="w-3 h-3 mr-1" />
-              Listening
-            </Badge>
-          )}
-        </div>
-        <div className="flex items-center space-x-4">
-          <ThemeToggle />
-        </div>
-      </header>
+          <div className="flex items-center space-x-2">
+            <Button variant="ghost" size="sm" className="text-gray-600 dark:text-gray-400">
+              <Share className="w-4 h-4" />
+            </Button>
+            <ThemeToggle />
+          </div>
+        </header>
 
-      {/* Main Content */}
-      <div className="relative z-10 flex-1 flex items-center justify-center px-6 py-8">
-        {conversation.length === 0 ? (
-          <div className="w-full max-w-2xl text-center space-y-8">
-            {/* Main Heading */}
-            <div className="space-y-4">
-              <h1 className="text-4xl font-bold text-white leading-tight bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent">
-                What can I help you with?
-              </h1>
-              <p className="text-lg text-gray-300">
-                Voice conversations, emotion detection, environment scanning, image generation, and smart AI assistance.
-              </p>
-            </div>
-
-            {/* Main Input Area */}
-            <div className="space-y-6">
-              <div className="relative">
-                <div className="bg-black/30 backdrop-blur-lg border border-white/20 rounded-xl p-1 shadow-2xl">
-                  <div className="bg-black/20 rounded-lg border border-white/10 p-4 input-3d">
-                    <Textarea
-                      value={inputText}
-                      onChange={(e) => setInputText(e.target.value)}
-                      placeholder="Ask Nurath.AI anything..."
-                      className="w-full min-h-[80px] bg-transparent border-none text-white placeholder-gray-400 resize-none text-lg focus:outline-none focus:ring-0"
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          if (inputText.trim()) {
-                            handleAIInteraction(inputText);
-                            setInputText("");
-                          }
-                        }
-                      }}
-                    />
-                    <div className="flex items-center justify-between mt-3">
-                      <div className="flex items-center space-x-2">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => fileInputRef.current?.click()}
-                          className="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-white/10 semi-rounded"
-                        >
-                          <Paperclip className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant={isListening ? "destructive" : "ghost"}
-                          onClick={isListening ? () => setIsListening(false) : startListening}
-                          className="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-white/10 semi-rounded"
-                        >
-                          {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant={isVideoOn ? "destructive" : "ghost"}
-                          onClick={isVideoOn ? stopVideo : startVideo}
-                          className="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-white/10 semi-rounded"
-                        >
-                          {isVideoOn ? <VideoOff className="w-4 h-4" /> : <Video className="w-4 h-4" />}
-                        </Button>
-                        {isVideoOn && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={takePhoto}
-                            className="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-white/10 semi-rounded"
-                          >
-                            <Camera className="w-4 h-4" />
-                          </Button>
-                        )}
-                      </div>
-                      <Button
-                        onClick={() => {
-                          if (inputText.trim()) {
-                            handleAIInteraction(inputText);
-                            setInputText("");
-                          }
-                        }}
-                        disabled={!inputText.trim()}
-                        className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-6 rounded-lg semi-rounded"
-                      >
-                        <Send className="w-4 h-4 mr-2" />
-                        Send
-                      </Button>
-                    </div>
-                  </div>
+        {/* Chat Messages Area */}
+        <div className="flex-1 overflow-y-auto">
+          {conversation.length === 0 ? (
+            // Welcome State - Like ChatGPT
+            <div className="h-full flex flex-col items-center justify-center p-8">
+              <div className="text-center max-w-2xl">
+                <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-8">
+                  What can I help you with?
+                </h1>
+                
+                {/* Quick Actions Grid */}
+                <div className="grid grid-cols-2 gap-4 mb-8">
+                  <Button
+                    onClick={() => handleAIInteraction("Sing me a beautiful song with your voice and sing the actual lyrics", 'voice')}
+                    variant="outline"
+                    className="h-20 flex flex-col items-center justify-center space-y-2 border-gray-200 dark:border-gray-700"
+                  >
+                    <Music className="w-6 h-6" />
+                    <span className="text-sm">Sing Song</span>
+                  </Button>
+                  <Button
+                    onClick={() => handleAIInteraction("Tell me a funny joke using your voice", 'voice')}
+                    variant="outline"
+                    className="h-20 flex flex-col items-center justify-center space-y-2 border-gray-200 dark:border-gray-700"
+                  >
+                    <Smile className="w-6 h-6" />
+                    <span className="text-sm">Tell Joke</span>
+                  </Button>
+                  <Button
+                    onClick={() => handleAIInteraction("Generate a creative logo design for me", 'text')}
+                    variant="outline"
+                    className="h-20 flex flex-col items-center justify-center space-y-2 border-gray-200 dark:border-gray-700"
+                  >
+                    <Palette className="w-6 h-6" />
+                    <span className="text-sm">Generate Image</span>
+                  </Button>
+                  <Button
+                    onClick={startVideo}
+                    variant="outline"
+                    className="h-20 flex flex-col items-center justify-center space-y-2 border-gray-200 dark:border-gray-700"
+                  >
+                    <Eye className="w-6 h-6" />
+                    <span className="text-sm">Recognize & Scan</span>
+                  </Button>
                 </div>
               </div>
-
-              {/* Enhanced Quick Actions Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <Button
-                  onClick={() => handleAIInteraction("Sing me a beautiful song with your voice and sing the actual lyrics", 'voice')}
-                  variant="outline"
-                  className="bg-black/30 backdrop-blur-lg border-white/20 text-white hover:bg-white/10 semi-rounded p-4 h-auto flex flex-col items-center space-y-2"
-                >
-                  <Music className="w-5 h-5" />
-                  <span className="text-sm">Sing Song</span>
-                </Button>
-                <Button
-                  onClick={() => handleAIInteraction("Tell me a funny joke using your voice", 'voice')}
-                  variant="outline"
-                  className="bg-black/30 backdrop-blur-lg border-white/20 text-white hover:bg-white/10 semi-rounded p-4 h-auto flex flex-col items-center space-y-2"
-                >
-                  <Smile className="w-5 h-5" />
-                  <span className="text-sm">Tell Joke</span>
-                </Button>
-                <Button
-                  onClick={() => handleAIInteraction("Generate a creative logo design for me", 'text')}
-                  variant="outline"
-                  className="bg-black/30 backdrop-blur-lg border-white/20 text-white hover:bg-white/10 semi-rounded p-4 h-auto flex flex-col items-center space-y-2"
-                >
-                  <Palette className="w-5 h-5" />
-                  <span className="text-sm">Generate Image</span>
-                </Button>
-                <Button
-                  onClick={startVideo}
-                  variant="outline"
-                  className="bg-black/30 backdrop-blur-lg border-white/20 text-white hover:bg-white/10 semi-rounded p-4 h-auto flex flex-col items-center space-y-2"
-                >
-                  <Eye className="w-5 h-5" />
-                  <span className="text-sm">Recognize & Scan</span>
-                </Button>
-              </div>
             </div>
-          </div>
-        ) : (
-          <div className="max-w-4xl w-full">
-            {/* Video Feed */}
-            {isVideoOn && (
-              <div className="bg-black/30 backdrop-blur-lg border border-white/20 mb-6 rounded-xl overflow-hidden">
-                <div className="relative">
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    muted
-                    className="w-full h-64 object-cover"
-                  />
-                  <div className="absolute bottom-4 left-4 right-4 flex justify-between items-center">
-                    <div className="flex space-x-2">
-                      <Button onClick={takePhoto} size="sm" className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 semi-rounded">
+          ) : (
+            <div className="max-w-3xl mx-auto w-full">
+              {/* Video Feed */}
+              {isVideoOn && (
+                <div className="p-4">
+                  <div className="bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden">
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      muted
+                      className="w-full h-64 object-cover"
+                    />
+                    <div className="p-4 flex space-x-2">
+                      <Button onClick={takePhoto} size="sm" variant="outline">
                         <Camera className="w-4 h-4 mr-2" />
                         Take Photo
-                      </Button>
-                      <Button size="sm" className="bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 semi-rounded">
-                        <Heart className="w-4 h-4 mr-2" />
-                        Detect Emotion
                       </Button>
                       <Button 
                         onClick={() => handleAIInteraction("Look around and tell me where I am and describe my surroundings in detail", 'video')}
                         size="sm" 
-                        className="bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 semi-rounded"
+                        variant="outline"
                       >
                         <MapPin className="w-4 h-4 mr-2" />
                         Scan Location
                       </Button>
+                      <Button onClick={stopVideo} size="sm" variant="destructive">
+                        <VideoOff className="w-4 h-4" />
+                      </Button>
                     </div>
-                    <Button onClick={stopVideo} size="sm" variant="destructive" className="semi-rounded">
-                      <VideoOff className="w-4 h-4" />
-                    </Button>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Magical Chat Messages */}
-            <div className="space-y-6 max-h-[60vh] overflow-y-auto mb-6 px-4">
-              {conversation.map((message, index) => (
-                <div key={index} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}>
-                  <div className={`max-w-[80%] ${
-                    message.type === 'user' 
-                      ? 'bg-gradient-to-r from-purple-600/80 to-pink-600/80' 
-                      : 'bg-black/40 backdrop-blur-lg border border-white/20'
-                  } rounded-2xl p-4 shadow-xl`}>
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                        message.type === 'user' 
-                          ? 'bg-white/20' 
-                          : 'bg-gradient-to-r from-cyan-500 to-blue-500'
-                      }`}>
-                        {message.type === 'user' ? <Users className="w-3 h-3 text-white" /> : <Brain className="w-3 h-3 text-white" />}
-                      </div>
-                      <span className="font-medium text-sm text-white">
-                        {message.type === 'user' ? 'You' : 'Nurath.AI'}
-                      </span>
-                      {message.hasAudio && (
-                        <div className="flex items-center gap-1">
-                          <Volume2 className="w-4 h-4 text-green-400" />
-                          <span className="text-xs text-green-400">Voice</span>
+              {/* Chat Messages */}
+              <div className="space-y-6 p-4">
+                {conversation.map((message, index) => (
+                  <div key={index} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[80%] ${
+                      message.type === 'user' 
+                        ? 'bg-blue-500 text-white' 
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+                    } rounded-lg px-4 py-2`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                          message.type === 'user' 
+                            ? 'bg-white/20' 
+                            : 'bg-blue-500'
+                        }`}>
+                          {message.type === 'user' ? <Users className="w-3 h-3 text-white" /> : <Brain className="w-3 h-3 text-white" />}
                         </div>
-                      )}
+                        <span className="font-medium text-sm">
+                          {message.type === 'user' ? 'You' : 'Nurath.AI'}
+                        </span>
+                        {message.hasAudio && (
+                          <div className="flex items-center gap-1">
+                            <Volume2 className="w-4 h-4 text-green-400" />
+                            <span className="text-xs text-green-400">Voice</span>
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-sm leading-relaxed">{message.content}</p>
+                      <span className="text-xs opacity-70 mt-2 block">
+                        {message.timestamp.toLocaleTimeString()}
+                      </span>
                     </div>
-                    <p className="text-sm leading-relaxed text-white">{message.content}</p>
-                    <span className="text-xs opacity-70 mt-2 block text-gray-300">
-                      {message.timestamp.toLocaleTimeString()}
-                    </span>
                   </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Enhanced Input Area */}
-            <div className="bg-black/30 backdrop-blur-lg border border-white/20 rounded-xl p-1">
-              <div className="bg-black/20 rounded-lg border border-white/10 p-4 input-3d">
-                <div className="flex gap-3 items-end">
-                  <div className="flex-1">
-                    <Textarea
-                      value={inputText}
-                      onChange={(e) => setInputText(e.target.value)}
-                      placeholder="Continue the conversation..."
-                      className="min-h-[60px] resize-none bg-transparent border-none text-white placeholder-gray-400 focus:outline-none focus:ring-0"
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          if (inputText.trim()) {
-                            handleAIInteraction(inputText);
-                            setInputText("");
-                          }
-                        }
-                      }}
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="text-gray-400 hover:text-white semi-rounded hover:bg-white/10"
-                    >
-                      <ImageIcon className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={isListening ? "destructive" : "secondary"}
-                      onClick={isListening ? () => setIsListening(false) : startListening}
-                      className="semi-rounded"
-                    >
-                      {isListening ? <StopCircle className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={isVideoOn ? "destructive" : "secondary"}
-                      onClick={isVideoOn ? stopVideo : startVideo}
-                      className="semi-rounded"
-                    >
-                      {isVideoOn ? <VideoOff className="w-4 h-4" /> : <Video className="w-4 h-4" />}
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        if (inputText.trim()) {
-                          handleAIInteraction(inputText);
-                          setInputText("");
-                        }
-                      }}
-                      disabled={!inputText.trim()}
-                      className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white semi-rounded"
-                    >
-                      <Send className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
+                ))}
               </div>
+            </div>
+          )}
+        </div>
+
+        {/* Input Area - Matching ChatGPT exactly */}
+        <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
+          <div className="max-w-3xl mx-auto">
+            <div className="relative bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+              <Textarea
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                placeholder="Message Nurath.AI..."
+                className="min-h-[60px] resize-none bg-transparent border-none px-4 py-3 pr-16 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-0"
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    if (inputText.trim()) {
+                      handleAIInteraction(inputText);
+                      setInputText("");
+                    }
+                  }
+                }}
+              />
+              <div className="absolute bottom-3 right-3 flex items-center space-x-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                >
+                  <Paperclip className="w-4 h-4" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={isListening ? () => setIsListening(false) : startListening}
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                >
+                  {isListening ? <StopCircle className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={isVideoOn ? stopVideo : startVideo}
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                >
+                  {isVideoOn ? <VideoOff className="w-4 h-4" /> : <Video className="w-4 h-4" />}
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (inputText.trim()) {
+                      handleAIInteraction(inputText);
+                      setInputText("");
+                    }
+                  }}
+                  disabled={!inputText.trim()}
+                  size="sm"
+                  className="bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Send className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 text-center mt-2">
+              Nurath.AI can make mistakes. Check important info.
             </div>
           </div>
-        )}
+        </div>
       </div>
 
       {/* Hidden Elements */}
