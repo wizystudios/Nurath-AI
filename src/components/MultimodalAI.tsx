@@ -20,7 +20,9 @@ import {
   BookOpen,
   Eye,
   MessageCircle,
-  Zap
+  Camera,
+  Image as ImageIcon,
+  StopCircle
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -65,7 +67,6 @@ const MultimodalAI = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Auto-play audio responses
   useEffect(() => {
@@ -74,20 +75,34 @@ const MultimodalAI = () => {
     }
   }, []);
 
-  // Initialize camera/video
+  // Initialize camera/video with better error handling
   const startVideo = useCallback(async () => {
     try {
+      console.log("Attempting to start camera...");
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { width: 640, height: 480 }, 
+        video: { 
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: 'user'
+        }, 
         audio: true 
       });
+      
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        await videoRef.current.play();
       }
       setIsVideoOn(true);
       toast.success("🎥 Camera activated! I can see you now!");
+      
+      // Automatically scan environment when camera starts
+      setTimeout(() => {
+        handleAIInteraction("I can see you now! Let me analyze what's in your environment.", 'video');
+      }, 1000);
+      
     } catch (error) {
-      toast.error("Camera access denied. Please enable camera permissions.");
+      console.error("Camera error:", error);
+      toast.error("Camera access denied. Please enable camera permissions in your browser settings.");
     }
   }, []);
 
@@ -95,12 +110,13 @@ const MultimodalAI = () => {
     if (videoRef.current?.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream;
       stream.getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
     }
     setIsVideoOn(false);
     toast.info("Camera stopped");
   }, []);
 
-  // Voice recognition
+  // Enhanced voice recognition with better error handling
   const startListening = useCallback(async () => {
     try {
       if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
@@ -122,13 +138,15 @@ const MultimodalAI = () => {
 
       recognition.onresult = (event) => {
         const transcript = event.results[0][0].transcript;
+        console.log("Voice input received:", transcript);
         setInputText(transcript);
         handleAIInteraction(transcript, 'voice');
         setIsListening(false);
       };
 
-      recognition.onerror = () => {
-        toast.error("Voice recognition error");
+      recognition.onerror = (error) => {
+        console.error("Speech recognition error:", error);
+        toast.error("Voice recognition error. Please try again.");
         setIsListening(false);
       };
 
@@ -138,13 +156,16 @@ const MultimodalAI = () => {
 
       recognition.start();
     } catch (error) {
+      console.error("Could not start voice recognition:", error);
       toast.error("Could not start voice recognition");
     }
   }, []);
 
-  // AI Interaction
+  // Enhanced AI Interaction with better error handling
   const handleAIInteraction = useCallback(async (input: string, mode: 'text' | 'voice' | 'image' | 'video' = 'text', attachments?: any[]) => {
     try {
+      console.log("Starting AI interaction:", { input, mode, attachments: attachments?.length || 0 });
+      
       setConversation(prev => [...prev, {
         type: 'user',
         content: input,
@@ -172,6 +193,16 @@ const MultimodalAI = () => {
 
       if (error) {
         console.error('AI Error:', error);
+        if (error.message?.includes('quota') || error.message?.includes('429')) {
+          toast.error("🚫 OpenAI API quota exceeded. Please check your API key billing status.");
+          setConversation(prev => [...prev, {
+            type: 'ai',
+            content: "I'm sorry, but my voice capabilities are temporarily unavailable due to API quota limits. My creator needs to check the OpenAI billing settings. I can still chat with you through text!",
+            timestamp: new Date(),
+            hasAudio: false
+          }]);
+          return;
+        }
         throw error;
       }
 
@@ -192,6 +223,7 @@ const MultimodalAI = () => {
         hasAudio: !!aiResponse.audioUrl
       }]);
 
+      // Handle audio response
       if (aiResponse.audioUrl && audioRef.current) {
         try {
           audioRef.current.src = aiResponse.audioUrl;
@@ -200,7 +232,7 @@ const MultimodalAI = () => {
           toast.success("🔊 Playing voice response");
         } catch (audioError) {
           console.error('Audio playback error:', audioError);
-          toast.error("Audio playback failed");
+          toast.error("Audio playback failed - please check browser audio permissions");
           setIsSpeaking(false);
         }
       }
@@ -212,13 +244,22 @@ const MultimodalAI = () => {
     } catch (error) {
       console.error('AI interaction error:', error);
       toast.error("Sorry, I'm having trouble. Please try again.");
+      
+      setConversation(prev => [...prev, {
+        type: 'ai',
+        content: "I apologize, but I'm experiencing technical difficulties. Please ensure you have a stable internet connection and try again.",
+        timestamp: new Date(),
+        hasAudio: false
+      }]);
     }
   }, [isVideoOn, recognizedPeople, currentEmotion, conversation]);
 
-  // File upload
+  // Enhanced file upload with image recognition
   const handleFileUpload = useCallback(async (files: FileList) => {
     const file = files[0];
     if (!file) return;
+
+    console.log("File uploaded:", file.name, file.type);
 
     const fileType = file.type.startsWith('image/') ? 'image' : 
                     file.type.startsWith('video/') ? 'video' : 'document';
@@ -226,8 +267,10 @@ const MultimodalAI = () => {
     const reader = new FileReader();
     reader.onload = async (e) => {
       const base64Data = e.target?.result as string;
+      console.log("File converted to base64, size:", base64Data.length);
+      
       await handleAIInteraction(
-        `Please analyze this ${fileType} and tell me about it`, 
+        `Please analyze this ${fileType} and tell me about it in detail. If it's an image, describe what you see. If it contains people, try to recognize them.`, 
         fileType as any, 
         [{ type: fileType, data: base64Data, name: file.name }]
       );
@@ -235,10 +278,42 @@ const MultimodalAI = () => {
     reader.readAsDataURL(file);
   }, [handleAIInteraction]);
 
+  // Take photo from camera
+  const takePhoto = useCallback(() => {
+    if (!videoRef.current || !isVideoOn) {
+      toast.error("Please turn on the camera first");
+      return;
+    }
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    canvas.width = videoRef.current.videoWidth;
+    canvas.height = videoRef.current.videoHeight;
+    
+    ctx?.drawImage(videoRef.current, 0, 0);
+    
+    canvas.toBlob((blob) => {
+      if (blob) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const base64Data = e.target?.result as string;
+          handleAIInteraction(
+            "I just took a photo. Please analyze what you see and tell me about it.", 
+            'image', 
+            [{ type: 'image', data: base64Data, name: 'camera-photo.jpg' }]
+          );
+        };
+        reader.readAsDataURL(blob);
+        toast.success("📸 Photo captured and analyzing...");
+      }
+    }, 'image/jpeg', 0.8);
+  }, [isVideoOn, handleAIInteraction]);
+
   return (
-    <div className="min-h-screen bg-[#1e1e1e] text-white flex flex-col">
-      {/* Header - minimal like Bolt */}
-      <header className="flex items-center justify-between px-6 py-4 bg-[#1e1e1e] border-b border-gray-800/50">
+    <div className="min-h-screen bg-[#0a0a0a] text-white flex flex-col">
+      {/* Header */}
+      <header className="flex items-center justify-between px-6 py-4 bg-[#0a0a0a] border-b border-gray-800/30">
         <div className="flex items-center space-x-4">
           <div className="text-white font-bold text-xl">Nurath.AI</div>
           {currentEmotion && (
@@ -253,16 +328,22 @@ const MultimodalAI = () => {
               Speaking
             </Badge>
           )}
+          {isListening && (
+            <Badge variant="outline" className="border-red-500/30 text-red-400 bg-red-500/10 animate-pulse">
+              <Mic className="w-3 h-3 mr-1" />
+              Listening
+            </Badge>
+          )}
         </div>
       </header>
 
-      {/* Main Content - Exact Bolt Layout */}
-      <div className="flex-1 flex items-center justify-center px-6 py-16">
+      {/* Main Content */}
+      <div className="flex-1 flex items-center justify-center px-6 py-8">
         {conversation.length === 0 ? (
-          <div className="w-full max-w-2xl text-center space-y-12">
+          <div className="w-full max-w-2xl text-center space-y-8">
             {/* Main Heading */}
-            <div className="space-y-6">
-              <h1 className="text-5xl font-bold text-white leading-tight">
+            <div className="space-y-4">
+              <h1 className="text-4xl font-bold text-white leading-tight">
                 What can I help you with?
               </h1>
               <p className="text-lg text-gray-400">
@@ -270,7 +351,7 @@ const MultimodalAI = () => {
               </p>
             </div>
 
-            {/* Main Input Area - 3D like Bolt */}
+            {/* Main Input Area */}
             <div className="space-y-6">
               <div className="relative">
                 <div className="bg-[#2a2a2a] border border-gray-600/50 rounded-xl p-1 shadow-2xl">
@@ -308,6 +389,24 @@ const MultimodalAI = () => {
                         >
                           {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                         </Button>
+                        <Button
+                          size="sm"
+                          variant={isVideoOn ? "destructive" : "ghost"}
+                          onClick={isVideoOn ? stopVideo : startVideo}
+                          className="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-gray-700/50"
+                        >
+                          {isVideoOn ? <VideoOff className="w-4 h-4" /> : <Video className="w-4 h-4" />}
+                        </Button>
+                        {isVideoOn && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={takePhoto}
+                            className="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-gray-700/50"
+                          >
+                            <Camera className="w-4 h-4" />
+                          </Button>
+                        )}
                       </div>
                       <Button
                         onClick={() => {
@@ -327,7 +426,7 @@ const MultimodalAI = () => {
                 </div>
               </div>
 
-              {/* Quick Actions Grid - Semi-rounded like Bolt */}
+              {/* Quick Actions Grid */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <Button
                   onClick={() => handleAIInteraction("Sing me a beautiful song with your voice", 'voice')}
@@ -362,51 +461,27 @@ const MultimodalAI = () => {
                   <span className="text-sm">Emotion</span>
                 </Button>
               </div>
-
-              {/* Main Action Buttons */}
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                <Button
-                  onClick={() => handleAIInteraction("Let's have a voice conversation", 'voice')}
-                  variant="outline"
-                  className="bg-[#2a2a2a] border-gray-600/50 text-gray-300 hover:text-white hover:border-gray-500 hover:bg-gray-700/50 rounded-lg p-3 flex items-center space-x-2"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  <span>Voice Chat</span>
-                </Button>
-                <Button
-                  onClick={() => handleAIInteraction("Scan my environment and tell me what you see", 'image')}
-                  variant="outline"
-                  className="bg-[#2a2a2a] border-gray-600/50 text-gray-300 hover:text-white hover:border-gray-500 hover:bg-gray-700/50 rounded-lg p-3 flex items-center space-x-2"
-                >
-                  <Eye className="w-4 h-4" />
-                  <span>Environment Scan</span>
-                </Button>
-                <Button
-                  onClick={() => handleAIInteraction("Help me with smart AI assistance")}
-                  variant="outline"
-                  className="bg-[#2a2a2a] border-gray-600/50 text-gray-300 hover:text-white hover:border-gray-500 hover:bg-gray-700/50 rounded-lg p-3 flex items-center space-x-2"
-                >
-                  <Brain className="w-4 h-4" />
-                  <span>Smart Assistant</span>
-                </Button>
-              </div>
             </div>
           </div>
         ) : (
-          // Chat Interface
+          // ChatGPT-style Chat Interface
           <div className="max-w-4xl w-full">
             {/* Video Feed */}
             {isVideoOn && (
-              <Card className="bg-gray-800/50 border-gray-700 mb-6 rounded-lg">
+              <Card className="bg-gray-900/50 border-gray-700 mb-6 rounded-xl overflow-hidden">
                 <div className="relative">
                   <video
                     ref={videoRef}
                     autoPlay
                     muted
-                    className="w-full h-64 object-cover rounded-lg"
+                    className="w-full h-64 object-cover"
                   />
                   <div className="absolute bottom-4 left-4 right-4 flex justify-between items-center">
                     <div className="flex space-x-2">
+                      <Button onClick={takePhoto} size="sm" className="bg-blue-600 hover:bg-blue-700 rounded-lg">
+                        <Camera className="w-4 h-4 mr-2" />
+                        Take Photo
+                      </Button>
                       <Button size="sm" className="bg-pink-600 hover:bg-pink-700 rounded-lg">
                         <Heart className="w-4 h-4 mr-2" />
                         Emotion
@@ -420,45 +495,39 @@ const MultimodalAI = () => {
               </Card>
             )}
 
-            {/* Conversation */}
-            <Card className="bg-gray-800/50 border-gray-700 mb-6 rounded-lg">
-              <CardContent className="p-6">
-                <div className="space-y-4 max-h-96 overflow-y-auto">
-                  {conversation.map((message, index) => (
-                    <div key={index} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[80%] rounded-lg p-4 ${
-                        message.type === 'user' 
-                          ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white' 
-                          : 'bg-gray-700/50 text-gray-100'
-                      }`}>
-                        <div className="flex items-center gap-2 mb-2">
-                          {message.type === 'user' ? <Users className="w-4 h-4" /> : <Brain className="w-4 h-4" />}
-                          <span className="font-medium text-sm">
-                            {message.type === 'user' ? 'You' : 'Nurath.AI'}
-                          </span>
-                          {message.hasAudio && <Volume2 className="w-4 h-4 text-green-400" />}
-                        </div>
-                        <p className="text-sm">{message.content}</p>
-                        <span className="text-xs opacity-70 mt-2 block">
-                          {message.timestamp.toLocaleTimeString()}
-                        </span>
+            {/* ChatGPT-style Conversation */}
+            <div className="space-y-6 max-h-[60vh] overflow-y-auto mb-6">
+              {conversation.map((message, index) => (
+                <div key={index} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[80%] ${message.type === 'user' ? 'bg-blue-600' : 'bg-gray-800'} rounded-2xl p-4 shadow-lg`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center ${message.type === 'user' ? 'bg-blue-700' : 'bg-gray-700'}`}>
+                        {message.type === 'user' ? <Users className="w-3 h-3" /> : <Brain className="w-3 h-3" />}
                       </div>
+                      <span className="font-medium text-sm">
+                        {message.type === 'user' ? 'You' : 'Nurath.AI'}
+                      </span>
+                      {message.hasAudio && <Volume2 className="w-4 h-4 text-green-400" />}
                     </div>
-                  ))}
+                    <p className="text-sm leading-relaxed">{message.content}</p>
+                    <span className="text-xs opacity-70 mt-2 block">
+                      {message.timestamp.toLocaleTimeString()}
+                    </span>
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
+              ))}
+            </div>
 
-            {/* Input Area */}
-            <Card className="bg-gray-800/50 border-gray-700 rounded-lg">
-              <CardContent className="p-4">
+            {/* Input Area - ChatGPT Style */}
+            <div className="bg-[#2a2a2a] border border-gray-600/50 rounded-xl p-1">
+              <div className="bg-[#1a1a1a] rounded-lg border border-gray-700/30 p-4">
                 <div className="flex gap-3 items-end">
                   <div className="flex-1">
                     <Textarea
                       value={inputText}
                       onChange={(e) => setInputText(e.target.value)}
                       placeholder="Continue the conversation..."
-                      className="min-h-[60px] resize-none bg-gray-900/50 border-gray-600 text-white placeholder-gray-400 rounded-lg"
+                      className="min-h-[60px] resize-none bg-transparent border-none text-white placeholder-gray-400 focus:outline-none focus:ring-0"
                       onKeyPress={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
@@ -473,11 +542,19 @@ const MultimodalAI = () => {
                   <div className="flex gap-2">
                     <Button
                       size="sm"
+                      variant="ghost"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="text-gray-400 hover:text-white rounded-lg"
+                    >
+                      <ImageIcon className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="sm"
                       variant={isListening ? "destructive" : "secondary"}
                       onClick={isListening ? () => setIsListening(false) : startListening}
                       className="rounded-lg"
                     >
-                      {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                      {isListening ? <StopCircle className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                     </Button>
                     <Button
                       size="sm"
@@ -501,8 +578,8 @@ const MultimodalAI = () => {
                     </Button>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -515,7 +592,6 @@ const MultimodalAI = () => {
         accept="image/*,video/*,.pdf,.doc,.docx"
         onChange={(e) => e.target.files && handleFileUpload(e.target.files)}
       />
-      <canvas ref={canvasRef} style={{ display: 'none' }} />
       <audio ref={audioRef} preload="auto" />
     </div>
   );
