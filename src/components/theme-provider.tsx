@@ -18,7 +18,7 @@ const ThemeProviderContext = createContext<ThemeProviderState | undefined>(undef
 
 export function ThemeProvider({
   children,
-  defaultTheme = "system",
+  defaultTheme = "dark", // Default to dark theme for magical background
   storageKey = "vite-ui-theme",
   ...props
 }: ThemeProviderProps) {
