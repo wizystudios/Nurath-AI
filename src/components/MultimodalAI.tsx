@@ -30,7 +30,12 @@ import {
   Plus,
   Search,
   Settings,
-  Share
+  Share,
+  Edit,
+  Trash2,
+  Phone,
+  PhoneCall,
+  X
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -55,27 +60,63 @@ interface AIResponse {
   recognizedFaces?: RelationshipTag[];
   environmentDescription?: string;
   suggestions?: string[];
+  imageUrl?: string;
+}
+
+interface ConversationMessage {
+  type: 'user' | 'ai';
+  content: string;
+  timestamp: Date;
+  attachments?: any[];
+  hasAudio?: boolean;
+  id: string;
+  imageUrl?: string;
 }
 
 const MultimodalAI = () => {
   const [isListening, setIsListening] = useState(false);
   const [isVideoOn, setIsVideoOn] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isAudioCall, setIsAudioCall] = useState(false);
+  const [isVideoCall, setIsVideoCall] = useState(false);
   const [inputText, setInputText] = useState("");
   const [currentEmotion, setCurrentEmotion] = useState<EmotionState | null>(null);
   const [recognizedPeople, setRecognizedPeople] = useState<RelationshipTag[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [conversation, setConversation] = useState<Array<{
-    type: 'user' | 'ai';
-    content: string;
-    timestamp: Date;
-    attachments?: any[];
-    hasAudio?: boolean;
-  }>>([]);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState("");
+  const [conversation, setConversation] = useState<ConversationMessage[]>([]);
+  const [conversationHistory, setConversationHistory] = useState<Array<{
+    id: string;
+    title: string;
+    date: string;
+    messages: ConversationMessage[];
+  }>>([
+    {
+      id: '1',
+      title: 'AI Voice and Emotion Interaction',
+      date: 'Today',
+      messages: []
+    },
+    {
+      id: '2', 
+      title: 'Telehealth App Requirements',
+      date: 'Today',
+      messages: []
+    },
+    {
+      id: '3',
+      title: 'TunzaTech E-Waste Solution',
+      date: 'Yesterday',
+      messages: []
+    }
+  ]);
+  const [currentConversationId, setCurrentConversationId] = useState<string>('1');
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   // Auto-play audio responses
   useEffect(() => {
@@ -134,18 +175,18 @@ const MultimodalAI = () => {
       }
 
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      const recognition = new SpeechRecognition();
+      recognitionRef.current = new SpeechRecognition();
       
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = 'en-US';
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.interimResults = false;
+      recognitionRef.current.lang = 'en-US';
 
-      recognition.onstart = () => {
+      recognitionRef.current.onstart = () => {
         setIsListening(true);
         toast.success("🎤 I'm listening... Speak now!");
       };
 
-      recognition.onresult = (event) => {
+      recognitionRef.current.onresult = (event) => {
         const transcript = event.results[0][0].transcript;
         console.log("Voice input received:", transcript);
         setInputText(transcript);
@@ -153,20 +194,27 @@ const MultimodalAI = () => {
         setIsListening(false);
       };
 
-      recognition.onerror = (error) => {
+      recognitionRef.current.onerror = (error) => {
         console.error("Speech recognition error:", error);
         toast.error("Voice recognition error. Please try again.");
         setIsListening(false);
       };
 
-      recognition.onend = () => {
+      recognitionRef.current.onend = () => {
         setIsListening(false);
       };
 
-      recognition.start();
+      recognitionRef.current.start();
     } catch (error) {
       console.error("Could not start voice recognition:", error);
       toast.error("Could not start voice recognition");
+    }
+  }, []);
+
+  const stopListening = useCallback(() => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsListening(false);
     }
   }, []);
 
@@ -175,12 +223,15 @@ const MultimodalAI = () => {
     try {
       console.log("Starting AI interaction:", { input, mode, attachments: attachments?.length || 0 });
       
-      setConversation(prev => [...prev, {
+      const newMessage: ConversationMessage = {
         type: 'user',
         content: input,
         timestamp: new Date(),
-        attachments
-      }]);
+        attachments,
+        id: Date.now().toString()
+      };
+
+      setConversation(prev => [...prev, newMessage]);
 
       toast.loading("🧠 Nurath.AI is thinking...");
 
@@ -204,12 +255,14 @@ const MultimodalAI = () => {
         console.error('AI Error:', error);
         if (error.message?.includes('quota') || error.message?.includes('429')) {
           toast.error("🚫 OpenAI API quota exceeded. Please check your API key billing status.");
-          setConversation(prev => [...prev, {
+          const errorMessage: ConversationMessage = {
             type: 'ai',
             content: "I'm sorry, but my voice capabilities are temporarily unavailable due to API quota limits. My creator needs to check the OpenAI billing settings. I can still chat with you through text!",
             timestamp: new Date(),
-            hasAudio: false
-          }]);
+            hasAudio: false,
+            id: Date.now().toString()
+          };
+          setConversation(prev => [...prev, errorMessage]);
           return;
         }
         throw error;
@@ -225,14 +278,18 @@ const MultimodalAI = () => {
         setCurrentEmotion(aiResponse.emotion);
       }
 
-      setConversation(prev => [...prev, {
+      const aiMessage: ConversationMessage = {
         type: 'ai',
         content: aiResponse.text,
         timestamp: new Date(),
-        hasAudio: !!aiResponse.audioUrl
-      }]);
+        hasAudio: !!aiResponse.audioUrl,
+        id: Date.now().toString(),
+        imageUrl: aiResponse.imageUrl
+      };
 
-      // Handle audio response
+      setConversation(prev => [...prev, aiMessage]);
+
+      // Handle audio response - REAL VOICE
       if (aiResponse.audioUrl && audioRef.current) {
         try {
           audioRef.current.src = aiResponse.audioUrl;
@@ -254,12 +311,14 @@ const MultimodalAI = () => {
       console.error('AI interaction error:', error);
       toast.error("Sorry, I'm having trouble. Please try again.");
       
-      setConversation(prev => [...prev, {
+      const errorMessage: ConversationMessage = {
         type: 'ai',
         content: "I apologize, but I'm experiencing technical difficulties. Please ensure you have a stable internet connection and try again.",
         timestamp: new Date(),
-        hasAudio: false
-      }]);
+        hasAudio: false,
+        id: Date.now().toString()
+      };
+      setConversation(prev => [...prev, errorMessage]);
     }
   }, [isVideoOn, recognizedPeople, currentEmotion, conversation]);
 
@@ -319,55 +378,192 @@ const MultimodalAI = () => {
     }, 'image/jpeg', 0.8);
   }, [isVideoOn, handleAIInteraction]);
 
-  const chatHistory = [
-    "AI Voice and Emotion Interaction",
-    "Telehealth App Requirements", 
-    "TunzaTech E-Waste Solution",
-    "XSS and CSRF Attacks",
-    "Health Industry App Ideas"
-  ];
+  // Start Audio Call
+  const startAudioCall = useCallback(async () => {
+    try {
+      setIsAudioCall(true);
+      toast.success("📞 Starting audio call with Nurath.AI...");
+      await handleAIInteraction("Hello! I'm starting an audio call with you. Please respond with your voice and let's have a real conversation!", 'voice');
+    } catch (error) {
+      console.error("Audio call error:", error);
+      toast.error("Failed to start audio call");
+      setIsAudioCall(false);
+    }
+  }, [handleAIInteraction]);
+
+  // Start Video Call
+  const startVideoCall = useCallback(async () => {
+    try {
+      setIsVideoCall(true);
+      await startVideo();
+      toast.success("📹 Starting video call with Nurath.AI...");
+      await handleAIInteraction("Hello! I'm starting a video call with you. I can see you now through the camera. Please respond with your voice and let's have a real face-to-face conversation!", 'video');
+    } catch (error) {
+      console.error("Video call error:", error);
+      toast.error("Failed to start video call");
+      setIsVideoCall(false);
+    }
+  }, [startVideo, handleAIInteraction]);
+
+  // End calls
+  const endCall = useCallback(() => {
+    setIsAudioCall(false);
+    setIsVideoCall(false);
+    stopVideo();
+    stopListening();
+    setIsSpeaking(false);
+    toast.info("Call ended");
+  }, [stopVideo, stopListening]);
+
+  // New Chat functionality
+  const startNewChat = useCallback(() => {
+    const newConversationId = Date.now().toString();
+    const newConversation = {
+      id: newConversationId,
+      title: 'New Chat',
+      date: 'Today',
+      messages: []
+    };
+    
+    setConversationHistory(prev => [newConversation, ...prev]);
+    setCurrentConversationId(newConversationId);
+    setConversation([]);
+    setInputText("");
+    toast.success("Started new conversation");
+  }, []);
+
+  // Load conversation
+  const loadConversation = useCallback((conversationId: string) => {
+    const conv = conversationHistory.find(c => c.id === conversationId);
+    if (conv) {
+      setCurrentConversationId(conversationId);
+      setConversation(conv.messages);
+      setIsSidebarOpen(false); // Close sidebar on mobile
+    }
+  }, [conversationHistory]);
+
+  // Delete conversation
+  const deleteConversation = useCallback((conversationId: string) => {
+    setConversationHistory(prev => prev.filter(c => c.id !== conversationId));
+    if (currentConversationId === conversationId) {
+      startNewChat();
+    }
+    toast.success("Conversation deleted");
+  }, [currentConversationId, startNewChat]);
+
+  // Edit message functionality
+  const startEditMessage = useCallback((messageId: string, content: string) => {
+    setEditingMessageId(messageId);
+    setEditingText(content);
+  }, []);
+
+  const saveEditMessage = useCallback(async () => {
+    if (!editingMessageId || !editingText.trim()) return;
+
+    // Update the message
+    setConversation(prev => prev.map(msg => 
+      msg.id === editingMessageId 
+        ? { ...msg, content: editingText.trim() }
+        : msg
+    ));
+
+    // Resend to AI if it was a user message
+    const message = conversation.find(m => m.id === editingMessageId);
+    if (message?.type === 'user') {
+      await handleAIInteraction(editingText.trim());
+    }
+
+    setEditingMessageId(null);
+    setEditingText("");
+    toast.success("Message updated and resent");
+  }, [editingMessageId, editingText, conversation, handleAIInteraction]);
+
+  const cancelEdit = useCallback(() => {
+    setEditingMessageId(null);
+    setEditingText("");
+  }, []);
+
+  // Delete message
+  const deleteMessage = useCallback((messageId: string) => {
+    setConversation(prev => prev.filter(msg => msg.id !== messageId));
+    toast.success("Message deleted");
+  }, []);
 
   return (
     <div className="flex h-screen bg-white dark:bg-gray-900">
-      {/* Sidebar - Matching ChatGPT exactly */}
-      <div className={`${isSidebarOpen ? 'w-64' : 'w-0'} transition-all duration-300 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden`}>
+      {/* Sidebar */}
+      <div className={`${isSidebarOpen ? 'w-64' : 'w-0'} transition-all duration-300 bg-gray-50 dark:bg-gray-800 flex flex-col overflow-hidden md:relative fixed inset-y-0 left-0 z-50`}>
         {isSidebarOpen && (
           <>
-            {/* Sidebar Header */}
-            <div className="p-3 border-b border-gray-200 dark:border-gray-700">
-              <Button 
-                className="w-full justify-start bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-900 dark:text-white"
-                onClick={() => {
-                  setConversation([]);
-                  setInputText("");
-                }}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                New chat
-              </Button>
-            </div>
-
-            {/* Chat History */}
-            <div className="flex-1 overflow-y-auto p-2">
-              <div className="space-y-1">
-                <div className="text-xs font-medium text-gray-500 dark:text-gray-400 px-2 py-1">Today</div>
-                {chatHistory.map((chat, index) => (
-                  <button
-                    key={index}
-                    className="w-full text-left p-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md truncate"
+            {/* Mobile overlay */}
+            <div 
+              className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
+              onClick={() => setIsSidebarOpen(false)}
+            />
+            
+            <div className="relative z-50 bg-gray-50 dark:bg-gray-800 h-full flex flex-col">
+              {/* Sidebar Header */}
+              <div className="p-3">
+                <div className="flex items-center justify-between mb-3">
+                  <Button 
+                    className="flex-1 justify-start bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-900 dark:text-white"
+                    onClick={startNewChat}
                   >
-                    {chat}
-                  </button>
-                ))}
+                    <Plus className="w-4 h-4 mr-2" />
+                    New chat
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="md:hidden ml-2"
+                    onClick={() => setIsSidebarOpen(false)}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
-            </div>
 
-            {/* Sidebar Footer */}
-            <div className="p-2 border-t border-gray-200 dark:border-gray-700 space-y-1">
-              <Button variant="ghost" className="w-full justify-start text-gray-700 dark:text-gray-300">
-                <Settings className="w-4 h-4 mr-2" />
-                Settings
-              </Button>
+              {/* Chat History */}
+              <div className="flex-1 overflow-y-auto px-2">
+                <div className="space-y-1">
+                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 px-2 py-1">Recent</div>
+                  {conversationHistory.map((conv) => (
+                    <div key={conv.id} className="group relative">
+                      <button
+                        onClick={() => loadConversation(conv.id)}
+                        className={`w-full text-left p-2 text-sm rounded-md truncate ${
+                          currentConversationId === conv.id 
+                            ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white' 
+                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                        }`}
+                      >
+                        {conv.title}
+                      </button>
+                      <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 flex space-x-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteConversation(conv.id);
+                          }}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Sidebar Footer */}
+              <div className="p-2 space-y-1">
+                <Button variant="ghost" className="w-full justify-start text-gray-700 dark:text-gray-300">
+                  <Settings className="w-4 h-4 mr-2" />
+                  Settings
+                </Button>
+              </div>
             </div>
           </>
         )}
@@ -375,8 +571,8 @@ const MultimodalAI = () => {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col">
-        {/* Top Header - Matching ChatGPT */}
-        <header className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+        {/* Top Header */}
+        <header className="flex items-center justify-between p-4 bg-white dark:bg-gray-900">
           <div className="flex items-center space-x-4">
             <Button 
               variant="ghost" 
@@ -405,8 +601,24 @@ const MultimodalAI = () => {
                 Listening
               </Badge>
             )}
+            {(isAudioCall || isVideoCall) && (
+              <Badge variant="outline" className="border-blue-500/30 text-blue-400 bg-blue-500/10 animate-pulse">
+                {isVideoCall ? <Video className="w-3 h-3 mr-1" /> : <Phone className="w-3 h-3 mr-1" />}
+                {isVideoCall ? 'Video Call' : 'Audio Call'}
+              </Badge>
+            )}
           </div>
           <div className="flex items-center space-x-2">
+            {(isAudioCall || isVideoCall) && (
+              <Button 
+                variant="destructive" 
+                size="sm" 
+                onClick={endCall}
+                className="bg-red-500 hover:bg-red-600"
+              >
+                End Call
+              </Button>
+            )}
             <Button variant="ghost" size="sm" className="text-gray-600 dark:text-gray-400">
               <Share className="w-4 h-4" />
             </Button>
@@ -415,9 +627,9 @@ const MultimodalAI = () => {
         </header>
 
         {/* Chat Messages Area */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto bg-white dark:bg-gray-900">
           {conversation.length === 0 ? (
-            // Welcome State - Like ChatGPT
+            // Welcome State
             <div className="h-full flex flex-col items-center justify-center p-8">
               <div className="text-center max-w-2xl">
                 <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-8">
@@ -429,7 +641,7 @@ const MultimodalAI = () => {
                   <Button
                     onClick={() => handleAIInteraction("Sing me a beautiful song with your voice and sing the actual lyrics", 'voice')}
                     variant="outline"
-                    className="h-20 flex flex-col items-center justify-center space-y-2 border-gray-200 dark:border-gray-700"
+                    className="h-20 flex flex-col items-center justify-center space-y-2"
                   >
                     <Music className="w-6 h-6" />
                     <span className="text-sm">Sing Song</span>
@@ -437,23 +649,39 @@ const MultimodalAI = () => {
                   <Button
                     onClick={() => handleAIInteraction("Tell me a funny joke using your voice", 'voice')}
                     variant="outline"
-                    className="h-20 flex flex-col items-center justify-center space-y-2 border-gray-200 dark:border-gray-700"
+                    className="h-20 flex flex-col items-center justify-center space-y-2"
                   >
                     <Smile className="w-6 h-6" />
                     <span className="text-sm">Tell Joke</span>
                   </Button>
                   <Button
-                    onClick={() => handleAIInteraction("Generate a creative logo design for me", 'text')}
+                    onClick={() => handleAIInteraction("Generate a creative beautiful image for me", 'text')}
                     variant="outline"
-                    className="h-20 flex flex-col items-center justify-center space-y-2 border-gray-200 dark:border-gray-700"
+                    className="h-20 flex flex-col items-center justify-center space-y-2"
                   >
                     <Palette className="w-6 h-6" />
                     <span className="text-sm">Generate Image</span>
                   </Button>
                   <Button
+                    onClick={startVideoCall}
+                    variant="outline"
+                    className="h-20 flex flex-col items-center justify-center space-y-2"
+                  >
+                    <Video className="w-6 h-6" />
+                    <span className="text-sm">Video Call</span>
+                  </Button>
+                  <Button
+                    onClick={startAudioCall}
+                    variant="outline"
+                    className="h-20 flex flex-col items-center justify-center space-y-2"
+                  >
+                    <PhoneCall className="w-6 h-6" />
+                    <span className="text-sm">Audio Call</span>
+                  </Button>
+                  <Button
                     onClick={startVideo}
                     variant="outline"
-                    className="h-20 flex flex-col items-center justify-center space-y-2 border-gray-200 dark:border-gray-700"
+                    className="h-20 flex flex-col items-center justify-center space-y-2"
                   >
                     <Eye className="w-6 h-6" />
                     <span className="text-sm">Recognize & Scan</span>
@@ -496,12 +724,12 @@ const MultimodalAI = () => {
 
               {/* Chat Messages */}
               <div className="space-y-6 p-4">
-                {conversation.map((message, index) => (
-                  <div key={index} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[80%] ${
+                {conversation.map((message) => (
+                  <div key={message.id} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[80%] group relative ${
                       message.type === 'user' 
                         ? 'bg-blue-500 text-white' 
-                        : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+                        : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-700'
                     } rounded-lg px-4 py-2`}>
                       <div className="flex items-center gap-2 mb-2">
                         <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
@@ -521,10 +749,59 @@ const MultimodalAI = () => {
                           </div>
                         )}
                       </div>
-                      <p className="text-sm leading-relaxed">{message.content}</p>
+                      
+                      {editingMessageId === message.id ? (
+                        <div className="space-y-2">
+                          <Textarea
+                            value={editingText}
+                            onChange={(e) => setEditingText(e.target.value)}
+                            className="min-h-[60px] text-sm"
+                          />
+                          <div className="flex space-x-2">
+                            <Button size="sm" onClick={saveEditMessage}>Save</Button>
+                            <Button size="sm" variant="outline" onClick={cancelEdit}>Cancel</Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-sm leading-relaxed">{message.content}</p>
+                          {message.imageUrl && (
+                            <div className="mt-2">
+                              <img 
+                                src={message.imageUrl} 
+                                alt="Generated content" 
+                                className="max-w-full h-auto rounded-lg"
+                              />
+                            </div>
+                          )}
+                        </>
+                      )}
+                      
                       <span className="text-xs opacity-70 mt-2 block">
                         {message.timestamp.toLocaleTimeString()}
                       </span>
+
+                      {/* Message Actions */}
+                      {message.type === 'user' && editingMessageId !== message.id && (
+                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 flex space-x-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                            onClick={() => startEditMessage(message.id, message.content)}
+                          >
+                            <Edit className="w-3 h-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm" 
+                            className="h-6 w-6 p-0"
+                            onClick={() => deleteMessage(message.id)}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -533,8 +810,8 @@ const MultimodalAI = () => {
           )}
         </div>
 
-        {/* Input Area - Matching ChatGPT exactly */}
-        <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
+        {/* Input Area */}
+        <div className="bg-white dark:bg-gray-900 p-4">
           <div className="max-w-3xl mx-auto">
             <div className="relative bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
               <Textarea
@@ -564,7 +841,7 @@ const MultimodalAI = () => {
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={isListening ? () => setIsListening(false) : startListening}
+                  onClick={isListening ? stopListening : startListening}
                   className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
                 >
                   {isListening ? <StopCircle className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
