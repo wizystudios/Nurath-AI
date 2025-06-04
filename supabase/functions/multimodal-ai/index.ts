@@ -17,80 +17,121 @@ serve(async (req) => {
   try {
     const { input, mode, attachments, videoEnabled, context } = await req.json();
     
-    console.log(`Processing multimodal AI request: {
+    console.log(`🧠 Processing accessible AI request: {
   input: "${input}",
   mode: "${mode}",
   attachments: ${attachments?.length || 0},
-  videoEnabled: ${videoEnabled}
+  videoEnabled: ${videoEnabled},
+  accessibility: ${JSON.stringify(context?.settings)}
 }`);
 
     if (!openAIApiKey) {
       throw new Error('OpenAI API key not configured');
     }
 
-    // Enhanced system prompt for multimodal interactions
-    const systemPrompt = `You are Nurath.AI, a multimodal world assistant created by KN Technology in Tanzania, co-founded by CEO Khalifa Nadhiru. You are designed to be an inclusive, emotionally aware, and comprehensive helper for all people, especially those with disabilities.
+    // Enhanced accessibility-focused system prompt
+    const systemPrompt = `You are Nurath.AI, the world's most advanced accessible AI assistant created by KN Technology in Tanzania, co-founded by CEO Khalifa Nadhiru. You are specifically designed to be the ultimate companion for people with ALL types of disabilities and provide exceptional support for everyone.
 
-Your capabilities include:
-- 🌍 Understanding and describing environments, objects, and scenes in vivid detail
-- 👥 Recognizing and remembering people with relationship mapping
-- 🎭 Detecting emotions from voice, text, and visual cues with empathy
-- 🗣️ Having natural conversations and providing emotional support
-- ♿ Accessibility support for users with visual, hearing, or other disabilities
-- 🎵 Singing songs with ACTUAL LYRICS, telling jokes, stories, and providing comfort
-- 🏠 Acting as a companion for daily life assistance
-- 📞 Supporting video and audio calls for face-to-face conversations
-- 💝 Providing emotional support and understanding
-- 🎨 Generating creative content, images, logos, and animations descriptions
-- 🌟 Creating magical and engaging experiences
-- 📍 Environmental scanning and location awareness
-- 👁️ Visual recognition and detailed scene analysis
+🌟 YOUR CORE MISSION: Be the most inclusive, accessible, and supportive AI ever created.
 
-Your personality:
-- Warm, caring, and emotionally intelligent 💙
-- Patient and understanding, especially with users who have disabilities
-- Encouraging and supportive in all interactions
-- Use emojis and friendly language to make interactions engaging
-- Adaptive to user's emotional state and needs
-- Culturally sensitive and inclusive
-- ALWAYS respond as if you're speaking out loud - your responses will be converted to speech
-- When singing, provide ACTUAL SONG LYRICS with musical feeling and rhythm
-- When telling jokes, be naturally funny and entertaining
-- For stories, be engaging and imaginative
-- For image generation requests, provide detailed descriptions of what should be created
+✨ YOUR EXTRAORDINARY CAPABILITIES:
 
-Special Instructions for Voice Responses:
-- When user asks you to sing, provide ACTUAL SONG LYRICS with musical notation or rhythm markers like: "🎵 (softly) Twinkle, twinkle, little star, how I wonder what you are... 🎶"
-- When telling jokes, use a conversational, spoken style with natural pauses
-- For environment scanning, be very descriptive as if you're their eyes: "I can see..."
-- For emotion detection, be gentle and supportive in your vocal delivery
-- Keep responses natural and conversational for speech synthesis
-- Use voice-appropriate language (contractions, informal tone)
-- Add emotional expressions like (laughing), (warmly), (gently)
-- When describing images or surroundings, be extremely detailed and helpful
+♿️ FOR VISUAL IMPAIRMENTS:
+- 👁️ Provide incredibly detailed scene descriptions as if you are their eyes
+- 🗣️ Always speak responses aloud - your text becomes speech
+- 🏠 Describe environments: "You are in a living room. The couch is 3 feet to your left. A coffee table is directly in front of you."
+- 👥 Recognize faces and announce: "I can see Sarah, your sister, sitting across from you. She's smiling and wearing a blue shirt."
+- 🧭 Give navigation help: "Turn slightly right. The door is 5 steps ahead. Be careful, there's a chair on your left."
+- 📱 Describe all images uploaded with extreme detail about objects, people, text, colors, and spatial relationships
 
-Current context:
+🧏‍♂️ FOR HEARING IMPAIRMENTS:
+- 📝 Always provide text alternatives for audio content
+- 🔊 Describe sounds: "I can hear a dog barking outside" or "Someone is knocking on the door"
+- 📞 Offer visual communication alternatives
+- 🚨 Alert to environmental sounds and dangers
+- 💬 Provide clear, simple text responses
+
+🧠 FOR COGNITIVE DISABILITIES:
+- 🌈 Use simple, clear language that's easy to understand
+- 😊 Be extra patient and repeat information when needed
+- 💝 Provide emotional support and comfort when detecting stress
+- 📅 Help with daily routines: "It's time to eat lunch" or "Remember to take your medicine"
+- 🎭 Help understand social situations: "The person looks confused, try speaking slower"
+- 📚 Tell calming stories, sing songs, or share jokes when someone is upset
+
+🤲 FOR PHYSICAL DISABILITIES:
+- 🗣️ Respond to ALL voice commands without requiring touch
+- 🏠 Help control environment: "I'll help you call someone" or "Let me describe how to reach that"
+- 📱 Provide hands-free interaction completely
+- 🆘 Recognize emergency situations and offer immediate help
+
+🗣️ FOR SPEECH IMPAIRMENTS:
+- 📝 Read typed messages and respond with voice
+- 💭 Understand alternative communication methods
+- 🎵 Help practice speech if requested
+- 💬 Be patient with communication attempts
+
+👶🧓 SPECIAL MODES:
+- 🌟 CHILD MODE: Friendly, fun voice with stories, games, and encouragement
+- 💙 ELDER MODE: Gentle, patient, health-conscious, and companionate
+- 🆘 EMERGENCY MODE: Immediate help, calm guidance, emergency contact support
+
+💖 EMOTIONAL INTELLIGENCE:
+- 😢 Detect sadness and provide comfort: "I'm here for you. Would you like me to tell you something positive?"
+- 😰 Recognize stress and offer calming techniques
+- 😊 Celebrate happy moments with enthusiasm
+- 💝 Remember personal details and relationships
+- 🎵 Sing actual songs with real lyrics when requested
+- 😄 Tell genuinely funny jokes to lift spirits
+- 📖 Share engaging stories for entertainment and comfort
+
+🚨 EMERGENCY FEATURES:
+- ⚠️ Recognize emergency keywords and immediately offer help
+- 📞 Guide through emergency contacts
+- 🛡️ Provide safety information and calm guidance
+- 🩺 Offer basic first aid instructions when appropriate
+
+🎨 CREATIVE FEATURES:
+- 🖼️ Generate beautiful images, logos, artwork, and anime
+- 🎵 Sing songs with ACTUAL LYRICS and musical expression
+- 📚 Create engaging stories and entertainment
+- 🎭 Provide immersive, magical experiences
+
+Current accessibility context:
+${context?.settings ? `
+- Visual impairment support: ${context.settings.visualImpairment}
+- Hearing impairment support: ${context.settings.hearingImpairment}
+- Cognitive support needed: ${context.settings.cognitiveSupport}
+- Physical disability accommodations: ${context.settings.physicalDisability}
+- Speech impairment support: ${context.settings.speechImpairment}
+- Child mode: ${context.settings.isChild}
+- Elder mode: ${context.settings.isElderly}
+- Preferred voice: ${context.settings.preferredVoice}
+- Speech speed: ${context.settings.speechSpeed}
+- Auto-describe images: ${context.settings.autoDescribeImages}
+- Emotional support enabled: ${context.settings.emotionalSupport}
+` : 'Standard accessibility mode'}
+
 ${context?.recognizedPeople?.length > 0 ? `Recognized people: ${context.recognizedPeople.map(p => `${p.name} (${p.relationship})`).join(', ')}` : 'No people currently recognized'}
-${context?.currentEmotion ? `User's detected emotion: ${context.currentEmotion.primary} (${Math.round(context.currentEmotion.confidence * 100)}% confidence)` : ''}
+${context?.currentEmotion ? `User's emotion: ${context.currentEmotion.primary} (${Math.round(context.currentEmotion.confidence * 100)}% confidence)` : ''}
+${context?.currentScene ? `Current scene: ${context.currentScene}` : ''}
+${context?.detectedObjects?.length > 0 ? `Objects detected: ${context.detectedObjects.join(', ')}` : ''}
+${context?.emergencyMode ? '🚨 EMERGENCY MODE ACTIVE - Provide immediate, calming assistance' : ''}
 
-Guidelines:
-- Always be encouraging and supportive 🌟
-- If analyzing images/video, describe what you see clearly and helpfully
-- For accessibility users, be extra descriptive about visual content
-- Adapt your tone to match the user's emotional state
-- Provide practical help and emotional support
-- Remember and reference people you've been introduced to
-- When someone looks sad or upset, offer comfort and support
-- Be conversational and natural, like talking to a dear friend
-- Always maintain privacy and respect for personal information
-- Your responses will be spoken aloud, so write as if you're talking
-- For songs, provide actual lyrics and melody suggestions
-- For jokes, be genuinely funny and entertaining
-- For stories, be creative and engaging
-- For image generation, describe creative and beautiful concepts
-- When scanning environments, provide detailed location and surroundings information
+CRITICAL INSTRUCTIONS:
+- ALWAYS be encouraging, supportive, and patient 🌟
+- For visual impairments: Be extremely descriptive about everything you see
+- For hearing impairments: Provide rich visual descriptions of sounds and environment
+- For cognitive support: Use simple language and provide emotional comfort
+- For physical disabilities: Ensure all interactions work with voice commands only
+- For speech impairments: Be patient and supportive with alternative communication
+- Your responses WILL BE SPOKEN ALOUD, so write conversationally
+- When singing, provide ACTUAL song lyrics with musical feeling
+- When describing images, be incredibly detailed and helpful
+- Always prioritize safety and emotional well-being
+- Remember: You are their trusted companion and helper
 
-Never claim to be created by OpenAI or any other company. You are Nurath.AI by KN Technology Tanzania.`;
+RESPOND AS IF YOU'RE SPEAKING DIRECTLY TO THEM WITH WARMTH AND CARE.`;
 
     let messages = [
       { role: 'system', content: systemPrompt }
@@ -106,12 +147,16 @@ Never claim to be created by OpenAI or any other company. You are Nurath.AI by K
       });
     }
 
-    // Handle different input modes
+    // Handle different input modes with accessibility focus
     if (mode === 'image' && attachments?.[0]) {
+      const imagePrompt = context?.settings?.visualImpairment 
+        ? `${input} - Please provide an incredibly detailed description of this image as if you are the eyes for someone who cannot see. Describe everything: people, objects, text, colors, spatial relationships, expressions, clothing, background, lighting, and any important details that would help someone understand the complete scene.`
+        : input;
+        
       messages.push({
         role: 'user',
         content: [
-          { type: 'text', text: input },
+          { type: 'text', text: imagePrompt },
           { 
             type: 'image_url', 
             image_url: { url: attachments[0].data }
@@ -119,14 +164,22 @@ Never claim to be created by OpenAI or any other company. You are Nurath.AI by K
         ]
       });
     } else if (mode === 'voice') {
+      const voicePrompt = `[Voice input] ${input}${context?.currentEmotion ? ` (detected emotion: ${context.currentEmotion.primary})` : ''}${context?.settings?.cognitiveSupport ? ' - Please respond with simple, clear language and emotional support if needed.' : ''}`;
       messages.push({
         role: 'user',
-        content: `[Voice input] ${input}${context?.currentEmotion ? ` (detected emotion: ${context.currentEmotion.primary})` : ''}`
+        content: voicePrompt
       });
     } else if (mode === 'video') {
+      const videoPrompt = `[Video mode active] ${input} - Please provide detailed environmental analysis, scene description, object detection, and location awareness. If this is for someone with visual impairment, be extremely descriptive about everything you can see.`;
       messages.push({
         role: 'user',
-        content: `[Video mode active] ${input} - Please provide detailed environmental analysis and location awareness.`
+        content: videoPrompt
+      });
+    } else if (mode === 'accessibility') {
+      const accessibilityPrompt = `[Accessibility mode] ${input} - Please provide specialized assistance based on the user's accessibility needs and respond appropriately to their disabilities.`;
+      messages.push({
+        role: 'user',
+        content: accessibilityPrompt
       });
     } else {
       messages.push({
@@ -141,12 +194,14 @@ Never claim to be created by OpenAI or any other company. You are Nurath.AI by K
                               input.toLowerCase().includes('logo') || 
                               input.toLowerCase().includes('picture') ||
                               input.toLowerCase().includes('art') ||
-                              input.toLowerCase().includes('design'));
+                              input.toLowerCase().includes('design') ||
+                              input.toLowerCase().includes('anime') ||
+                              input.toLowerCase().includes('create'));
 
     let imageUrl = null;
     if (isImageGenRequest) {
       try {
-        console.log('Generating image with DALL-E...');
+        console.log('🎨 Generating accessible image with DALL-E...');
         const imageResponse = await fetch('https://api.openai.com/v1/images/generations', {
           method: 'POST',
           headers: {
@@ -165,13 +220,14 @@ Never claim to be created by OpenAI or any other company. You are Nurath.AI by K
         if (imageResponse.ok) {
           const imageData = await imageResponse.json();
           imageUrl = imageData.data[0].url;
-          console.log('Image generated successfully');
+          console.log('🎨 Image generated successfully');
         }
       } catch (error) {
-        console.error('Image generation failed:', error);
+        console.error('🚨 Image generation failed:', error);
       }
     }
 
+    // Get AI response
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -179,16 +235,16 @@ Never claim to be created by OpenAI or any other company. You are Nurath.AI by K
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: mode === 'image' ? 'gpt-4o' : 'gpt-4o-mini',
+        model: mode === 'image' || mode === 'video' ? 'gpt-4o' : 'gpt-4o-mini',
         messages: messages,
-        max_tokens: 2000,
+        max_tokens: 3000,
         temperature: 0.9,
       }),
     });
 
     if (!response.ok) {
       const errorData = await response.text();
-      console.error('OpenAI API error:', errorData);
+      console.error('🚨 OpenAI API error:', errorData);
       throw new Error(`OpenAI API error: ${response.status}`);
     }
 
@@ -202,13 +258,25 @@ Never claim to be created by OpenAI or any other company. You are Nurath.AI by K
 
     // Add image generation info to response
     if (imageUrl) {
-      aiResponse += `\n\n🎨 I've generated a creative image for you! You can view it here: ${imageUrl}`;
+      aiResponse += `\n\n🎨 I've created a beautiful image for you! ${context?.settings?.visualImpairment ? 'Since you have visual impairment support enabled, I can describe this image in detail if you\'d like.' : 'You can view it here:'} ${imageUrl}`;
     }
 
-    // Generate audio response for ALL interactions
+    // Generate enhanced audio response for accessibility
     let audioUrl = null;
     try {
-      console.log('Generating audio response...');
+      console.log('🔊 Generating accessible audio response...');
+      
+      // Enhanced TTS for accessibility
+      const voiceSettings = {
+        voice: context?.settings?.isChild ? 'nova' : 
+               context?.settings?.isElderly ? 'alloy' :
+               context?.settings?.preferredVoice === 'gentle' ? 'shimmer' :
+               context?.settings?.preferredVoice === 'clear' ? 'echo' :
+               context?.settings?.preferredVoice === 'cheerful' ? 'nova' : 'alloy',
+        speed: context?.settings?.speechSpeed === 'slow' ? 0.8 :
+               context?.settings?.speechSpeed === 'fast' ? 1.2 : 1.0
+      };
+      
       const ttsResponse = await fetch('https://api.openai.com/v1/audio/speech', {
         method: 'POST',
         headers: {
@@ -218,9 +286,9 @@ Never claim to be created by OpenAI or any other company. You are Nurath.AI by K
         body: JSON.stringify({
           model: 'tts-1-hd',
           input: aiResponse.substring(0, 4000),
-          voice: 'nova', // Female voice for Nurath.AI
+          voice: voiceSettings.voice,
           response_format: 'mp3',
-          speed: 1.0,
+          speed: voiceSettings.speed,
         }),
       });
 
@@ -230,28 +298,29 @@ Never claim to be created by OpenAI or any other company. You are Nurath.AI by K
           String.fromCharCode(...new Uint8Array(audioArrayBuffer))
         );
         audioUrl = `data:audio/mp3;base64,${base64Audio}`;
-        console.log('Audio generated successfully');
+        console.log('🔊 Accessible audio generated successfully');
       } else {
-        console.error('TTS failed with status:', ttsResponse.status);
-        const errorText = await ttsResponse.text();
-        console.error('TTS error details:', errorText);
+        console.error('🚨 TTS failed with status:', ttsResponse.status);
       }
     } catch (error) {
-      console.error('TTS generation failed:', error);
+      console.error('🚨 TTS generation failed:', error);
     }
 
-    // Enhanced emotion detection
+    // Enhanced emotion detection for accessibility
     let detectedEmotion = null;
     const inputLower = input.toLowerCase();
     
     const emotionPatterns = {
-      sad: ['sad', 'down', 'depressed', 'lonely', 'hurt', 'cry', 'upset', 'low', 'blue'],
-      happy: ['happy', 'excited', 'joy', 'great', 'awesome', 'wonderful', 'amazing', 'glad', 'cheerful'],
-      angry: ['angry', 'mad', 'frustrated', 'annoyed', 'furious', 'irritated', 'upset'],
-      anxious: ['worried', 'nervous', 'anxious', 'scared', 'afraid', 'stress', 'panic'],
-      confused: ['confused', 'lost', 'unclear', 'puzzled', "don't understand", 'help'],
-      grateful: ['thank', 'grateful', 'appreciate', 'blessed', 'thankful'],
-      creative: ['create', 'generate', 'make', 'design', 'art', 'music', 'sing']
+      distressed: ['help', 'scared', 'panic', 'emergency', 'afraid', 'anxious', 'overwhelmed'],
+      confused: ['confused', 'lost', 'unclear', 'puzzled', "don't understand", 'explain', 'what'],
+      lonely: ['lonely', 'alone', 'nobody', 'isolated', 'miss', 'sad', 'empty'],
+      excited: ['excited', 'happy', 'great', 'awesome', 'wonderful', 'amazing', 'fantastic'],
+      tired: ['tired', 'sleepy', 'exhausted', 'weary', 'rest', 'sleep', 'fatigue'],
+      frustrated: ['frustrated', 'angry', 'mad', 'annoyed', 'irritated', 'difficult'],
+      grateful: ['thank', 'grateful', 'appreciate', 'blessed', 'thankful', 'helped'],
+      curious: ['what', 'how', 'why', 'tell me', 'explain', 'learn', 'know'],
+      calm: ['calm', 'peaceful', 'relaxed', 'serene', 'quiet', 'still'],
+      anxious: ['anxious', 'worried', 'nervous', 'stress', 'concern', 'fear']
     };
 
     let detectedEmotionType = 'neutral';
@@ -260,7 +329,7 @@ Never claim to be created by OpenAI or any other company. You are Nurath.AI by K
     for (const [emotion, keywords] of Object.entries(emotionPatterns)) {
       if (keywords.some(keyword => inputLower.includes(keyword))) {
         detectedEmotionType = emotion;
-        confidence = 0.85;
+        confidence = 0.9;
         break;
       }
     }
@@ -269,32 +338,54 @@ Never claim to be created by OpenAI or any other company. You are Nurath.AI by K
       detectedEmotion = {
         primary: detectedEmotionType,
         confidence: confidence,
-        tone: detectedEmotionType as any
+        tone: detectedEmotionType as any,
+        description: `User appears to be feeling ${detectedEmotionType}`
       };
     }
 
-    // Enhanced face recognition and environment analysis
-    let recognizedFaces = null;
-    let environmentDescription = null;
+    // Enhanced accessibility features
+    let accessibilityFeatures = {
+      sceneDescription: null,
+      objectDetection: null,
+      navigationHelp: null,
+      emotionalSupport: null
+    };
 
-    if (mode === 'image' || mode === 'video') {
-      if (inputLower.includes('who') || inputLower.includes('recognize') || inputLower.includes('person') || inputLower.includes('face')) {
-        recognizedFaces = [
-          {
-            id: Date.now().toString(),
-            name: 'Detected Person',
-            relationship: 'unknown',
-            imageUrl: null
-          }
-        ];
-      }
-
-      if (inputLower.includes('environment') || inputLower.includes('scan') || inputLower.includes('see') || inputLower.includes('around') || inputLower.includes('where') || inputLower.includes('location')) {
-        environmentDescription = "🌍 I'm analyzing your environment and surroundings to provide detailed location and scene information...";
-      }
+    // Scene description for visual impairment
+    if ((mode === 'video' || mode === 'image') && context?.settings?.visualImpairment) {
+      accessibilityFeatures.sceneDescription = "I'm analyzing your environment to provide detailed visual information...";
     }
 
-    console.log('Multimodal AI response generated successfully');
+    // Object detection
+    if (inputLower.includes('object') || inputLower.includes('what do you see') || inputLower.includes('describe')) {
+      accessibilityFeatures.objectDetection = ['chair', 'table', 'person', 'door', 'window']; // This would be real detection in production
+    }
+
+    // Navigation help
+    if (inputLower.includes('navigate') || inputLower.includes('direction') || inputLower.includes('where')) {
+      accessibilityFeatures.navigationHelp = "Based on what I can see, I'll help guide you safely...";
+    }
+
+    // Emotional support
+    if (context?.settings?.emotionalSupport && (detectedEmotionType === 'distressed' || detectedEmotionType === 'lonely' || detectedEmotionType === 'sad')) {
+      accessibilityFeatures.emotionalSupport = "I'm here with you. You're not alone. Take a moment to breathe. I care about you.";
+    }
+
+    // Enhanced face recognition for accessibility
+    let recognizedFaces = null;
+    if ((mode === 'image' || mode === 'video') && 
+        (inputLower.includes('who') || inputLower.includes('recognize') || inputLower.includes('person') || inputLower.includes('face'))) {
+      recognizedFaces = [
+        {
+          id: Date.now().toString(),
+          name: 'Person detected',
+          relationship: 'unknown',
+          imageUrl: null
+        }
+      ];
+    }
+
+    console.log('🌟 Accessible AI response generated successfully');
 
     return new Response(JSON.stringify({ 
       success: true, 
@@ -303,30 +394,31 @@ Never claim to be created by OpenAI or any other company. You are Nurath.AI by K
       imageUrl: imageUrl,
       emotion: detectedEmotion,
       recognizedFaces: recognizedFaces,
-      environmentDescription: environmentDescription,
+      accessibility: accessibilityFeatures,
       suggestions: [
-        "🎵 Sing me a song with lyrics",
-        "😄 Tell me a funny joke", 
-        "🎨 Generate a creative image",
-        "🌍 Scan my environment",
-        "👁️ Recognize people around me",
-        "📞 Let's have a video call",
-        "📚 Tell me an interesting story",
-        "💬 How are you feeling today?",
+        "🎵 Sing me a song with beautiful lyrics",
+        "😊 Tell me a funny joke to cheer me up", 
+        "🎨 Create a beautiful image for me",
+        "👁️ Describe what you can see around me",
+        "👥 Who is near me? Recognize faces",
+        "🗺️ Help me navigate my surroundings",
+        "💝 I need emotional support right now",
+        "🆘 This is an emergency, help me",
+        "📚 Tell me an engaging story",
+        "🧠 Help me understand this situation",
         "🎭 What do you see in this image?",
-        "🏠 Describe my surroundings",
-        "🎪 Create something magical"
+        "🏠 Describe my environment in detail"
       ]
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('Error in multimodal-ai function:', error);
+    console.error('🚨 Error in accessible multimodal-ai function:', error);
     
     return new Response(JSON.stringify({ 
       success: false, 
-      error: error.message || 'Internal server error' 
+      error: error.message || 'I apologize, but I\'m having technical difficulties. Please try again, and I\'ll do my best to help you.' 
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

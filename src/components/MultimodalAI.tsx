@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -35,7 +34,14 @@ import {
   Trash2,
   Phone,
   PhoneCall,
-  X
+  X,
+  VolumeX,
+  Accessibility,
+  AlertTriangle,
+  Clock,
+  Shield,
+  Baby,
+  Sparkles
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -45,12 +51,14 @@ interface RelationshipTag {
   name: string;
   relationship: string;
   imageUrl?: string;
+  voicePattern?: string;
 }
 
 interface EmotionState {
   primary: string;
   confidence: number;
-  tone: 'happy' | 'sad' | 'angry' | 'excited' | 'calm' | 'confused';
+  tone: 'happy' | 'sad' | 'angry' | 'excited' | 'calm' | 'confused' | 'stressed' | 'anxious';
+  description?: string;
 }
 
 interface AIResponse {
@@ -61,6 +69,12 @@ interface AIResponse {
   environmentDescription?: string;
   suggestions?: string[];
   imageUrl?: string;
+  accessibility?: {
+    sceneDescription?: string;
+    objectDetection?: string[];
+    navigationHelp?: string;
+    emotionalSupport?: string;
+  };
 }
 
 interface ConversationMessage {
@@ -71,6 +85,27 @@ interface ConversationMessage {
   hasAudio?: boolean;
   id: string;
   imageUrl?: string;
+  accessibility?: {
+    altText?: string;
+    audioDescription?: string;
+  };
+}
+
+interface AccessibilitySettings {
+  visualImpairment: boolean;
+  hearingImpairment: boolean;
+  cognitiveSupport: boolean;
+  physicalDisability: boolean;
+  speechImpairment: boolean;
+  isChild: boolean;
+  isElderly: boolean;
+  emergencyContact?: string;
+  preferredVoice: 'gentle' | 'clear' | 'cheerful' | 'calm';
+  fontSize: 'small' | 'medium' | 'large' | 'extra-large';
+  speechSpeed: 'slow' | 'normal' | 'fast';
+  enableVibration: boolean;
+  autoDescribeImages: boolean;
+  emotionalSupport: boolean;
 }
 
 const MultimodalAI = () => {
@@ -86,6 +121,25 @@ const MultimodalAI = () => {
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
   const [conversation, setConversation] = useState<ConversationMessage[]>([]);
+  const [isEmergency, setIsEmergency] = useState(false);
+  const [currentScene, setCurrentScene] = useState<string>("");
+  const [detectedObjects, setDetectedObjects] = useState<string[]>([]);
+  const [accessibilitySettings, setAccessibilitySettings] = useState<AccessibilitySettings>({
+    visualImpairment: false,
+    hearingImpairment: false,
+    cognitiveSupport: false,
+    physicalDisability: false,
+    speechImpairment: false,
+    isChild: false,
+    isElderly: false,
+    preferredVoice: 'gentle',
+    fontSize: 'medium',
+    speechSpeed: 'normal',
+    enableVibration: true,
+    autoDescribeImages: true,
+    emotionalSupport: true
+  });
+
   const [conversationHistory, setConversationHistory] = useState<Array<{
     id: string;
     title: string;
@@ -94,20 +148,8 @@ const MultimodalAI = () => {
   }>>([
     {
       id: '1',
-      title: 'AI Voice and Emotion Interaction',
+      title: 'Daily Assistant Chat',
       date: 'Today',
-      messages: []
-    },
-    {
-      id: '2', 
-      title: 'Telehealth App Requirements',
-      date: 'Today',
-      messages: []
-    },
-    {
-      id: '3',
-      title: 'TunzaTech E-Waste Solution',
-      date: 'Yesterday',
       messages: []
     }
   ]);
@@ -117,18 +159,332 @@ const MultimodalAI = () => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const vibrationRef = useRef<number | null>(null);
 
-  // Auto-play audio responses
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.onended = () => setIsSpeaking(false);
+  // Accessibility-enhanced voice commands
+  const voiceCommands = {
+    emergency: ['help', 'emergency', 'call help', 'danger', 'urgent'],
+    navigation: ['where am i', 'describe surroundings', 'what do you see', 'navigate', 'location'],
+    social: ['who is here', 'recognize faces', 'who is talking', 'social situation'],
+    emotion: ['how do i feel', 'mood check', 'emotional support', 'comfort me'],
+    routine: ['remind me', 'schedule', 'medicine time', 'eat', 'sleep'],
+    entertainment: ['sing song', 'tell story', 'tell joke', 'play music', 'calm me'],
+    control: ['take photo', 'call someone', 'open app', 'control lights']
+  };
+
+  // Enhanced emotion detection for accessibility
+  const detectAdvancedEmotion = useCallback((input: string, voiceTone?: any) => {
+    const emotionPatterns = {
+      distressed: ['help', 'scared', 'panic', 'emergency', 'afraid', 'anxious'],
+      confused: ['confused', 'lost', 'dont understand', 'unclear', 'explain'],
+      lonely: ['lonely', 'alone', 'nobody', 'sad', 'miss', 'isolated'],
+      excited: ['excited', 'happy', 'great', 'awesome', 'wonderful', 'amazing'],
+      tired: ['tired', 'sleepy', 'exhausted', 'rest', 'sleep'],
+      frustrated: ['frustrated', 'angry', 'annoyed', 'difficult', 'hard'],
+      grateful: ['thank', 'grateful', 'appreciate', 'helpful', 'kind'],
+      curious: ['what', 'how', 'why', 'tell me', 'explain', 'learn']
+    };
+
+    const inputLower = input.toLowerCase();
+    for (const [emotion, keywords] of Object.entries(emotionPatterns)) {
+      if (keywords.some(keyword => inputLower.includes(keyword))) {
+        return {
+          primary: emotion,
+          confidence: 0.85,
+          tone: emotion as any,
+          description: `User appears to be feeling ${emotion}`
+        };
+      }
     }
+
+    return null;
   }, []);
 
-  // Initialize camera/video with better error handling
+  // Vibration alerts for hearing impaired
+  const triggerVibration = useCallback((pattern: number[] = [200, 100, 200]) => {
+    if (accessibilitySettings.enableVibration && 'vibrate' in navigator) {
+      navigator.vibrate(pattern);
+    }
+  }, [accessibilitySettings]);
+
+  // Enhanced TTS with accessibility options
+  const speakText = useCallback(async (text: string, priority: 'low' | 'normal' | 'high' = 'normal') => {
+    if ('speechSynthesis' in window) {
+      // Stop current speech if high priority
+      if (priority === 'high') {
+        speechSynthesis.cancel();
+      }
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      
+      // Accessibility voice settings
+      utterance.rate = accessibilitySettings.speechSpeed === 'slow' ? 0.7 : 
+                      accessibilitySettings.speechSpeed === 'fast' ? 1.3 : 1.0;
+      utterance.pitch = accessibilitySettings.isChild ? 1.2 : 
+                       accessibilitySettings.isElderly ? 0.9 : 1.0;
+      utterance.volume = 0.9;
+
+      // Voice selection based on accessibility needs
+      const voices = speechSynthesis.getVoices();
+      if (voices.length > 0) {
+        const preferredVoice = voices.find(voice => 
+          voice.name.toLowerCase().includes(accessibilitySettings.preferredVoice) ||
+          (accessibilitySettings.isChild && voice.name.toLowerCase().includes('child')) ||
+          (accessibilitySettings.isElderly && voice.name.toLowerCase().includes('gentle'))
+        ) || voices[0];
+        utterance.voice = preferredVoice;
+      }
+
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      
+      speechSynthesis.speak(utterance);
+    }
+  }, [accessibilitySettings]);
+
+  // Enhanced AI interaction with accessibility context
+  const handleAIInteraction = useCallback(async (
+    input: string, 
+    mode: 'text' | 'voice' | 'image' | 'video' | 'accessibility' = 'text', 
+    attachments?: any[]
+  ) => {
+    try {
+      console.log("🧠 Starting accessible AI interaction:", { input, mode, accessibility: accessibilitySettings });
+      
+      // Detect emotion for cognitive support
+      const detectedEmotion = detectAdvancedEmotion(input);
+      if (detectedEmotion) {
+        setCurrentEmotion(detectedEmotion);
+        
+        // Immediate emotional support for cognitive disabilities
+        if (accessibilitySettings.cognitiveSupport && detectedEmotion.primary === 'distressed') {
+          speakText("I'm here to help you. Take a deep breath. You're safe.", 'high');
+          triggerVibration([100, 50, 100, 50, 100]);
+        }
+      }
+
+      const newMessage: ConversationMessage = {
+        type: 'user',
+        content: input,
+        timestamp: new Date(),
+        attachments,
+        id: Date.now().toString(),
+        accessibility: {
+          altText: mode === 'voice' ? 'Voice message' : undefined
+        }
+      };
+
+      setConversation(prev => [...prev, newMessage]);
+
+      // Show accessible loading message
+      if (accessibilitySettings.visualImpairment) {
+        speakText("Processing your request, please wait a moment.", 'normal');
+      }
+      toast.loading("🧠 Your AI assistant is thinking...");
+
+      // Enhanced context for accessibility
+      const accessibilityContext = {
+        settings: accessibilitySettings,
+        currentEmotion: detectedEmotion || currentEmotion,
+        recognizedPeople,
+        currentScene,
+        detectedObjects,
+        conversationHistory: conversation.slice(-10),
+        emergencyMode: isEmergency
+      };
+
+      const { data, error } = await supabase.functions.invoke('multimodal-ai', {
+        body: {
+          input,
+          mode,
+          attachments,
+          videoEnabled: isVideoOn,
+          context: accessibilityContext
+        }
+      });
+
+      toast.dismiss();
+
+      if (error) {
+        console.error('🚨 AI Error:', error);
+        const errorText = "I'm sorry, I'm having trouble right now. Please try again.";
+        speakText(errorText, 'high');
+        throw error;
+      }
+
+      const aiResponse: AIResponse = data;
+
+      // Update accessibility state
+      if (aiResponse.accessibility) {
+        if (aiResponse.accessibility.sceneDescription) {
+          setCurrentScene(aiResponse.accessibility.sceneDescription);
+          if (accessibilitySettings.visualImpairment) {
+            speakText(`Scene update: ${aiResponse.accessibility.sceneDescription}`, 'normal');
+          }
+        }
+        
+        if (aiResponse.accessibility.objectDetection) {
+          setDetectedObjects(aiResponse.accessibility.objectDetection);
+          if (accessibilitySettings.visualImpairment) {
+            speakText(`Objects detected: ${aiResponse.accessibility.objectDetection.join(', ')}`, 'normal');
+          }
+        }
+
+        if (aiResponse.accessibility.emotionalSupport && accessibilitySettings.emotionalSupport) {
+          speakText(aiResponse.accessibility.emotionalSupport, 'high');
+        }
+      }
+
+      if (aiResponse.recognizedFaces) {
+        setRecognizedPeople(aiResponse.recognizedFaces);
+        if (accessibilitySettings.visualImpairment) {
+          const peopleNames = aiResponse.recognizedFaces.map(p => p.name).join(', ');
+          speakText(`I can see: ${peopleNames}`, 'normal');
+        }
+      }
+
+      if (aiResponse.emotion) {
+        setCurrentEmotion(aiResponse.emotion);
+      }
+
+      const aiMessage: ConversationMessage = {
+        type: 'ai',
+        content: aiResponse.text,
+        timestamp: new Date(),
+        hasAudio: !!aiResponse.audioUrl,
+        id: Date.now().toString(),
+        imageUrl: aiResponse.imageUrl,
+        accessibility: {
+          audioDescription: aiResponse.accessibility?.sceneDescription
+        }
+      };
+
+      setConversation(prev => [...prev, aiMessage]);
+
+      // Enhanced audio response handling
+      if (aiResponse.audioUrl && audioRef.current) {
+        try {
+          audioRef.current.src = aiResponse.audioUrl;
+          setIsSpeaking(true);
+          await audioRef.current.play();
+          
+          // Vibration for hearing impaired when AI speaks
+          if (accessibilitySettings.hearingImpairment) {
+            triggerVibration([300, 100, 300]);
+          }
+          
+          toast.success("🔊 AI is speaking");
+        } catch (audioError) {
+          console.error('🚨 Audio playback error:', audioError);
+          // Fallback to TTS for accessibility
+          speakText(aiResponse.text, 'normal');
+        }
+      } else if (accessibilitySettings.visualImpairment || accessibilitySettings.cognitiveSupport) {
+        // Always provide voice feedback for accessibility
+        speakText(aiResponse.text, 'normal');
+      }
+
+      // Emergency detection
+      if (input.toLowerCase().includes('emergency') || input.toLowerCase().includes('help')) {
+        setIsEmergency(true);
+        if (accessibilitySettings.emergencyContact) {
+          speakText("Emergency detected. I'm here to help you. Stay calm.", 'high');
+          triggerVibration([500, 200, 500, 200, 500]);
+        }
+      }
+
+    } catch (error) {
+      console.error('🚨 AI interaction error:', error);
+      const errorText = "I'm sorry, I'm having technical difficulties. Please try speaking to me again.";
+      speakText(errorText, 'high');
+      toast.error("Technical issue - please try again");
+      
+      const errorMessage: ConversationMessage = {
+        type: 'ai',
+        content: errorText,
+        timestamp: new Date(),
+        hasAudio: false,
+        id: Date.now().toString()
+      };
+      setConversation(prev => [...prev, errorMessage]);
+    }
+  }, [
+    accessibilitySettings, 
+    currentEmotion, 
+    recognizedPeople, 
+    currentScene, 
+    detectedObjects, 
+    conversation, 
+    isEmergency, 
+    isVideoOn,
+    detectAdvancedEmotion,
+    speakText,
+    triggerVibration
+  ]);
+
+  // Enhanced voice recognition with accessibility
+  const startListening = useCallback(async () => {
+    try {
+      if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        speakText("Voice recognition is not supported in this browser.", 'high');
+        toast.error("Speech recognition not supported");
+        return;
+      }
+
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      
+      recognitionRef.current.continuous = accessibilitySettings.physicalDisability;
+      recognitionRef.current.interimResults = true;
+      recognitionRef.current.lang = 'en-US';
+
+      recognitionRef.current.onstart = () => {
+        setIsListening(true);
+        speakText("I'm listening", 'normal');
+        triggerVibration([100]);
+        toast.success("🎤 Listening...");
+      };
+
+      recognitionRef.current.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        console.log("🎤 Voice input:", transcript);
+        
+        // Check for voice commands for accessibility
+        const lowerTranscript = transcript.toLowerCase();
+        
+        // Emergency voice commands
+        if (voiceCommands.emergency.some(cmd => lowerTranscript.includes(cmd))) {
+          setIsEmergency(true);
+          speakText("Emergency mode activated. How can I help you?", 'high');
+          triggerVibration([500, 200, 500, 200, 500]);
+        }
+        
+        setInputText(transcript);
+        handleAIInteraction(transcript, 'voice');
+        setIsListening(false);
+      };
+
+      recognitionRef.current.onerror = (error) => {
+        console.error("🚨 Speech recognition error:", error);
+        speakText("Voice recognition error. Please try again.", 'high');
+        setIsListening(false);
+      };
+
+      recognitionRef.current.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current.start();
+    } catch (error) {
+      console.error("🚨 Voice recognition start error:", error);
+      speakText("Could not start voice recognition. Please try typing instead.", 'high');
+    }
+  }, [accessibilitySettings, handleAIInteraction, speakText, triggerVibration]);
+
+  // Enhanced camera with accessibility features
   const startVideo = useCallback(async () => {
     try {
-      console.log("Attempting to start camera...");
+      console.log("📹 Starting accessible camera...");
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { 
           width: { ideal: 1280 },
@@ -143,19 +499,28 @@ const MultimodalAI = () => {
         await videoRef.current.play();
       }
       setIsVideoOn(true);
-      toast.success("🎥 Camera activated! I can see you now!");
       
-      // Automatically scan environment when camera starts
-      setTimeout(() => {
-        handleAIInteraction("I can see you now! Let me analyze what's in your environment and tell you about your surroundings in detail.", 'video');
-      }, 1000);
+      speakText("Camera activated. I can now see your environment.", 'normal');
+      toast.success("🎥 Camera activated for accessibility features!");
+      
+      // Auto-describe for visual impairment
+      if (accessibilitySettings.visualImpairment || accessibilitySettings.autoDescribeImages) {
+        setTimeout(() => {
+          handleAIInteraction(
+            "Please describe what you see in detail, including people, objects, text, colors, and spatial relationships. Help me understand my surroundings completely.", 
+            'video'
+          );
+        }, 2000);
+      }
       
     } catch (error) {
-      console.error("Camera error:", error);
-      toast.error("Camera access denied. Please enable camera permissions in your browser settings.");
+      console.error("🚨 Camera error:", error);
+      speakText("Camera access denied. Please enable camera permissions for accessibility features.", 'high');
+      toast.error("Camera access needed for visual assistance");
     }
-  }, []);
+  }, [accessibilitySettings, handleAIInteraction, speakText]);
 
+  // Stop video
   const stopVideo = useCallback(() => {
     if (videoRef.current?.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream;
@@ -163,54 +528,11 @@ const MultimodalAI = () => {
       videoRef.current.srcObject = null;
     }
     setIsVideoOn(false);
+    speakText("Camera stopped", 'normal');
     toast.info("Camera stopped");
-  }, []);
+  }, [speakText]);
 
-  // Enhanced voice recognition with better error handling
-  const startListening = useCallback(async () => {
-    try {
-      if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-        toast.error("Speech recognition not supported in your browser");
-        return;
-      }
-
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      
-      recognitionRef.current.continuous = false;
-      recognitionRef.current.interimResults = false;
-      recognitionRef.current.lang = 'en-US';
-
-      recognitionRef.current.onstart = () => {
-        setIsListening(true);
-        toast.success("🎤 I'm listening... Speak now!");
-      };
-
-      recognitionRef.current.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        console.log("Voice input received:", transcript);
-        setInputText(transcript);
-        handleAIInteraction(transcript, 'voice');
-        setIsListening(false);
-      };
-
-      recognitionRef.current.onerror = (error) => {
-        console.error("Speech recognition error:", error);
-        toast.error("Voice recognition error. Please try again.");
-        setIsListening(false);
-      };
-
-      recognitionRef.current.onend = () => {
-        setIsListening(false);
-      };
-
-      recognitionRef.current.start();
-    } catch (error) {
-      console.error("Could not start voice recognition:", error);
-      toast.error("Could not start voice recognition");
-    }
-  }, []);
-
+  // Stop listening
   const stopListening = useCallback(() => {
     if (recognitionRef.current) {
       recognitionRef.current.stop();
@@ -218,116 +540,33 @@ const MultimodalAI = () => {
     }
   }, []);
 
-  // Enhanced AI Interaction with better error handling
-  const handleAIInteraction = useCallback(async (input: string, mode: 'text' | 'voice' | 'image' | 'video' = 'text', attachments?: any[]) => {
-    try {
-      console.log("Starting AI interaction:", { input, mode, attachments: attachments?.length || 0 });
-      
-      const newMessage: ConversationMessage = {
-        type: 'user',
-        content: input,
-        timestamp: new Date(),
-        attachments,
-        id: Date.now().toString()
-      };
-
-      setConversation(prev => [...prev, newMessage]);
-
-      toast.loading("🧠 Nurath.AI is thinking...");
-
-      const { data, error } = await supabase.functions.invoke('multimodal-ai', {
-        body: {
-          input,
-          mode,
-          attachments,
-          videoEnabled: isVideoOn,
-          context: {
-            recognizedPeople,
-            currentEmotion,
-            conversationHistory: conversation.slice(-5)
-          }
-        }
-      });
-
-      toast.dismiss();
-
-      if (error) {
-        console.error('AI Error:', error);
-        if (error.message?.includes('quota') || error.message?.includes('429')) {
-          toast.error("🚫 OpenAI API quota exceeded. Please check your API key billing status.");
-          const errorMessage: ConversationMessage = {
-            type: 'ai',
-            content: "I'm sorry, but my voice capabilities are temporarily unavailable due to API quota limits. My creator needs to check the OpenAI billing settings. I can still chat with you through text!",
-            timestamp: new Date(),
-            hasAudio: false,
-            id: Date.now().toString()
-          };
-          setConversation(prev => [...prev, errorMessage]);
-          return;
-        }
-        throw error;
-      }
-
-      const aiResponse: AIResponse = data;
-
-      if (aiResponse.recognizedFaces) {
-        setRecognizedPeople(aiResponse.recognizedFaces);
-      }
-
-      if (aiResponse.emotion) {
-        setCurrentEmotion(aiResponse.emotion);
-      }
-
-      const aiMessage: ConversationMessage = {
-        type: 'ai',
-        content: aiResponse.text,
-        timestamp: new Date(),
-        hasAudio: !!aiResponse.audioUrl,
-        id: Date.now().toString(),
-        imageUrl: aiResponse.imageUrl
-      };
-
-      setConversation(prev => [...prev, aiMessage]);
-
-      // Handle audio response - REAL VOICE
-      if (aiResponse.audioUrl && audioRef.current) {
-        try {
-          audioRef.current.src = aiResponse.audioUrl;
-          setIsSpeaking(true);
-          await audioRef.current.play();
-          toast.success("🔊 Playing voice response");
-        } catch (audioError) {
-          console.error('Audio playback error:', audioError);
-          toast.error("Audio playback failed - please check browser audio permissions");
-          setIsSpeaking(false);
-        }
-      }
-
-      if (aiResponse.environmentDescription) {
-        toast.info(`🌍 ${aiResponse.environmentDescription}`);
-      }
-
-    } catch (error) {
-      console.error('AI interaction error:', error);
-      toast.error("Sorry, I'm having trouble. Please try again.");
-      
-      const errorMessage: ConversationMessage = {
-        type: 'ai',
-        content: "I apologize, but I'm experiencing technical difficulties. Please ensure you have a stable internet connection and try again.",
-        timestamp: new Date(),
-        hasAudio: false,
-        id: Date.now().toString()
-      };
-      setConversation(prev => [...prev, errorMessage]);
+  // Auto-play audio responses
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.onended = () => setIsSpeaking(false);
     }
-  }, [isVideoOn, recognizedPeople, currentEmotion, conversation]);
+  }, []);
 
-  // Enhanced file upload with image recognition
+  // Accessibility announcements on mount
+  useEffect(() => {
+    const welcomeMessage = accessibilitySettings.isChild 
+      ? "Hi there! I'm your friendly AI assistant. I'm here to help you with anything you need!"
+      : accessibilitySettings.isElderly 
+      ? "Hello, I'm your AI companion. I'm here to assist you and keep you company."
+      : "Welcome to your accessible AI assistant. I'm here to help with all your needs.";
+    
+    if (accessibilitySettings.visualImpairment || accessibilitySettings.cognitiveSupport) {
+      setTimeout(() => speakText(welcomeMessage, 'normal'), 1000);
+    }
+  }, [accessibilitySettings, speakText]);
+
+  // File upload with accessibility
   const handleFileUpload = useCallback(async (files: FileList) => {
     const file = files[0];
     if (!file) return;
 
-    console.log("File uploaded:", file.name, file.type);
+    console.log("📁 Accessible file upload:", file.name, file.type);
+    speakText("Processing your file, please wait.", 'normal');
 
     const fileType = file.type.startsWith('image/') ? 'image' : 
                     file.type.startsWith('video/') ? 'video' : 'document';
@@ -335,21 +574,25 @@ const MultimodalAI = () => {
     const reader = new FileReader();
     reader.onload = async (e) => {
       const base64Data = e.target?.result as string;
-      console.log("File converted to base64, size:", base64Data.length);
+      
+      const accessiblePrompt = accessibilitySettings.visualImpairment
+        ? `Please describe this ${fileType} in great detail for someone who cannot see it. Include all people, objects, text, colors, and spatial relationships.`
+        : `Please analyze this ${fileType} and tell me about it.`;
       
       await handleAIInteraction(
-        `Please analyze this ${fileType} and tell me about it in detail. If it's an image, describe what you see. If it contains people, try to recognize them and tell me about the environment and surroundings.`, 
+        accessiblePrompt, 
         fileType as any, 
         [{ type: fileType, data: base64Data, name: file.name }]
       );
     };
     reader.readAsDataURL(file);
-  }, [handleAIInteraction]);
+  }, [accessibilitySettings, handleAIInteraction, speakText]);
 
-  // Take photo from camera
+  // Take accessible photo
   const takePhoto = useCallback(() => {
     if (!videoRef.current || !isVideoOn) {
-      toast.error("Please turn on the camera first");
+      speakText("Please turn on the camera first", 'high');
+      toast.error("Camera needed for photo");
       return;
     }
 
@@ -366,54 +609,23 @@ const MultimodalAI = () => {
         const reader = new FileReader();
         reader.onload = (e) => {
           const base64Data = e.target?.result as string;
+          
+          const accessiblePrompt = accessibilitySettings.visualImpairment
+            ? "I just took a photo. Please describe everything you see in great detail - people, objects, surroundings, and help me understand my environment completely."
+            : "I just took a photo. Please analyze what you see.";
+            
           handleAIInteraction(
-            "I just took a photo. Please analyze what you see, recognize any people, describe the environment and surroundings in detail.", 
+            accessiblePrompt, 
             'image', 
-            [{ type: 'image', data: base64Data, name: 'camera-photo.jpg' }]
+            [{ type: 'image', data: base64Data, name: 'accessibility-photo.jpg' }]
           );
         };
         reader.readAsDataURL(blob);
+        speakText("Photo captured. Analyzing what I can see.", 'normal');
         toast.success("📸 Photo captured and analyzing...");
       }
     }, 'image/jpeg', 0.8);
-  }, [isVideoOn, handleAIInteraction]);
-
-  // Start Audio Call
-  const startAudioCall = useCallback(async () => {
-    try {
-      setIsAudioCall(true);
-      toast.success("📞 Starting audio call with Nurath.AI...");
-      await handleAIInteraction("Hello! I'm starting an audio call with you. Please respond with your voice and let's have a real conversation!", 'voice');
-    } catch (error) {
-      console.error("Audio call error:", error);
-      toast.error("Failed to start audio call");
-      setIsAudioCall(false);
-    }
-  }, [handleAIInteraction]);
-
-  // Start Video Call
-  const startVideoCall = useCallback(async () => {
-    try {
-      setIsVideoCall(true);
-      await startVideo();
-      toast.success("📹 Starting video call with Nurath.AI...");
-      await handleAIInteraction("Hello! I'm starting a video call with you. I can see you now through the camera. Please respond with your voice and let's have a real face-to-face conversation!", 'video');
-    } catch (error) {
-      console.error("Video call error:", error);
-      toast.error("Failed to start video call");
-      setIsVideoCall(false);
-    }
-  }, [startVideo, handleAIInteraction]);
-
-  // End calls
-  const endCall = useCallback(() => {
-    setIsAudioCall(false);
-    setIsVideoCall(false);
-    stopVideo();
-    stopListening();
-    setIsSpeaking(false);
-    toast.info("Call ended");
-  }, [stopVideo, stopListening]);
+  }, [isVideoOn, accessibilitySettings, handleAIInteraction, speakText]);
 
   // New Chat functionality
   const startNewChat = useCallback(() => {
@@ -429,6 +641,7 @@ const MultimodalAI = () => {
     setCurrentConversationId(newConversationId);
     setConversation([]);
     setInputText("");
+    speakText("Started new conversation", 'normal');
     toast.success("Started new conversation");
   }, []);
 
@@ -439,6 +652,7 @@ const MultimodalAI = () => {
       setCurrentConversationId(conversationId);
       setConversation(conv.messages);
       setIsSidebarOpen(false); // Close sidebar on mobile
+      speakText(`Loaded conversation: ${conv.title}`, 'normal');
     }
   }, [conversationHistory]);
 
@@ -448,6 +662,7 @@ const MultimodalAI = () => {
     if (currentConversationId === conversationId) {
       startNewChat();
     }
+    speakText("Conversation deleted", 'normal');
     toast.success("Conversation deleted");
   }, [currentConversationId, startNewChat]);
 
@@ -475,6 +690,7 @@ const MultimodalAI = () => {
 
     setEditingMessageId(null);
     setEditingText("");
+    speakText("Message updated and resent", 'normal');
     toast.success("Message updated and resent");
   }, [editingMessageId, editingText, conversation, handleAIInteraction]);
 
@@ -486,28 +702,32 @@ const MultimodalAI = () => {
   // Delete message
   const deleteMessage = useCallback((messageId: string) => {
     setConversation(prev => prev.filter(msg => msg.id !== messageId));
+    speakText("Message deleted", 'normal');
     toast.success("Message deleted");
   }, []);
 
   return (
-    <div className="flex h-screen bg-white dark:bg-gray-900">
-      {/* Sidebar */}
+    <div className={`flex h-screen bg-white dark:bg-gray-900 ${
+      accessibilitySettings.fontSize === 'large' ? 'text-lg' : 
+      accessibilitySettings.fontSize === 'extra-large' ? 'text-xl' : 'text-base'
+    }`}>
+      {/* Enhanced Sidebar */}
       <div className={`${isSidebarOpen ? 'w-64' : 'w-0'} transition-all duration-300 bg-gray-50 dark:bg-gray-800 flex flex-col overflow-hidden md:relative fixed inset-y-0 left-0 z-50`}>
         {isSidebarOpen && (
           <>
-            {/* Mobile overlay */}
-            <div 
-              className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
-              onClick={() => setIsSidebarOpen(false)}
-            />
+            <div className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-40" onClick={() => setIsSidebarOpen(false)} />
             
             <div className="relative z-50 bg-gray-50 dark:bg-gray-800 h-full flex flex-col">
               {/* Sidebar Header */}
               <div className="p-3">
                 <div className="flex items-center justify-between mb-3">
                   <Button 
-                    className="flex-1 justify-start bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-900 dark:text-white"
-                    onClick={startNewChat}
+                    className="flex-1 justify-start bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-900 dark:text-white"
+                    onClick={() => {
+                      setConversation([]);
+                      setCurrentConversationId(Date.now().toString());
+                      speakText("New conversation started", 'normal');
+                    }}
                   >
                     <Plus className="w-4 h-4 mr-2" />
                     New chat
@@ -530,7 +750,12 @@ const MultimodalAI = () => {
                   {conversationHistory.map((conv) => (
                     <div key={conv.id} className="group relative">
                       <button
-                        onClick={() => loadConversation(conv.id)}
+                        onClick={() => {
+                          setCurrentConversationId(conv.id);
+                          setConversation(conv.messages);
+                          setIsSidebarOpen(false);
+                          speakText(`Loaded conversation: ${conv.title}`, 'normal');
+                        }}
                         className={`w-full text-left p-2 text-sm rounded-md truncate ${
                           currentConversationId === conv.id 
                             ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white' 
@@ -546,7 +771,8 @@ const MultimodalAI = () => {
                           className="h-6 w-6 p-0"
                           onClick={(e) => {
                             e.stopPropagation();
-                            deleteConversation(conv.id);
+                            setConversationHistory(prev => prev.filter(c => c.id !== conv.id));
+                            speakText("Conversation deleted", 'normal');
                           }}
                         >
                           <Trash2 className="w-3 h-3" />
@@ -557,9 +783,21 @@ const MultimodalAI = () => {
                 </div>
               </div>
 
-              {/* Sidebar Footer */}
+              {/* Accessibility Settings */}
               <div className="p-2 space-y-1">
-                <Button variant="ghost" className="w-full justify-start text-gray-700 dark:text-gray-300">
+                <Button 
+                  variant="ghost" 
+                  className="w-full justify-start text-gray-700 dark:text-gray-300"
+                  onClick={() => speakText("Accessibility settings available. You can adjust voice speed, font size, and enable features for visual, hearing, or cognitive support.", 'normal')}
+                >
+                  <Accessibility className="w-4 h-4 mr-2" />
+                  Accessibility
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  className="w-full justify-start text-gray-700 dark:text-gray-300"
+                  onClick={() => speakText("Settings menu. Configure your AI assistant preferences here.", 'normal')}
+                >
                   <Settings className="w-4 h-4 mr-2" />
                   Settings
                 </Button>
@@ -571,7 +809,7 @@ const MultimodalAI = () => {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col">
-        {/* Top Header */}
+        {/* Enhanced Header with Accessibility Status */}
         <header className="flex items-center justify-between p-4 bg-white dark:bg-gray-900">
           <div className="flex items-center space-x-4">
             <Button 
@@ -583,6 +821,32 @@ const MultimodalAI = () => {
               <Menu className="w-5 h-5" />
             </Button>
             <div className="font-semibold text-gray-900 dark:text-white">Nurath.AI</div>
+            
+            {/* Accessibility Status Badges */}
+            {accessibilitySettings.visualImpairment && (
+              <Badge variant="outline" className="border-blue-500/30 text-blue-400 bg-blue-500/10">
+                <Eye className="w-3 h-3 mr-1" />
+                Visual Support
+              </Badge>
+            )}
+            {accessibilitySettings.hearingImpairment && (
+              <Badge variant="outline" className="border-purple-500/30 text-purple-400 bg-purple-500/10">
+                <VolumeX className="w-3 h-3 mr-1" />
+                Hearing Support
+              </Badge>
+            )}
+            {accessibilitySettings.cognitiveSupport && (
+              <Badge variant="outline" className="border-green-500/30 text-green-400 bg-green-500/10">
+                <Brain className="w-3 h-3 mr-1" />
+                Cognitive Support
+              </Badge>
+            )}
+            {isEmergency && (
+              <Badge variant="outline" className="border-red-500/30 text-red-400 bg-red-500/10 animate-pulse">
+                <AlertTriangle className="w-3 h-3 mr-1" />
+                Emergency Mode
+              </Badge>
+            )}
             {currentEmotion && (
               <Badge variant="outline" className="border-pink-500/30 text-pink-400 bg-pink-500/10">
                 <Heart className="w-3 h-3 mr-1" />
@@ -613,15 +877,20 @@ const MultimodalAI = () => {
               <Button 
                 variant="destructive" 
                 size="sm" 
-                onClick={endCall}
+                onClick={() => {
+                  setIsAudioCall(false);
+                  setIsVideoCall(false);
+                  stopVideo();
+                  stopListening();
+                  setIsSpeaking(false);
+                  speakText("Call ended", 'normal');
+                  toast.info("Call ended");
+                }}
                 className="bg-red-500 hover:bg-red-600"
               >
                 End Call
               </Button>
             )}
-            <Button variant="ghost" size="sm" className="text-gray-600 dark:text-gray-400">
-              <Share className="w-4 h-4" />
-            </Button>
             <ThemeToggle />
           </div>
         </header>
@@ -629,17 +898,22 @@ const MultimodalAI = () => {
         {/* Chat Messages Area */}
         <div className="flex-1 overflow-y-auto bg-white dark:bg-gray-900">
           {conversation.length === 0 ? (
-            // Welcome State
+            // Welcome State with Accessibility Features
             <div className="h-full flex flex-col items-center justify-center p-8">
-              <div className="text-center max-w-2xl">
-                <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-8">
-                  What can I help you with?
+              <div className="text-center max-w-4xl">
+                <h1 className={`font-bold text-gray-900 dark:text-white mb-8 ${
+                  accessibilitySettings.fontSize === 'large' ? 'text-5xl' : 
+                  accessibilitySettings.fontSize === 'extra-large' ? 'text-6xl' : 'text-4xl'
+                }`}>
+                  {accessibilitySettings.isChild ? "Hi! What can I help you with today?" :
+                   accessibilitySettings.isElderly ? "Hello! I'm here to assist you." :
+                   "What can I help you with?"}
                 </h1>
                 
-                {/* Quick Actions Grid */}
-                <div className="grid grid-cols-2 gap-4 mb-8">
+                {/* Accessibility Quick Actions */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                   <Button
-                    onClick={() => handleAIInteraction("Sing me a beautiful song with your voice and sing the actual lyrics", 'voice')}
+                    onClick={() => handleAIInteraction("Please sing me a beautiful song with your voice and sing the actual lyrics", 'voice')}
                     variant="outline"
                     className="h-20 flex flex-col items-center justify-center space-y-2"
                   >
@@ -647,51 +921,70 @@ const MultimodalAI = () => {
                     <span className="text-sm">Sing Song</span>
                   </Button>
                   <Button
-                    onClick={() => handleAIInteraction("Tell me a funny joke using your voice", 'voice')}
+                    onClick={() => handleAIInteraction("Tell me what you can see around me and describe my environment", 'video')}
                     variant="outline"
                     className="h-20 flex flex-col items-center justify-center space-y-2"
                   >
-                    <Smile className="w-6 h-6" />
-                    <span className="text-sm">Tell Joke</span>
+                    <Eye className="w-6 h-6" />
+                    <span className="text-sm">Describe Scene</span>
                   </Button>
                   <Button
-                    onClick={() => handleAIInteraction("Generate a creative beautiful image for me", 'text')}
+                    onClick={() => handleAIInteraction("I need emotional support and comfort right now", 'voice')}
                     variant="outline"
                     className="h-20 flex flex-col items-center justify-center space-y-2"
                   >
-                    <Palette className="w-6 h-6" />
-                    <span className="text-sm">Generate Image</span>
+                    <Heart className="w-6 h-6" />
+                    <span className="text-sm">Emotional Support</span>
                   </Button>
                   <Button
-                    onClick={startVideoCall}
+                    onClick={() => handleAIInteraction("Help me with my daily routine and remind me of important things", 'voice')}
                     variant="outline"
                     className="h-20 flex flex-col items-center justify-center space-y-2"
                   >
-                    <Video className="w-6 h-6" />
-                    <span className="text-sm">Video Call</span>
-                  </Button>
-                  <Button
-                    onClick={startAudioCall}
-                    variant="outline"
-                    className="h-20 flex flex-col items-center justify-center space-y-2"
-                  >
-                    <PhoneCall className="w-6 h-6" />
-                    <span className="text-sm">Audio Call</span>
+                    <Clock className="w-6 h-6" />
+                    <span className="text-sm">Daily Help</span>
                   </Button>
                   <Button
                     onClick={startVideo}
                     variant="outline"
                     className="h-20 flex flex-col items-center justify-center space-y-2"
                   >
-                    <Eye className="w-6 h-6" />
-                    <span className="text-sm">Recognize & Scan</span>
+                    <Video className="w-6 h-6" />
+                    <span className="text-sm">Start Camera</span>
+                  </Button>
+                  <Button
+                    onClick={() => handleAIInteraction("Who is around me? Please recognize faces and tell me about people nearby", 'video')}
+                    variant="outline"
+                    className="h-20 flex flex-col items-center justify-center space-y-2"
+                  >
+                    <Users className="w-6 h-6" />
+                    <span className="text-sm">Recognize People</span>
+                  </Button>
+                  <Button
+                    onClick={() => handleAIInteraction("Generate a beautiful creative image for me", 'text')}
+                    variant="outline"
+                    className="h-20 flex flex-col items-center justify-center space-y-2"
+                  >
+                    <Palette className="w-6 h-6" />
+                    <span className="text-sm">Create Image</span>
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setIsEmergency(true);
+                      handleAIInteraction("This is an emergency situation. I need help.", 'voice');
+                    }}
+                    variant="outline"
+                    className="h-20 flex flex-col items-center justify-center space-y-2 border-red-200 text-red-600"
+                  >
+                    <Shield className="w-6 h-6" />
+                    <span className="text-sm">Emergency</span>
                   </Button>
                 </div>
               </div>
             </div>
           ) : (
             <div className="max-w-3xl mx-auto w-full">
-              {/* Video Feed */}
+              {/* Video Feed for Accessibility */}
               {isVideoOn && (
                 <div className="p-4">
                   <div className="bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden">
@@ -701,28 +994,37 @@ const MultimodalAI = () => {
                       muted
                       className="w-full h-64 object-cover"
                     />
-                    <div className="p-4 flex space-x-2">
+                    <div className="p-4 flex flex-wrap gap-2">
                       <Button onClick={takePhoto} size="sm" variant="outline">
                         <Camera className="w-4 h-4 mr-2" />
                         Take Photo
                       </Button>
                       <Button 
-                        onClick={() => handleAIInteraction("Look around and tell me where I am and describe my surroundings in detail", 'video')}
+                        onClick={() => handleAIInteraction("Describe my surroundings and tell me where I am in detail", 'video')}
                         size="sm" 
                         variant="outline"
                       >
                         <MapPin className="w-4 h-4 mr-2" />
-                        Scan Location
+                        Describe Location
+                      </Button>
+                      <Button 
+                        onClick={() => handleAIInteraction("Who can you see around me? Please recognize faces and tell me about people", 'video')}
+                        size="sm" 
+                        variant="outline"
+                      >
+                        <Users className="w-4 h-4 mr-2" />
+                        Recognize People
                       </Button>
                       <Button onClick={stopVideo} size="sm" variant="destructive">
                         <VideoOff className="w-4 h-4" />
+                        Stop Camera
                       </Button>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Chat Messages */}
+              {/* Enhanced Chat Messages */}
               <div className="space-y-6 p-4">
                 {conversation.map((message) => (
                   <div key={message.id} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -748,6 +1050,12 @@ const MultimodalAI = () => {
                             <span className="text-xs text-green-400">Voice</span>
                           </div>
                         )}
+                        {message.accessibility?.audioDescription && accessibilitySettings.visualImpairment && (
+                          <Badge variant="outline" className="text-xs">
+                            <Accessibility className="w-3 h-3 mr-1" />
+                            Audio Description
+                          </Badge>
+                        )}
                       </div>
                       
                       {editingMessageId === message.id ? (
@@ -758,20 +1066,54 @@ const MultimodalAI = () => {
                             className="min-h-[60px] text-sm"
                           />
                           <div className="flex space-x-2">
-                            <Button size="sm" onClick={saveEditMessage}>Save</Button>
-                            <Button size="sm" variant="outline" onClick={cancelEdit}>Cancel</Button>
+                            <Button 
+                              size="sm" 
+                              onClick={() => {
+                                setConversation(prev => prev.map(msg => 
+                                  msg.id === editingMessageId 
+                                    ? { ...msg, content: editingText.trim() }
+                                    : msg
+                                ));
+                                handleAIInteraction(editingText.trim());
+                                setEditingMessageId(null);
+                                setEditingText("");
+                                speakText("Message updated and resent", 'normal');
+                              }}
+                            >
+                              Save
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              onClick={() => {
+                                setEditingMessageId(null);
+                                setEditingText("");
+                              }}
+                            >
+                              Cancel
+                            </Button>
                           </div>
                         </div>
                       ) : (
                         <>
-                          <p className="text-sm leading-relaxed">{message.content}</p>
+                          <p className={`leading-relaxed ${
+                            accessibilitySettings.fontSize === 'large' ? 'text-lg' : 
+                            accessibilitySettings.fontSize === 'extra-large' ? 'text-xl' : 'text-sm'
+                          }`}>
+                            {message.content}
+                          </p>
                           {message.imageUrl && (
                             <div className="mt-2">
                               <img 
                                 src={message.imageUrl} 
-                                alt="Generated content" 
+                                alt={message.accessibility?.altText || "Generated content"} 
                                 className="max-w-full h-auto rounded-lg"
                               />
+                            </div>
+                          )}
+                          {message.accessibility?.audioDescription && (
+                            <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                              Audio Description: {message.accessibility.audioDescription}
                             </div>
                           )}
                         </>
@@ -788,7 +1130,10 @@ const MultimodalAI = () => {
                             variant="ghost"
                             size="sm"
                             className="h-6 w-6 p-0"
-                            onClick={() => startEditMessage(message.id, message.content)}
+                            onClick={() => {
+                              setEditingMessageId(message.id);
+                              setEditingText(message.content);
+                            }}
                           >
                             <Edit className="w-3 h-3" />
                           </Button>
@@ -796,7 +1141,10 @@ const MultimodalAI = () => {
                             variant="ghost"
                             size="sm" 
                             className="h-6 w-6 p-0"
-                            onClick={() => deleteMessage(message.id)}
+                            onClick={() => {
+                              setConversation(prev => prev.filter(msg => msg.id !== message.id));
+                              speakText("Message deleted", 'normal');
+                            }}
                           >
                             <Trash2 className="w-3 h-3" />
                           </Button>
@@ -810,15 +1158,24 @@ const MultimodalAI = () => {
           )}
         </div>
 
-        {/* Input Area */}
+        {/* Enhanced Input Area with Accessibility */}
         <div className="bg-white dark:bg-gray-900 p-4">
           <div className="max-w-3xl mx-auto">
             <div className="relative bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
               <Textarea
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
-                placeholder="Message Nurath.AI..."
-                className="min-h-[60px] resize-none bg-transparent border-none px-4 py-3 pr-16 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-0"
+                placeholder={
+                  accessibilitySettings.physicalDisability 
+                    ? "Speak to me or type your message..."
+                    : accessibilitySettings.speechImpairment
+                    ? "Type your message here..."
+                    : "Message Nurath.AI..."
+                }
+                className={`resize-none bg-transparent border-none px-4 py-3 pr-16 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-0 ${
+                  accessibilitySettings.fontSize === 'large' ? 'text-lg min-h-[80px]' : 
+                  accessibilitySettings.fontSize === 'extra-large' ? 'text-xl min-h-[100px]' : 'text-base min-h-[60px]'
+                }`}
                 onKeyPress={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
@@ -835,6 +1192,7 @@ const MultimodalAI = () => {
                   variant="ghost"
                   onClick={() => fileInputRef.current?.click()}
                   className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                  title="Upload file for accessibility analysis"
                 >
                   <Paperclip className="w-4 h-4" />
                 </Button>
@@ -843,6 +1201,7 @@ const MultimodalAI = () => {
                   variant="ghost"
                   onClick={isListening ? stopListening : startListening}
                   className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                  title={isListening ? "Stop voice input" : "Start voice input"}
                 >
                   {isListening ? <StopCircle className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                 </Button>
@@ -851,6 +1210,7 @@ const MultimodalAI = () => {
                   variant="ghost"
                   onClick={isVideoOn ? stopVideo : startVideo}
                   className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                  title={isVideoOn ? "Stop camera" : "Start camera for visual assistance"}
                 >
                   {isVideoOn ? <VideoOff className="w-4 h-4" /> : <Video className="w-4 h-4" />}
                 </Button>
@@ -864,13 +1224,16 @@ const MultimodalAI = () => {
                   disabled={!inputText.trim()}
                   size="sm"
                   className="bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Send message"
                 >
                   <Send className="w-4 h-4" />
                 </Button>
               </div>
             </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 text-center mt-2">
-              Nurath.AI can make mistakes. Check important info.
+            <div className={`text-gray-500 dark:text-gray-400 text-center mt-2 ${
+              accessibilitySettings.fontSize === 'large' ? 'text-sm' : 'text-xs'
+            }`}>
+              Nurath.AI - Your accessible AI companion. Speak naturally or type your message.
             </div>
           </div>
         </div>
