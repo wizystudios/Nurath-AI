@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -48,9 +49,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useNavigate } from "react-router-dom";
+import UserAuthButton from "@/components/UserAuthButton";
 
 interface RelationshipTag {
   id: string;
@@ -118,8 +119,6 @@ const MultimodalAI = () => {
   const [isListening, setIsListening] = useState(false);
   const [isVideoOn, setIsVideoOn] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [isAudioCall, setIsAudioCall] = useState(false);
-  const [isVideoCall, setIsVideoCall] = useState(false);
   const [inputText, setInputText] = useState("");
   const [currentEmotion, setCurrentEmotion] = useState<EmotionState | null>(null);
   const [recognizedPeople, setRecognizedPeople] = useState<RelationshipTag[]>([]);
@@ -153,15 +152,8 @@ const MultimodalAI = () => {
     title: string;
     date: string;
     messages: ConversationMessage[];
-  }>>([
-    {
-      id: '1',
-      title: 'Daily Assistant Chat',
-      date: 'Today',
-      messages: []
-    }
-  ]);
-  const [currentConversationId, setCurrentConversationId] = useState<string>('1');
+  }>>([]);
+  const [currentConversationId, setCurrentConversationId] = useState<string>('');
 
   const [currentMode, setCurrentMode] = useState<'text' | 'voice' | 'video'>('text');
   const [user, setUser] = useState<any>(null);
@@ -213,9 +205,10 @@ const MultimodalAI = () => {
         const voices = speechSynthesis.getVoices();
         if (voices.length > 0) {
           const preferredVoice = voices.find(voice => 
-            voice.name.toLowerCase().includes(accessibilitySettings.preferredVoice) ||
             voice.name.toLowerCase().includes('female') ||
-            voice.name.toLowerCase().includes('natural')
+            voice.name.toLowerCase().includes('woman') ||
+            voice.name.toLowerCase().includes('samantha') ||
+            voice.name.toLowerCase().includes('alex')
           ) || voices[0];
           utterance.voice = preferredVoice;
         }
@@ -297,33 +290,6 @@ const MultimodalAI = () => {
     }
   }, [accessibilitySettings]);
 
-  // REAL Image Generation Function
-  const generateImage = useCallback(async (prompt: string) => {
-    try {
-      setIsProcessing(true);
-      
-      const { data, error } = await supabase.functions.invoke('multimodal-ai', {
-        body: {
-          input: prompt,
-          mode: 'image_generation',
-          generateImage: true,
-          context: {
-            settings: accessibilitySettings
-          }
-        }
-      });
-
-      if (error) throw error;
-      
-      return data;
-    } catch (error) {
-      console.error('Image generation error:', error);
-      throw error;
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [accessibilitySettings]);
-
   // Authentication check
   useEffect(() => {
     const checkUser = async () => {
@@ -337,6 +303,28 @@ const MultimodalAI = () => {
           .eq('id', user.id)
           .single();
         setProfile(profileData);
+
+        // Load conversation history for logged in users
+        const { data: conversations } = await supabase
+          .from('chat_messages')
+          .select('conversation_id, created_at')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (conversations) {
+          const uniqueConversations = conversations.reduce((acc: any[], msg) => {
+            if (!acc.find(c => c.id === msg.conversation_id)) {
+              acc.push({
+                id: msg.conversation_id,
+                title: `Chat ${new Date(msg.created_at).toLocaleDateString()}`,
+                date: new Date(msg.created_at).toLocaleDateString(),
+                messages: []
+              });
+            }
+            return acc;
+          }, []);
+          setConversationHistory(uniqueConversations);
+        }
       }
     };
     
@@ -344,12 +332,17 @@ const MultimodalAI = () => {
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user || null);
+      if (!session?.user) {
+        setProfile(null);
+        setConversationHistory([]);
+        setConversation([]);
+      }
     });
     
     return () => subscription.unsubscribe();
   }, []);
 
-  // Enhanced AI interaction with proper speaking control based on mode
+  // Enhanced AI interaction
   const handleAIInteraction = useCallback(async (
     input: string, 
     mode: 'text' | 'voice' | 'image' | 'video' | 'accessibility' | 'image_generation' | 'document' = 'text', 
@@ -397,7 +390,7 @@ const MultimodalAI = () => {
           context: {
             settings: {
               ...accessibilitySettings,
-              preferredVoice: 'shimmer', // Use female voice
+              preferredVoice: 'shimmer',
               speechSpeed: 'normal'
             },
             currentEmotion,
@@ -431,7 +424,6 @@ const MultimodalAI = () => {
 
       const aiResponse = data;
 
-      // Update states based on response
       if (aiResponse.emotion) {
         setCurrentEmotion(aiResponse.emotion);
       }
@@ -450,12 +442,10 @@ const MultimodalAI = () => {
 
       setConversation(prev => [...prev, aiMessage]);
 
-      // Handle generated images
       if (aiResponse.imageUrl) {
         toast.success("🎨 Image generated successfully!");
       }
 
-      // Handle audio responses ONLY if audio was generated
       if (aiResponse.audioUrl && audioRef.current) {
         try {
           audioRef.current.src = aiResponse.audioUrl;
@@ -468,7 +458,7 @@ const MultimodalAI = () => {
       }
 
       // Save conversation if user is logged in
-      if (user) {
+      if (user && currentConversationId) {
         try {
           await supabase.from('chat_messages').insert([
             {
@@ -542,7 +532,7 @@ const MultimodalAI = () => {
         
         if (event.results[event.results.length - 1].isFinal) {
           setInputText(transcript);
-          handleAIInteraction(transcript, 'voice', undefined, true); // Enable speaking for voice input
+          handleAIInteraction(transcript, 'voice', undefined, true);
           setIsListening(false);
         }
       };
@@ -590,11 +580,10 @@ const MultimodalAI = () => {
       }
       setIsVideoOn(true);
       
-      await speakText("Camera activated. I can now see your environment.", 'normal');
-      toast.success("🎥 Camera activated!");
-      
-      // Auto-describe for visual impairment
-      if (accessibilitySettings.visualImpairment || accessibilitySettings.autoDescribeImages) {
+      if (currentMode === 'video') {
+        await speakText("Camera activated. I can now see your environment.", 'normal');
+        toast.success("🎥 Camera activated!");
+        
         setTimeout(() => {
           handleAIInteraction(
             "Please describe what you see in detail, including people, objects, text, colors, and spatial relationships. Help me understand my surroundings completely.", 
@@ -608,7 +597,7 @@ const MultimodalAI = () => {
       await speakText("Camera access denied. Please enable camera permissions.", 'high');
       toast.error("Camera access needed");
     }
-  }, [accessibilitySettings, handleAIInteraction, speakText]);
+  }, [accessibilitySettings, handleAIInteraction, speakText, currentMode]);
 
   const stopVideo = useCallback(() => {
     if (videoRef.current?.srcObject) {
@@ -617,9 +606,11 @@ const MultimodalAI = () => {
       videoRef.current.srcObject = null;
     }
     setIsVideoOn(false);
-    speakText("Camera stopped", 'normal');
+    if (currentMode === 'video') {
+      speakText("Camera stopped", 'normal');
+    }
     toast.info("Camera stopped");
-  }, [speakText]);
+  }, [speakText, currentMode]);
 
   // File Upload with REAL Analysis
   const handleFileUpload = useCallback(async (files: FileList) => {
@@ -719,7 +710,6 @@ const MultimodalAI = () => {
 
   // Auto-speak quick action responses with voice enabled for specific actions
   const handleQuickAction = useCallback(async (actionType: string, prompt: string) => {
-    // These actions should ALWAYS speak (real human-like interaction)
     const shouldSpeak = ['sing', 'emotional', 'daily', 'emergency', 'recognize'].some(action => 
       actionType.includes(action) || prompt.toLowerCase().includes(action)
     );
@@ -732,13 +722,50 @@ const MultimodalAI = () => {
     );
   }, [handleAIInteraction]);
 
+  // Handle user login
+  const handleLogin = useCallback(async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    toast.success("Logged in successfully!");
+  }, []);
+
+  // Handle user signup
+  const handleSignup = useCallback(async (email: string, password: string, name: string) => {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: name
+        }
+      }
+    });
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    toast.success("Account created successfully! Please check your email.");
+  }, []);
+
   // Handle logout
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     await supabase.auth.signOut();
     setUser(null);
     setProfile(null);
+    setConversationHistory([]);
+    setConversation([]);
     toast.success("Logged out successfully");
-  };
+  }, []);
 
   // Auto-play audio responses and handle end event
   useEffect(() => {
@@ -748,33 +775,25 @@ const MultimodalAI = () => {
     }
   }, []);
 
-  // Welcome message
-  useEffect(() => {
-    const welcomeMessage = accessibilitySettings.isChild 
-      ? "Hi there! I'm your friendly AI assistant. I can talk, see, and help you with anything!"
-      : accessibilitySettings.isElderly 
-      ? "Hello, I'm your AI companion. I'm here to assist you and keep you company."
-      : "Welcome to your accessible AI assistant. I can speak, see, and help with all your needs.";
-    
-    setTimeout(() => speakText(welcomeMessage, 'normal'), 1000);
-  }, [accessibilitySettings, speakText]);
-
   // Start a new chat
   const startNewChat = useCallback(() => {
     const newConversationId = Date.now().toString();
     setCurrentConversationId(newConversationId);
     setConversation([]);
     
-    const newConversation = {
-      id: newConversationId,
-      title: 'New Chat',
-      date: 'Today',
-      messages: []
-    };
+    if (user) {
+      const newConversation = {
+        id: newConversationId,
+        title: 'New Chat',
+        date: 'Today',
+        messages: []
+      };
+      
+      setConversationHistory(prev => [newConversation, ...prev]);
+    }
     
-    setConversationHistory(prev => [newConversation, ...prev]);
     toast.success("New chat started");
-  }, []);
+  }, [user]);
 
   // Load a conversation
   const loadConversation = useCallback(async (conversationId: string) => {
@@ -803,10 +822,32 @@ const MultimodalAI = () => {
         toast.error("Failed to load conversation");
       }
     } else {
-      // For non-logged in users, just clear conversation
       setConversation([]);
     }
   }, [user]);
+
+  // Mode change effects
+  useEffect(() => {
+    if (currentMode === 'voice') {
+      if (!isListening) {
+        startListening();
+      }
+    } else {
+      if (isListening) {
+        stopListening();
+      }
+    }
+
+    if (currentMode === 'video') {
+      if (!isVideoOn) {
+        startVideo();
+      }
+    } else {
+      if (isVideoOn) {
+        stopVideo();
+      }
+    }
+  }, [currentMode]);
 
   return (
     <div className={`flex h-screen bg-white dark:bg-gray-900 ${
@@ -822,45 +863,16 @@ const MultimodalAI = () => {
             <div className="relative z-50 bg-gray-50 dark:bg-gray-800 h-full flex flex-col">
               {/* Sidebar Header with Profile */}
               <div className="p-3">
-                {user ? (
-                  <div className="flex items-center space-x-3 mb-3 p-2 bg-white dark:bg-gray-700 rounded-xl">
-                    <Avatar className="w-10 h-10">
-                      <AvatarImage src={profile?.avatar_url} />
-                      <AvatarFallback>
-                        {profile?.full_name ? profile.full_name.charAt(0).toUpperCase() : user.email?.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                        {profile?.full_name || user.email}
-                      </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                        {user.email}
-                      </p>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleLogout}
-                      className="h-8 w-8 p-0"
-                    >
-                      <LogOut className="w-4 h-4" />
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="mb-3">
-                    <Button 
-                      onClick={() => navigate('/auth')}
-                      className="w-full bg-blue-500 hover:bg-blue-600 text-white rounded-xl"
-                    >
-                      <User className="w-4 h-4 mr-2" />
-                      Login / Sign Up
-                    </Button>
-                  </div>
-                )}
+                <UserAuthButton
+                  isLoggedIn={!!user}
+                  onLogin={handleLogin}
+                  onSignup={handleSignup}
+                  onLogout={handleLogout}
+                  username={profile?.full_name || user?.email}
+                />
                 
                 <Button 
-                  className="w-full justify-start bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-xl"
+                  className="w-full justify-start bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-xl mt-3"
                   onClick={startNewChat}
                 >
                   <Plus className="w-4 h-4 mr-2" />
@@ -922,17 +934,36 @@ const MultimodalAI = () => {
             </Button>
             <div className="font-semibold text-gray-900 dark:text-white">Nurath.AI</div>
             
-            {/* Mode Selection */}
-            <Select value={currentMode} onValueChange={(value: 'text' | 'voice' | 'video') => setCurrentMode(value)}>
-              <SelectTrigger className="w-32 h-8 text-xs rounded-xl">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="text">💬 Text</SelectItem>
-                <SelectItem value="voice">🎤 Voice</SelectItem>
-                <SelectItem value="video">📹 Video</SelectItem>
-              </SelectContent>
-            </Select>
+            {/* Compact Mode Selection - Icons Only */}
+            <div className="flex items-center bg-white dark:bg-gray-800 rounded-full p-1 border border-gray-200 dark:border-gray-700">
+              <Button
+                variant={currentMode === 'text' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setCurrentMode('text')}
+                className="h-8 w-8 p-0 rounded-full"
+                title="Text Mode"
+              >
+                <MessageCircle className="w-4 h-4" />
+              </Button>
+              <Button
+                variant={currentMode === 'voice' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setCurrentMode('voice')}
+                className="h-8 w-8 p-0 rounded-full"
+                title="Voice Mode"
+              >
+                <Mic className="w-4 h-4" />
+              </Button>
+              <Button
+                variant={currentMode === 'video' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setCurrentMode('video')}
+                className="h-8 w-8 p-0 rounded-full"
+                title="Video Mode"
+              >
+                <Video className="w-4 h-4" />
+              </Button>
+            </div>
             
             {/* Status Badges */}
             {isListening && (
@@ -963,7 +994,7 @@ const MultimodalAI = () => {
             // Welcome State
             <div className="h-full flex flex-col items-center justify-center p-8">
               <div className="text-center max-w-4xl">
-                <h1 className={`font-bold text-gray-900 dark:text-white mb-8 animate-pulse ${
+                <h1 className={`font-bold text-gray-900 dark:text-white mb-8 animate-fade-in ${
                   accessibilitySettings.fontSize === 'large' ? 'text-5xl' : 
                   accessibilitySettings.fontSize === 'extra-large' ? 'text-6xl' : 'text-4xl'
                 }`} style={{ 
@@ -987,7 +1018,7 @@ const MultimodalAI = () => {
                   </Button>
                   <Button
                     onClick={() => {
-                      startVideo();
+                      setCurrentMode('video');
                       setTimeout(() => handleQuickAction('video', "Tell me what you can see around me and describe my environment"), 2000);
                     }}
                     variant="outline"
@@ -1014,7 +1045,7 @@ const MultimodalAI = () => {
                   </Button>
                   <Button
                     onClick={() => {
-                      startVideo();
+                      setCurrentMode('video');
                       setTimeout(() => handleQuickAction('recognize', "Who is around me? Please recognize faces and tell me about people nearby"), 2000);
                     }}
                     variant="outline"
@@ -1032,7 +1063,7 @@ const MultimodalAI = () => {
                     <span className="text-sm">Create Image</span>
                   </Button>
                   <Button
-                    onClick={startVideo}
+                    onClick={() => setCurrentMode('video')}
                     variant="outline"
                     className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl hover:scale-105 transition-transform"
                   >
@@ -1056,7 +1087,7 @@ const MultimodalAI = () => {
           ) : (
             <div className="max-w-3xl mx-auto w-full">
               {/* Video Feed */}
-              {isVideoOn && (
+              {isVideoOn && currentMode === 'video' && (
                 <div className="p-4">
                   <div className="bg-gray-100 dark:bg-gray-800 rounded-2xl overflow-hidden">
                     <video
@@ -1167,7 +1198,7 @@ const MultimodalAI = () => {
                         )}
                       </div>
                       
-                      {/* Hover Actions - positioned below message */}
+                      {/* Hover Actions */}
                       {editingMessageId !== message.id && (
                         <div className="absolute -bottom-8 right-2 opacity-0 group-hover:opacity-100 flex space-x-1 bg-white rounded-xl shadow-lg p-1">
                           <Button
@@ -1206,72 +1237,120 @@ const MultimodalAI = () => {
           )}
         </div>
 
-        {/* Input Area with more space */}
+        {/* Input Area - Dynamic based on mode */}
         <div className="bg-white dark:bg-gray-900 p-6">
           <div className="max-w-3xl mx-auto">
-            <div className="relative bg-gray-50 dark:bg-gray-800 rounded-2xl">
-              <Textarea
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                placeholder={`Message Nurath.AI... (${currentMode} mode)`}
-                className={`resize-none bg-transparent px-6 py-4 pr-20 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-0 rounded-2xl border-0 ${
-                  accessibilitySettings.fontSize === 'large' ? 'text-lg min-h-[100px]' : 
-                  accessibilitySettings.fontSize === 'extra-large' ? 'text-xl min-h-[120px]' : 'text-base min-h-[80px]'
-                }`}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    if (inputText.trim()) {
-                      handleAIInteraction(inputText, currentMode);
-                      setInputText("");
-                    }
-                  }
-                }}
-              />
-              <div className="absolute bottom-4 right-4 flex items-center space-x-2">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 rounded-xl"
-                  title="Attach file"
-                >
-                  <Paperclip className="w-4 h-4" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={isListening ? stopListening : startListening}
-                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 rounded-xl"
-                  title={isListening ? "Stop listening" : "Start voice input"}
-                >
-                  {isListening ? <StopCircle className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={isVideoOn ? stopVideo : startVideo}
-                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 rounded-xl"
-                  title={isVideoOn ? "Stop camera" : "Start camera"}
-                >
-                  {isVideoOn ? <VideoOff className="w-4 h-4" /> : <Video className="w-4 h-4" />}
-                </Button>
-                <Button
-                  onClick={() => {
-                    if (inputText.trim()) {
-                      handleAIInteraction(inputText, currentMode);
-                      setInputText("");
+            {currentMode === 'text' && (
+              <div className="relative bg-gray-50 dark:bg-gray-800 rounded-2xl">
+                <Textarea
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  placeholder="Message Nurath.AI..."
+                  className={`resize-none bg-transparent px-6 py-4 pr-20 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-0 rounded-2xl border-0 ${
+                    accessibilitySettings.fontSize === 'large' ? 'text-lg min-h-[120px]' : 
+                    accessibilitySettings.fontSize === 'extra-large' ? 'text-xl min-h-[140px]' : 'text-base min-h-[100px]'
+                  }`}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      if (inputText.trim()) {
+                        handleAIInteraction(inputText, currentMode);
+                        setInputText("");
+                      }
                     }
                   }}
-                  disabled={!inputText.trim()}
-                  size="sm"
-                  className="bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-xl"
-                  title="Send message"
-                >
-                  <Send className="w-4 h-4" />
-                </Button>
+                />
+                <div className="absolute bottom-4 right-4 flex items-center space-x-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 rounded-xl"
+                    title="Attach file"
+                  >
+                    <Paperclip className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      if (inputText.trim()) {
+                        handleAIInteraction(inputText, currentMode);
+                        setInputText("");
+                      }
+                    }}
+                    disabled={!inputText.trim()}
+                    size="sm"
+                    className="bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-xl"
+                    title="Send message"
+                  >
+                    <Send className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
-            </div>
+            )}
+
+            {currentMode === 'voice' && (
+              <div className="text-center">
+                <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl p-8">
+                  <div className="flex flex-col items-center space-y-4">
+                    <div className={`w-24 h-24 rounded-full flex items-center justify-center ${
+                      isListening ? 'bg-red-500 animate-pulse' : 'bg-blue-500'
+                    }`}>
+                      <Mic className="w-12 h-12 text-white" />
+                    </div>
+                    <p className="text-lg font-medium text-gray-900 dark:text-white">
+                      {isListening ? 'Listening...' : 'Tap to speak'}
+                    </p>
+                    <Button
+                      onClick={isListening ? stopListening : startListening}
+                      size="lg"
+                      className={`rounded-full ${
+                        isListening ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-500 hover:bg-blue-600'
+                      }`}
+                    >
+                      {isListening ? <StopCircle className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {currentMode === 'video' && (
+              <div className="text-center">
+                <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl p-8">
+                  <div className="flex flex-col items-center space-y-4">
+                    <div className={`w-24 h-24 rounded-full flex items-center justify-center ${
+                      isVideoOn ? 'bg-green-500' : 'bg-gray-500'
+                    }`}>
+                      <Video className="w-12 h-12 text-white" />
+                    </div>
+                    <p className="text-lg font-medium text-gray-900 dark:text-white">
+                      {isVideoOn ? 'Video call active' : 'Start video call'}
+                    </p>
+                    <div className="flex space-x-4">
+                      <Button
+                        onClick={isVideoOn ? stopVideo : startVideo}
+                        size="lg"
+                        className={`rounded-full ${
+                          isVideoOn ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'
+                        }`}
+                      >
+                        {isVideoOn ? <VideoOff className="w-6 h-6" /> : <Video className="w-6 h-6" />}
+                      </Button>
+                      {isVideoOn && (
+                        <Button
+                          onClick={takePhoto}
+                          size="lg"
+                          variant="outline"
+                          className="rounded-full"
+                        >
+                          <Camera className="w-6 h-6" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
