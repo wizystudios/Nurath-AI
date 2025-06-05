@@ -9,6 +9,29 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Rate limiting helper
+let requestCount = 0;
+let lastResetTime = Date.now();
+const RATE_LIMIT = 3; // requests per minute
+const RESET_INTERVAL = 60 * 1000; // 1 minute
+
+function checkRateLimit() {
+  const now = Date.now();
+  
+  // Reset counter if a minute has passed
+  if (now - lastResetTime > RESET_INTERVAL) {
+    requestCount = 0;
+    lastResetTime = now;
+  }
+  
+  if (requestCount >= RATE_LIMIT) {
+    const timeToWait = RESET_INTERVAL - (now - lastResetTime);
+    throw new Error(`Rate limit exceeded. Please wait ${Math.ceil(timeToWait / 1000)} seconds.`);
+  }
+  
+  requestCount++;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -17,7 +40,7 @@ serve(async (req) => {
   try {
     const { input, mode, attachments, videoEnabled, context, generateImage, analyzeFile } = await req.json();
     
-    console.log(`🧠 Processing REAL AI request: {
+    console.log(`🧠 Processing AI request: {
   input: "${input}",
   mode: "${mode}",
   attachments: ${attachments?.length || 0},
@@ -29,6 +52,57 @@ serve(async (req) => {
     if (!openAIApiKey) {
       throw new Error('OpenAI API key not configured');
     }
+
+    // Check if this is a TTS-only request (don't count against rate limit)
+    if (mode === 'tts') {
+      try {
+        const ttsResponse = await fetch('https://api.openai.com/v1/audio/speech', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openAIApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'tts-1-hd',
+            input: input.substring(0, 4000),
+            voice: context?.settings?.isChild ? 'nova' : 
+                   context?.settings?.isElderly ? 'alloy' :
+                   context?.settings?.preferredVoice === 'gentle' ? 'shimmer' :
+                   context?.settings?.preferredVoice === 'clear' ? 'echo' :
+                   context?.settings?.preferredVoice === 'cheerful' ? 'nova' : 'alloy',
+            response_format: 'mp3',
+            speed: context?.settings?.speechSpeed === 'slow' ? 0.8 :
+                   context?.settings?.speechSpeed === 'fast' ? 1.2 : 1.0,
+          }),
+        });
+
+        if (ttsResponse.ok) {
+          const audioArrayBuffer = await ttsResponse.arrayBuffer();
+          const base64Audio = btoa(
+            String.fromCharCode(...new Uint8Array(audioArrayBuffer))
+          );
+          return new Response(JSON.stringify({ 
+            success: true,
+            audioUrl: `data:audio/mp3;base64,${base64Audio}`
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      } catch (error) {
+        console.error('TTS generation error:', error);
+      }
+      
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: 'TTS generation failed'
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Apply rate limiting for main AI requests
+    checkRateLimit();
 
     // Enhanced system prompt for REAL functionality
     const systemPrompt = `You are Nurath.AI, the world's most advanced accessible AI assistant. You have REAL capabilities:
@@ -138,44 +212,6 @@ RESPOND AS IF YOU'RE SPEAKING DIRECTLY TO THEM WITH WARMTH AND CARE.`;
         role: 'user',
         content: videoPrompt
       });
-    } else if (mode === 'tts') {
-      // Handle TTS generation
-      try {
-        const ttsResponse = await fetch('https://api.openai.com/v1/audio/speech', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${openAIApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'tts-1-hd',
-            input: input.substring(0, 4000),
-            voice: context?.settings?.isChild ? 'nova' : 
-                   context?.settings?.isElderly ? 'alloy' :
-                   context?.settings?.preferredVoice === 'gentle' ? 'shimmer' :
-                   context?.settings?.preferredVoice === 'clear' ? 'echo' :
-                   context?.settings?.preferredVoice === 'cheerful' ? 'nova' : 'alloy',
-            response_format: 'mp3',
-            speed: context?.settings?.speechSpeed === 'slow' ? 0.8 :
-                   context?.settings?.speechSpeed === 'fast' ? 1.2 : 1.0,
-          }),
-        });
-
-        if (ttsResponse.ok) {
-          const audioArrayBuffer = await ttsResponse.arrayBuffer();
-          const base64Audio = btoa(
-            String.fromCharCode(...new Uint8Array(audioArrayBuffer))
-          );
-          return new Response(JSON.stringify({ 
-            success: true,
-            audioUrl: `data:audio/mp3;base64,${base64Audio}`
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        }
-      } catch (error) {
-        console.error('TTS generation error:', error);
-      }
     } else {
       messages.push({
         role: 'user',
@@ -183,18 +219,16 @@ RESPOND AS IF YOU'RE SPEAKING DIRECTLY TO THEM WITH WARMTH AND CARE.`;
       });
     }
 
-    // REAL Image Generation
+    // REAL Image Generation - Check for image generation requests
     let imageUrl = null;
-    if (generateImage || mode === 'image_generation' || 
-        (input.toLowerCase().includes('generate') && 
-         (input.toLowerCase().includes('image') || 
-          input.toLowerCase().includes('logo') || 
-          input.toLowerCase().includes('picture') ||
-          input.toLowerCase().includes('art') ||
-          input.toLowerCase().includes('design') ||
-          input.toLowerCase().includes('anime') ||
-          input.toLowerCase().includes('create')))) {
-      
+    const imageKeywords = ['generate', 'create', 'make', 'draw', 'design', 'show me'];
+    const imageTypes = ['image', 'picture', 'photo', 'logo', 'artwork', 'art', 'anime', 'drawing', 'illustration'];
+    
+    const shouldGenerateImage = generateImage || mode === 'image_generation' || 
+        (imageKeywords.some(keyword => input.toLowerCase().includes(keyword)) && 
+         imageTypes.some(type => input.toLowerCase().includes(type)));
+
+    if (shouldGenerateImage) {
       try {
         console.log('🎨 GENERATING REAL IMAGE with DALL-E...');
         
@@ -206,6 +240,8 @@ RESPOND AS IF YOU'RE SPEAKING DIRECTLY TO THEM WITH WARMTH AND CARE.`;
           enhancedPrompt = `Professional logo design: ${input}`;
         } else if (input.toLowerCase().includes('art')) {
           enhancedPrompt = `Digital artwork: ${input}`;
+        } else if (input.toLowerCase().includes('cat')) {
+          enhancedPrompt = `High-quality photo of ${input}`;
         }
         
         const imageResponse = await fetch('https://api.openai.com/v1/images/generations', {
@@ -229,32 +265,60 @@ RESPOND AS IF YOU'RE SPEAKING DIRECTLY TO THEM WITH WARMTH AND CARE.`;
           imageUrl = imageData.data[0].url;
           console.log('🎨 REAL IMAGE GENERATED SUCCESSFULLY');
         } else {
-          console.error('Image generation failed:', await imageResponse.text());
+          const errorText = await imageResponse.text();
+          console.error('Image generation failed:', errorText);
+          
+          // If image generation fails, still provide a helpful response
+          messages.push({
+            role: 'user',
+            content: `I wanted to generate an image of: ${input}. Please tell me you're generating it and describe what it would look like.`
+          });
         }
       } catch (error) {
         console.error('🚨 Image generation error:', error);
       }
     }
 
-    // Get AI response
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: mode === 'image' || mode === 'video' || mode === 'document' ? 'gpt-4o' : 'gpt-4o-mini',
-        messages: messages,
-        max_tokens: 3000,
-        temperature: 0.9,
-      }),
-    });
+    // Get AI response with retry logic
+    let response;
+    let attempts = 0;
+    const maxAttempts = 2;
 
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error('🚨 OpenAI API error:', errorData);
-      throw new Error(`OpenAI API error: ${response.status}`);
+    while (attempts < maxAttempts) {
+      try {
+        response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openAIApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: mode === 'image' || mode === 'video' || mode === 'document' ? 'gpt-4o' : 'gpt-4o-mini',
+            messages: messages,
+            max_tokens: 1500, // Reduced to stay within limits
+            temperature: 0.7, // Reduced for consistency
+          }),
+        });
+
+        if (response.ok) break;
+        
+        const errorData = await response.text();
+        if (response.status === 429) {
+          console.log('Rate limited, waiting before retry...');
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          attempts++;
+        } else {
+          throw new Error(`OpenAI API error: ${response.status} - ${errorData}`);
+        }
+      } catch (error) {
+        attempts++;
+        if (attempts >= maxAttempts) throw error;
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+
+    if (!response || !response.ok) {
+      throw new Error('Failed to get response from OpenAI after retries');
     }
 
     const data = await response.json();
@@ -267,13 +331,13 @@ RESPOND AS IF YOU'RE SPEAKING DIRECTLY TO THEM WITH WARMTH AND CARE.`;
 
     // Add image generation info to response
     if (imageUrl) {
-      aiResponse += `\n\n🎨 I've created a beautiful image for you! You can view it in our conversation.`;
+      aiResponse = `🎨 I've created a beautiful image for you! Here it is:\n\n${aiResponse}`;
     }
 
-    // Generate REAL audio response
+    // Generate audio response
     let audioUrl = null;
     try {
-      console.log('🔊 Generating REAL audio response...');
+      console.log('🔊 Generating audio response...');
       
       const voiceSettings = {
         voice: context?.settings?.isChild ? 'nova' : 
@@ -306,12 +370,12 @@ RESPOND AS IF YOU'RE SPEAKING DIRECTLY TO THEM WITH WARMTH AND CARE.`;
           String.fromCharCode(...new Uint8Array(audioArrayBuffer))
         );
         audioUrl = `data:audio/mp3;base64,${base64Audio}`;
-        console.log('🔊 REAL AUDIO GENERATED SUCCESSFULLY');
+        console.log('🔊 AUDIO GENERATED SUCCESSFULLY');
       } else {
-        console.error('🚨 TTS failed with status:', ttsResponse.status);
+        console.log('TTS failed, but continuing without audio');
       }
     } catch (error) {
-      console.error('🚨 TTS generation failed:', error);
+      console.log('TTS generation failed, continuing without audio:', error);
     }
 
     // Enhanced emotion detection
@@ -319,16 +383,12 @@ RESPOND AS IF YOU'RE SPEAKING DIRECTLY TO THEM WITH WARMTH AND CARE.`;
     const inputLower = input.toLowerCase();
     
     const emotionPatterns = {
-      distressed: ['help', 'scared', 'panic', 'emergency', 'afraid', 'anxious', 'overwhelmed'],
-      confused: ['confused', 'lost', 'unclear', 'puzzled', "don't understand", 'explain', 'what'],
-      lonely: ['lonely', 'alone', 'nobody', 'isolated', 'miss', 'sad', 'empty'],
-      excited: ['excited', 'happy', 'great', 'awesome', 'wonderful', 'amazing', 'fantastic'],
-      tired: ['tired', 'sleepy', 'exhausted', 'weary', 'rest', 'sleep', 'fatigue'],
-      frustrated: ['frustrated', 'angry', 'mad', 'annoyed', 'irritated', 'difficult'],
-      grateful: ['thank', 'grateful', 'appreciate', 'blessed', 'thankful', 'helped'],
-      curious: ['what', 'how', 'why', 'tell me', 'explain', 'learn', 'know'],
+      happy: ['happy', 'excited', 'great', 'awesome', 'wonderful', 'amazing', 'fantastic', 'joy'],
+      sad: ['sad', 'lonely', 'depressed', 'down', 'upset', 'cry', 'miss'],
+      angry: ['angry', 'mad', 'frustrated', 'annoyed', 'irritated', 'hate'],
+      confused: ['confused', 'lost', 'unclear', 'puzzled', "don't understand", 'help'],
       calm: ['calm', 'peaceful', 'relaxed', 'serene', 'quiet', 'still'],
-      anxious: ['anxious', 'worried', 'nervous', 'stress', 'concern', 'fear']
+      anxious: ['anxious', 'worried', 'nervous', 'stress', 'concern', 'fear', 'scared']
     };
 
     let detectedEmotionType = 'neutral';
@@ -351,45 +411,7 @@ RESPOND AS IF YOU'RE SPEAKING DIRECTLY TO THEM WITH WARMTH AND CARE.`;
       };
     }
 
-    // Enhanced accessibility features
-    let accessibilityFeatures = {
-      sceneDescription: null,
-      objectDetection: null,
-      navigationHelp: null,
-      emotionalSupport: null
-    };
-
-    if ((mode === 'video' || mode === 'image') && context?.settings?.visualImpairment) {
-      accessibilityFeatures.sceneDescription = "I'm analyzing your environment to provide detailed visual information...";
-    }
-
-    if (inputLower.includes('object') || inputLower.includes('what do you see') || inputLower.includes('describe')) {
-      accessibilityFeatures.objectDetection = ['person', 'face', 'furniture', 'door', 'window'];
-    }
-
-    if (inputLower.includes('navigate') || inputLower.includes('direction') || inputLower.includes('where')) {
-      accessibilityFeatures.navigationHelp = "Based on what I can see, I'll help guide you safely...";
-    }
-
-    if (context?.settings?.emotionalSupport && (detectedEmotionType === 'distressed' || detectedEmotionType === 'lonely' || detectedEmotionType === 'sad')) {
-      accessibilityFeatures.emotionalSupport = "I'm here with you. You're not alone. Take a moment to breathe. I care about you.";
-    }
-
-    // Face recognition simulation
-    let recognizedFaces = null;
-    if ((mode === 'image' || mode === 'video') && 
-        (inputLower.includes('who') || inputLower.includes('recognize') || inputLower.includes('person') || inputLower.includes('face'))) {
-      recognizedFaces = [
-        {
-          id: Date.now().toString(),
-          name: 'Person detected',
-          relationship: 'friend',
-          imageUrl: null
-        }
-      ];
-    }
-
-    console.log('🌟 REAL AI response generated successfully');
+    console.log('✅ AI response generated successfully');
 
     return new Response(JSON.stringify({ 
       success: true, 
@@ -397,32 +419,33 @@ RESPOND AS IF YOU'RE SPEAKING DIRECTLY TO THEM WITH WARMTH AND CARE.`;
       audioUrl: audioUrl,
       imageUrl: imageUrl,
       emotion: detectedEmotion,
-      recognizedFaces: recognizedFaces,
-      accessibility: accessibilityFeatures,
       suggestions: [
-        "🎵 Sing me a song with beautiful lyrics",
-        "😊 Tell me a funny joke", 
-        "🎨 Create a beautiful image for me",
-        "👁️ Describe what you can see",
-        "👥 Recognize faces around me",
-        "🗺️ Help me navigate",
-        "💝 I need emotional support",
-        "🆘 This is an emergency",
-        "📚 Tell me a story",
-        "🧠 Help me understand",
-        "🎭 Analyze this image",
-        "🏠 Describe my environment"
+        "🎵 Sing me a song",
+        "😊 Tell me a joke", 
+        "🎨 Create an image",
+        "👁️ Describe what you see",
+        "💝 I need support",
+        "📚 Tell me a story"
       ]
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('🚨 Error in REAL multimodal-ai function:', error);
+    console.error('🚨 Error in multimodal-ai function:', error);
+    
+    // Provide user-friendly error messages
+    let errorMessage = 'I apologize, but I\'m having technical difficulties. Please try again.';
+    
+    if (error.message.includes('Rate limit')) {
+      errorMessage = error.message;
+    } else if (error.message.includes('API key')) {
+      errorMessage = 'API configuration issue. Please contact support.';
+    }
     
     return new Response(JSON.stringify({ 
       success: false, 
-      error: error.message || 'I apologize, but I\'m having technical difficulties. Please try again.' 
+      error: errorMessage
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

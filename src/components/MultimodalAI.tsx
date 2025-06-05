@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -190,6 +189,8 @@ const MultimodalAI = () => {
         speechSynthesis.cancel();
       }
 
+      setIsSpeaking(true);
+
       // Use browser TTS first for immediate response
       if ('speechSynthesis' in window) {
         const utterance = new SpeechSynthesisUtterance(text);
@@ -221,7 +222,7 @@ const MultimodalAI = () => {
         body: {
           input: text,
           mode: 'tts',
-          settings: accessibilitySettings
+          context: { settings: accessibilitySettings }
         }
       });
 
@@ -234,6 +235,7 @@ const MultimodalAI = () => {
       }
     } catch (error) {
       console.error('TTS Error:', error);
+      setIsSpeaking(false);
     }
   }, [accessibilitySettings]);
 
@@ -319,14 +321,9 @@ const MultimodalAI = () => {
     attachments?: any[]
   ) => {
     try {
-      console.log("🧠 Starting REAL AI interaction:", { input, mode, accessibility: accessibilitySettings });
+      console.log("🧠 Starting AI interaction:", { input, mode, accessibility: accessibilitySettings });
       
       setIsProcessing(true);
-
-      // REAL voice input - announce what user said
-      if (mode === 'voice') {
-        await speakText(`You said: ${input}. Let me help you with that.`, 'normal');
-      }
 
       const newMessage: ConversationMessage = {
         type: 'user',
@@ -341,24 +338,21 @@ const MultimodalAI = () => {
 
       setConversation(prev => [...prev, newMessage]);
 
-      // Show processing with voice feedback
-      await speakText("Processing your request, please wait.", 'normal');
-      toast.loading("🧠 AI is thinking and preparing response...");
-
-      // For image generation requests
-      if (input.toLowerCase().includes('generate') || input.toLowerCase().includes('create') || 
-          (input.toLowerCase().includes('image') || input.toLowerCase().includes('logo') || 
-           input.toLowerCase().includes('anime') || input.toLowerCase().includes('art'))) {
-        mode = 'image_generation';
-      }
+      // Determine if this should generate an image
+      const imageKeywords = ['generate', 'create', 'make', 'draw', 'design', 'show me'];
+      const imageTypes = ['image', 'picture', 'photo', 'logo', 'artwork', 'art', 'anime', 'drawing', 'illustration'];
+      
+      const shouldGenerateImage = mode === 'image_generation' || 
+          (imageKeywords.some(keyword => input.toLowerCase().includes(keyword)) && 
+           imageTypes.some(type => input.toLowerCase().includes(type)));
 
       const { data, error } = await supabase.functions.invoke('multimodal-ai', {
         body: {
           input,
-          mode,
+          mode: shouldGenerateImage ? 'image_generation' : mode,
           attachments,
           videoEnabled: isVideoOn,
-          generateImage: mode === 'image_generation',
+          generateImage: shouldGenerateImage,
           analyzeFile: attachments && attachments.length > 0,
           context: {
             settings: accessibilitySettings,
@@ -373,43 +367,28 @@ const MultimodalAI = () => {
         }
       });
 
-      toast.dismiss();
       setIsProcessing(false);
 
       if (error) {
         console.error('🚨 AI Error:', error);
-        const errorText = "I'm sorry, I'm having trouble right now. Please try again.";
-        await speakText(errorText, 'high');
-        throw error;
+        const errorText = data?.error || "I'm sorry, I'm having trouble right now. Please try again.";
+        
+        const errorMessage: ConversationMessage = {
+          type: 'ai',
+          content: errorText,
+          timestamp: new Date(),
+          hasAudio: false,
+          id: Date.now().toString()
+        };
+        setConversation(prev => [...prev, errorMessage]);
+        
+        // Don't speak error messages automatically to avoid spam
+        return;
       }
 
-      const aiResponse: AIResponse = data;
+      const aiResponse = data;
 
       // Update states based on response
-      if (aiResponse.accessibility) {
-        if (aiResponse.accessibility.sceneDescription) {
-          setCurrentScene(aiResponse.accessibility.sceneDescription);
-          if (accessibilitySettings.visualImpairment) {
-            await speakText(`Scene update: ${aiResponse.accessibility.sceneDescription}`, 'normal');
-          }
-        }
-        
-        if (aiResponse.accessibility.objectDetection) {
-          setDetectedObjects(aiResponse.accessibility.objectDetection);
-          if (accessibilitySettings.visualImpairment) {
-            await speakText(`Objects detected: ${aiResponse.accessibility.objectDetection.join(', ')}`, 'normal');
-          }
-        }
-      }
-
-      if (aiResponse.recognizedFaces) {
-        setRecognizedPeople(aiResponse.recognizedFaces);
-        if (accessibilitySettings.visualImpairment) {
-          const peopleNames = aiResponse.recognizedFaces.map(p => p.name).join(', ');
-          await speakText(`I can see: ${peopleNames}`, 'normal');
-        }
-      }
-
       if (aiResponse.emotion) {
         setCurrentEmotion(aiResponse.emotion);
       }
@@ -428,12 +407,14 @@ const MultimodalAI = () => {
 
       setConversation(prev => [...prev, aiMessage]);
 
-      // ALWAYS speak the response for accessibility
-      await speakText(aiResponse.text, 'normal');
+      // Speak the response (this is what makes it REAL voice AI)
+      if (aiResponse.text) {
+        await speakText(aiResponse.text, 'normal');
+      }
 
       // Handle generated images
       if (aiResponse.imageUrl) {
-        await speakText("I've created an image for you. You can view it in our conversation.", 'normal');
+        toast.success("🎨 Image generated successfully!");
       }
 
       // Handle audio responses
@@ -449,8 +430,6 @@ const MultimodalAI = () => {
     } catch (error) {
       console.error('🚨 AI interaction error:', error);
       const errorText = "I'm sorry, I'm having technical difficulties. Please try speaking to me again.";
-      await speakText(errorText, 'high');
-      toast.error("Technical issue - please try again");
       
       const errorMessage: ConversationMessage = {
         type: 'ai',
@@ -460,6 +439,8 @@ const MultimodalAI = () => {
         id: Date.now().toString()
       };
       setConversation(prev => [...prev, errorMessage]);
+      
+      toast.error("Technical issue - please try again");
     } finally {
       setIsProcessing(false);
     }
@@ -486,7 +467,6 @@ const MultimodalAI = () => {
       
       recognition.onstart = () => {
         setIsListening(true);
-        speakText("I'm listening", 'normal');
         toast.success("🎤 Listening...");
       };
 
@@ -494,15 +474,17 @@ const MultimodalAI = () => {
         const transcript = event.results[event.results.length - 1][0].transcript;
         console.log("🎤 Voice input:", transcript);
         
-        setInputText(transcript);
-        handleAIInteraction(transcript, 'voice');
-        setIsListening(false);
+        if (event.results[event.results.length - 1].isFinal) {
+          setInputText(transcript);
+          handleAIInteraction(transcript, 'voice');
+          setIsListening(false);
+        }
       };
 
       recognition.onerror = (error) => {
         console.error("🚨 Speech recognition error:", error);
-        speakText("Voice recognition error. Please try again.", 'high');
         setIsListening(false);
+        toast.error("Voice recognition error. Please try again.");
       };
 
       recognition.onend = () => {
@@ -512,9 +494,9 @@ const MultimodalAI = () => {
       recognition.start();
     } catch (error) {
       console.error("🚨 Voice recognition start error:", error);
-      speakText("Could not start voice recognition. Please try typing instead.", 'high');
+      toast.error("Could not start voice recognition. Please try typing instead.");
     }
-  }, [handleAIInteraction, speakText, setupVoiceRecognition]);
+  }, [handleAIInteraction, setupVoiceRecognition]);
 
   const stopListening = useCallback(() => {
     if (recognitionRef.current) {
@@ -669,6 +651,15 @@ const MultimodalAI = () => {
     toast.success("Message updated and resent");
   }, [editingMessageId, editingText, conversation, handleAIInteraction]);
 
+  // Auto-speak quick action responses
+  const handleQuickAction = useCallback(async (actionType: string, prompt: string) => {
+    // Immediately speak what the user clicked
+    await speakText(`Starting ${actionType}`, 'high');
+    
+    // Then process the AI interaction
+    await handleAIInteraction(prompt, actionType === 'video' ? 'video' : actionType === 'voice' ? 'voice' : 'text');
+  }, [handleAIInteraction, speakText]);
+
   // New Chat
   const startNewChat = useCallback(() => {
     const newConversationId = Date.now().toString();
@@ -732,8 +723,23 @@ const MultimodalAI = () => {
               <div className="p-3">
                 <div className="flex items-center justify-between mb-3">
                   <Button 
-                    className="flex-1 justify-start bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-xl"
-                    onClick={startNewChat}
+                    className="flex-1 justify-start bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-xl border-0"
+                    onClick={() => {
+                      const newConversationId = Date.now().toString();
+                      const newConversation = {
+                        id: newConversationId,
+                        title: 'New Chat',
+                        date: 'Today',
+                        messages: []
+                      };
+                      
+                      setConversationHistory(prev => [newConversation, ...prev]);
+                      setCurrentConversationId(newConversationId);
+                      setConversation([]);
+                      setInputText("");
+                      speakText("Started new conversation", 'normal');
+                      toast.success("Started new conversation");
+                    }}
                   >
                     <Plus className="w-4 h-4 mr-2" />
                     New chat
@@ -756,8 +762,13 @@ const MultimodalAI = () => {
                   {conversationHistory.map((conv) => (
                     <div key={conv.id} className="group relative">
                       <button
-                        onClick={() => loadConversation(conv.id)}
-                        className={`w-full text-left p-2 text-sm rounded-xl truncate transition-colors ${
+                        onClick={() => {
+                          setCurrentConversationId(conv.id);
+                          setConversation(conv.messages);
+                          setIsSidebarOpen(false);
+                          speakText(`Loaded conversation: ${conv.title}`, 'normal');
+                        }}
+                        className={`w-full text-left p-2 text-sm rounded-xl truncate transition-colors border-0 ${
                           currentConversationId === conv.id 
                             ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white' 
                             : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
@@ -769,11 +780,12 @@ const MultimodalAI = () => {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-6 w-6 p-0 rounded-lg"
+                          className="h-6 w-6 p-0 rounded-lg border-0"
                           onClick={(e) => {
                             e.stopPropagation();
                             setConversationHistory(prev => prev.filter(c => c.id !== conv.id));
                             speakText("Conversation deleted", 'normal');
+                            toast.success("Conversation deleted");
                           }}
                         >
                           <Trash2 className="w-3 h-3" />
@@ -788,7 +800,7 @@ const MultimodalAI = () => {
               <div className="p-2 space-y-1">
                 <Button 
                   variant="ghost" 
-                  className="w-full justify-start text-gray-700 dark:text-gray-300 rounded-xl"
+                  className="w-full justify-start text-gray-700 dark:text-gray-300 rounded-xl border-0"
                   onClick={() => speakText("Settings available. You can adjust voice, accessibility, and preferences.", 'normal')}
                 >
                   <Settings className="w-4 h-4 mr-2" />
@@ -803,13 +815,13 @@ const MultimodalAI = () => {
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <header className="flex items-center justify-between p-4 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+        <header className="flex items-center justify-between p-4 bg-white dark:bg-gray-900">
           <div className="flex items-center space-x-4">
             <Button 
               variant="ghost" 
               size="sm"
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="text-gray-600 dark:text-gray-400 rounded-xl"
+              className="text-gray-600 dark:text-gray-400 rounded-xl border-0"
             >
               <Menu className="w-5 h-5" />
             </Button>
@@ -854,7 +866,7 @@ const MultimodalAI = () => {
                 {/* Quick Actions */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                   <Button
-                    onClick={() => handleAIInteraction("Please sing me a beautiful song with your voice and sing the actual lyrics", 'voice')}
+                    onClick={() => handleQuickAction('voice', "Please sing me a beautiful song with your voice and sing the actual lyrics")}
                     variant="outline"
                     className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl border-gray-200"
                   >
@@ -864,7 +876,7 @@ const MultimodalAI = () => {
                   <Button
                     onClick={() => {
                       startVideo();
-                      setTimeout(() => handleAIInteraction("Tell me what you can see around me and describe my environment", 'video'), 2000);
+                      setTimeout(() => handleQuickAction('video', "Tell me what you can see around me and describe my environment"), 2000);
                     }}
                     variant="outline"
                     className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl border-gray-200"
@@ -873,7 +885,7 @@ const MultimodalAI = () => {
                     <span className="text-sm">Describe Scene</span>
                   </Button>
                   <Button
-                    onClick={() => handleAIInteraction("I need emotional support and comfort right now", 'voice')}
+                    onClick={() => handleQuickAction('voice', "I need emotional support and comfort right now")}
                     variant="outline"
                     className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl border-gray-200"
                   >
@@ -881,7 +893,7 @@ const MultimodalAI = () => {
                     <span className="text-sm">Emotional Support</span>
                   </Button>
                   <Button
-                    onClick={() => handleAIInteraction("Help me with my daily routine and remind me of important things", 'voice')}
+                    onClick={() => handleQuickAction('voice', "Help me with my daily routine and remind me of important things")}
                     variant="outline"
                     className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl border-gray-200"
                   >
@@ -891,7 +903,7 @@ const MultimodalAI = () => {
                   <Button
                     onClick={() => {
                       startVideo();
-                      setTimeout(() => handleAIInteraction("Who is around me? Please recognize faces and tell me about people nearby", 'video'), 2000);
+                      setTimeout(() => handleQuickAction('video', "Who is around me? Please recognize faces and tell me about people nearby"), 2000);
                     }}
                     variant="outline"
                     className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl border-gray-200"
@@ -900,7 +912,7 @@ const MultimodalAI = () => {
                     <span className="text-sm">Recognize People</span>
                   </Button>
                   <Button
-                    onClick={() => handleAIInteraction("Generate a beautiful creative image or anime artwork for me", 'image_generation')}
+                    onClick={() => handleQuickAction('image_generation', "Generate a beautiful creative image or anime artwork for me")}
                     variant="outline"
                     className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl border-gray-200"
                   >
@@ -918,7 +930,7 @@ const MultimodalAI = () => {
                   <Button
                     onClick={() => {
                       setIsEmergency(true);
-                      handleAIInteraction("This is an emergency situation. I need help.", 'voice');
+                      handleQuickAction('voice', "This is an emergency situation. I need help.");
                     }}
                     variant="outline"
                     className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl border-red-200 text-red-600"
@@ -942,7 +954,7 @@ const MultimodalAI = () => {
                       className="w-full h-64 object-cover"
                     />
                     <div className="p-4 flex flex-wrap gap-2">
-                      <Button onClick={takePhoto} size="sm" variant="outline" className="rounded-xl">
+                      <Button onClick={takePhoto} size="sm" variant="outline" className="rounded-xl border-0">
                         <Camera className="w-4 h-4 mr-2" />
                         Take Photo
                       </Button>
@@ -950,12 +962,12 @@ const MultimodalAI = () => {
                         onClick={() => handleAIInteraction("Describe my surroundings and tell me where I am in detail", 'video')}
                         size="sm" 
                         variant="outline"
-                        className="rounded-xl"
+                        className="rounded-xl border-0"
                       >
                         <MapPin className="w-4 h-4 mr-2" />
                         Describe Location
                       </Button>
-                      <Button onClick={stopVideo} size="sm" variant="destructive" className="rounded-xl">
+                      <Button onClick={stopVideo} size="sm" variant="destructive" className="rounded-xl border-0">
                         <VideoOff className="w-4 h-4" />
                         Stop Camera
                       </Button>
@@ -980,10 +992,10 @@ const MultimodalAI = () => {
                             <Textarea
                               value={editingText}
                               onChange={(e) => setEditingText(e.target.value)}
-                              className="min-h-[60px] text-sm rounded-xl"
+                              className="min-h-[60px] text-sm rounded-xl border-0"
                             />
                             <div className="flex space-x-2">
-                              <Button size="sm" onClick={saveEdit} className="rounded-xl">
+                              <Button size="sm" onClick={saveEdit} className="rounded-xl border-0">
                                 Save
                               </Button>
                               <Button 
@@ -993,7 +1005,7 @@ const MultimodalAI = () => {
                                   setEditingMessageId(null);
                                   setEditingText("");
                                 }}
-                                className="rounded-xl"
+                                className="rounded-xl border-0"
                               >
                                 Cancel
                               </Button>
@@ -1043,13 +1055,13 @@ const MultimodalAI = () => {
                         )}
                       </div>
                       
-                      {/* Hover Actions */}
+                      {/* Hover Actions - positioned below message */}
                       {editingMessageId !== message.id && (
-                        <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 flex space-x-1 bg-white rounded-xl shadow-lg p-1">
+                        <div className="absolute -bottom-8 right-2 opacity-0 group-hover:opacity-100 flex space-x-1 bg-white rounded-xl shadow-lg p-1">
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-6 w-6 p-0"
+                            className="h-6 w-6 p-0 border-0"
                             onClick={() => copyMessage(message.content)}
                           >
                             <Copy className="w-3 h-3" />
@@ -1058,7 +1070,7 @@ const MultimodalAI = () => {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-6 w-6 p-0"
+                              className="h-6 w-6 p-0 border-0"
                               onClick={() => editMessage(message.id, message.content)}
                             >
                               <Edit className="w-3 h-3" />
@@ -1067,7 +1079,7 @@ const MultimodalAI = () => {
                           <Button
                             variant="ghost"
                             size="sm" 
-                            className="h-6 w-6 p-0"
+                            className="h-6 w-6 p-0 border-0"
                             onClick={() => deleteMessage(message.id)}
                           >
                             <Trash2 className="w-3 h-3" />
@@ -1085,12 +1097,12 @@ const MultimodalAI = () => {
         {/* Input Area */}
         <div className="bg-white dark:bg-gray-900 p-4">
           <div className="max-w-3xl mx-auto">
-            <div className="relative bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700">
+            <div className="relative bg-gray-50 dark:bg-gray-800 rounded-2xl">
               <Textarea
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 placeholder="Message Nurath.AI..."
-                className={`resize-none bg-transparent border-none px-4 py-3 pr-16 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-0 rounded-2xl ${
+                className={`resize-none bg-transparent border-0 px-4 py-3 pr-16 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-0 rounded-2xl ${
                   accessibilitySettings.fontSize === 'large' ? 'text-lg min-h-[80px]' : 
                   accessibilitySettings.fontSize === 'extra-large' ? 'text-xl min-h-[100px]' : 'text-base min-h-[60px]'
                 }`}
@@ -1109,7 +1121,7 @@ const MultimodalAI = () => {
                   size="sm"
                   variant="ghost"
                   onClick={() => fileInputRef.current?.click()}
-                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 rounded-xl"
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 rounded-xl border-0"
                 >
                   <Paperclip className="w-4 h-4" />
                 </Button>
@@ -1117,7 +1129,7 @@ const MultimodalAI = () => {
                   size="sm"
                   variant="ghost"
                   onClick={isListening ? stopListening : startListening}
-                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 rounded-xl"
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 rounded-xl border-0"
                 >
                   {isListening ? <StopCircle className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                 </Button>
@@ -1125,7 +1137,7 @@ const MultimodalAI = () => {
                   size="sm"
                   variant="ghost"
                   onClick={isVideoOn ? stopVideo : startVideo}
-                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 rounded-xl"
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 rounded-xl border-0"
                 >
                   {isVideoOn ? <VideoOff className="w-4 h-4" /> : <Video className="w-4 h-4" />}
                 </Button>
@@ -1138,7 +1150,7 @@ const MultimodalAI = () => {
                   }}
                   disabled={!inputText.trim()}
                   size="sm"
-                  className="bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-xl"
+                  className="bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-xl border-0"
                 >
                   <Send className="w-4 h-4" />
                 </Button>
