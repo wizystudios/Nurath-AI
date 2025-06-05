@@ -759,6 +759,55 @@ const MultimodalAI = () => {
     setTimeout(() => speakText(welcomeMessage, 'normal'), 1000);
   }, [accessibilitySettings, speakText]);
 
+  // Start a new chat
+  const startNewChat = useCallback(() => {
+    const newConversationId = Date.now().toString();
+    setCurrentConversationId(newConversationId);
+    setConversation([]);
+    
+    const newConversation = {
+      id: newConversationId,
+      title: 'New Chat',
+      date: 'Today',
+      messages: []
+    };
+    
+    setConversationHistory(prev => [newConversation, ...prev]);
+    toast.success("New chat started");
+  }, []);
+
+  // Load a conversation
+  const loadConversation = useCallback(async (conversationId: string) => {
+    setCurrentConversationId(conversationId);
+    
+    if (user) {
+      try {
+        const { data: messages, error } = await supabase
+          .from('chat_messages')
+          .select('*')
+          .eq('conversation_id', conversationId)
+          .order('created_at', { ascending: true });
+
+        if (!error && messages) {
+          const formattedMessages: ConversationMessage[] = messages.map(msg => ({
+            type: msg.role as 'user' | 'ai',
+            content: msg.content,
+            timestamp: new Date(msg.created_at),
+            id: msg.id,
+            hasAudio: false
+          }));
+          setConversation(formattedMessages);
+        }
+      } catch (error) {
+        console.error('Error loading conversation:', error);
+        toast.error("Failed to load conversation");
+      }
+    } else {
+      // For non-logged in users, just clear conversation
+      setConversation([]);
+    }
+  }, [user]);
+
   return (
     <div className={`flex h-screen bg-white dark:bg-gray-900 ${
       accessibilitySettings.fontSize === 'large' ? 'text-lg' : 
