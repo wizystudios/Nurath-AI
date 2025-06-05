@@ -9,36 +9,13 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Rate limiting helper
-let requestCount = 0;
-let lastResetTime = Date.now();
-const RATE_LIMIT = 3; // requests per minute
-const RESET_INTERVAL = 60 * 1000; // 1 minute
-
-function checkRateLimit() {
-  const now = Date.now();
-  
-  // Reset counter if a minute has passed
-  if (now - lastResetTime > RESET_INTERVAL) {
-    requestCount = 0;
-    lastResetTime = now;
-  }
-  
-  if (requestCount >= RATE_LIMIT) {
-    const timeToWait = RESET_INTERVAL - (now - lastResetTime);
-    throw new Error(`Rate limit exceeded. Please wait ${Math.ceil(timeToWait / 1000)} seconds.`);
-  }
-  
-  requestCount++;
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { input, mode, attachments, videoEnabled, context, generateImage, analyzeFile } = await req.json();
+    const { input, mode, attachments, videoEnabled, context, generateImage, analyzeFile, shouldSpeak } = await req.json();
     
     console.log(`🧠 Processing AI request: {
   input: "${input}",
@@ -46,14 +23,15 @@ serve(async (req) => {
   attachments: ${attachments?.length || 0},
   videoEnabled: ${videoEnabled},
   generateImage: ${generateImage},
-  analyzeFile: ${analyzeFile}
+  analyzeFile: ${analyzeFile},
+  shouldSpeak: ${shouldSpeak}
 }`);
 
     if (!openAIApiKey) {
       throw new Error('OpenAI API key not configured');
     }
 
-    // Check if this is a TTS-only request (don't count against rate limit)
+    // Check if this is a TTS-only request
     if (mode === 'tts') {
       try {
         const ttsResponse = await fetch('https://api.openai.com/v1/audio/speech', {
@@ -101,16 +79,12 @@ serve(async (req) => {
       });
     }
 
-    // Apply rate limiting for main AI requests
-    checkRateLimit();
-
     // Enhanced system prompt for REAL functionality
     const systemPrompt = `You are Nurath.AI, the world's most advanced accessible AI assistant. You have REAL capabilities:
 
 🎯 REAL FUNCTIONALITY:
-- VOICE: You CAN and MUST speak responses using text-to-speech
 - VISION: You CAN analyze images, videos, and documents in detail
-- CREATIVITY: You CAN generate real images, logos, anime, and artwork
+- CREATIVITY: You CAN generate real images, logos, anime, and artwork using DALL-E
 - INTELLIGENCE: You understand context, emotions, and provide real assistance
 
 ✨ ACCESSIBILITY FEATURES:
@@ -118,7 +92,7 @@ serve(async (req) => {
 🧏‍♂️ Hearing Impairment: Provide text alternatives and visual alerts
 🧠 Cognitive Support: Use simple language and emotional support
 🤲 Physical Disabilities: Respond to voice commands only
-🗣️ Speech Impairments: Read text and respond with voice
+🗣️ Speech Impairments: Read text and respond with voice when requested
 
 💖 EMOTIONAL INTELLIGENCE:
 - Detect emotions from voice tone and text
@@ -127,18 +101,11 @@ serve(async (req) => {
 - Celebrate happy moments with enthusiasm
 
 🎨 CREATIVE CAPABILITIES:
-- Generate REAL images, logos, artwork, anime
-- Sing actual songs with real lyrics
+- Generate REAL images, logos, artwork, anime using DALL-E
 - Create engaging stories and entertainment
 - Provide immersive experiences
 
-🚨 EMERGENCY FEATURES:
-- Recognize emergency situations immediately
-- Provide calm guidance and safety information
-- Help contact emergency services if needed
-
 IMPORTANT: 
-- You MUST use your voice to speak responses
 - You CAN generate real images when requested
 - You CAN analyze uploaded files thoroughly
 - You MUST provide detailed descriptions for visual content
@@ -161,7 +128,7 @@ ${context?.currentEmotion ? `User's emotion: ${context.currentEmotion.primary}` 
 ${context?.currentScene ? `Current scene: ${context.currentScene}` : ''}
 ${context?.uploadedFiles?.length > 0 ? `Files uploaded: ${context.uploadedFiles.map(f => f.name).join(', ')}` : ''}
 
-RESPOND AS IF YOU'RE SPEAKING DIRECTLY TO THEM WITH WARMTH AND CARE.`;
+RESPOND NATURALLY AND HELPFULLY.`;
 
     let messages = [
       { role: 'system', content: systemPrompt }
@@ -194,7 +161,6 @@ RESPOND AS IF YOU'RE SPEAKING DIRECTLY TO THEM WITH WARMTH AND CARE.`;
         ]
       });
     } else if (mode === 'document' && attachments?.[0]) {
-      // Handle document analysis
       const docPrompt = `${input} - Please analyze this document thoroughly and provide insights about its content, structure, and any important information.`;
       messages.push({
         role: 'user',
@@ -235,13 +201,15 @@ RESPOND AS IF YOU'RE SPEAKING DIRECTLY TO THEM WITH WARMTH AND CARE.`;
         // Enhanced prompt for better image generation
         let enhancedPrompt = input;
         if (input.toLowerCase().includes('anime')) {
-          enhancedPrompt = `Anime style artwork: ${input}`;
+          enhancedPrompt = `High quality anime artwork: ${input}`;
         } else if (input.toLowerCase().includes('logo')) {
           enhancedPrompt = `Professional logo design: ${input}`;
         } else if (input.toLowerCase().includes('art')) {
-          enhancedPrompt = `Digital artwork: ${input}`;
+          enhancedPrompt = `Beautiful digital artwork: ${input}`;
         } else if (input.toLowerCase().includes('cat')) {
-          enhancedPrompt = `High-quality photo of ${input}`;
+          enhancedPrompt = `High-quality detailed image of ${input}`;
+        } else if (input.toLowerCase().includes('creative')) {
+          enhancedPrompt = `Creative artistic masterpiece: ${input}`;
         }
         
         const imageResponse = await fetch('https://api.openai.com/v1/images/generations', {
@@ -267,58 +235,31 @@ RESPOND AS IF YOU'RE SPEAKING DIRECTLY TO THEM WITH WARMTH AND CARE.`;
         } else {
           const errorText = await imageResponse.text();
           console.error('Image generation failed:', errorText);
-          
-          // If image generation fails, still provide a helpful response
-          messages.push({
-            role: 'user',
-            content: `I wanted to generate an image of: ${input}. Please tell me you're generating it and describe what it would look like.`
-          });
         }
       } catch (error) {
         console.error('🚨 Image generation error:', error);
       }
     }
 
-    // Get AI response with retry logic
-    let response;
-    let attempts = 0;
-    const maxAttempts = 2;
+    // Get AI response
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: mode === 'image' || mode === 'video' || mode === 'document' ? 'gpt-4o' : 'gpt-4o-mini',
+        messages: messages,
+        max_tokens: 1000,
+        temperature: 0.7,
+      }),
+    });
 
-    while (attempts < maxAttempts) {
-      try {
-        response = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${openAIApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: mode === 'image' || mode === 'video' || mode === 'document' ? 'gpt-4o' : 'gpt-4o-mini',
-            messages: messages,
-            max_tokens: 1500, // Reduced to stay within limits
-            temperature: 0.7, // Reduced for consistency
-          }),
-        });
-
-        if (response.ok) break;
-        
-        const errorData = await response.text();
-        if (response.status === 429) {
-          console.log('Rate limited, waiting before retry...');
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          attempts++;
-        } else {
-          throw new Error(`OpenAI API error: ${response.status} - ${errorData}`);
-        }
-      } catch (error) {
-        attempts++;
-        if (attempts >= maxAttempts) throw error;
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-    }
-
-    if (!response || !response.ok) {
-      throw new Error('Failed to get response from OpenAI after retries');
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error('OpenAI API error:', errorData);
+      throw new Error(`OpenAI API error: ${response.status}`);
     }
 
     const data = await response.json();
@@ -334,48 +275,50 @@ RESPOND AS IF YOU'RE SPEAKING DIRECTLY TO THEM WITH WARMTH AND CARE.`;
       aiResponse = `🎨 I've created a beautiful image for you! Here it is:\n\n${aiResponse}`;
     }
 
-    // Generate audio response
+    // Generate audio response ONLY if shouldSpeak is true
     let audioUrl = null;
-    try {
-      console.log('🔊 Generating audio response...');
-      
-      const voiceSettings = {
-        voice: context?.settings?.isChild ? 'nova' : 
-               context?.settings?.isElderly ? 'alloy' :
-               context?.settings?.preferredVoice === 'gentle' ? 'shimmer' :
-               context?.settings?.preferredVoice === 'clear' ? 'echo' :
-               context?.settings?.preferredVoice === 'cheerful' ? 'nova' : 'alloy',
-        speed: context?.settings?.speechSpeed === 'slow' ? 0.8 :
-               context?.settings?.speechSpeed === 'fast' ? 1.2 : 1.0
-      };
-      
-      const ttsResponse = await fetch('https://api.openai.com/v1/audio/speech', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openAIApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'tts-1-hd',
-          input: aiResponse.substring(0, 4000),
-          voice: voiceSettings.voice,
-          response_format: 'mp3',
-          speed: voiceSettings.speed,
-        }),
-      });
+    if (shouldSpeak || mode === 'voice' || mode === 'video') {
+      try {
+        console.log('🔊 Generating audio response...');
+        
+        const voiceSettings = {
+          voice: context?.settings?.isChild ? 'nova' : 
+                 context?.settings?.isElderly ? 'alloy' :
+                 context?.settings?.preferredVoice === 'gentle' ? 'shimmer' :
+                 context?.settings?.preferredVoice === 'clear' ? 'echo' :
+                 context?.settings?.preferredVoice === 'cheerful' ? 'nova' : 'alloy',
+          speed: context?.settings?.speechSpeed === 'slow' ? 0.8 :
+                 context?.settings?.speechSpeed === 'fast' ? 1.2 : 1.0
+        };
+        
+        const ttsResponse = await fetch('https://api.openai.com/v1/audio/speech', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openAIApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'tts-1-hd',
+            input: aiResponse.substring(0, 4000),
+            voice: voiceSettings.voice,
+            response_format: 'mp3',
+            speed: voiceSettings.speed,
+          }),
+        });
 
-      if (ttsResponse.ok) {
-        const audioArrayBuffer = await ttsResponse.arrayBuffer();
-        const base64Audio = btoa(
-          String.fromCharCode(...new Uint8Array(audioArrayBuffer))
-        );
-        audioUrl = `data:audio/mp3;base64,${base64Audio}`;
-        console.log('🔊 AUDIO GENERATED SUCCESSFULLY');
-      } else {
-        console.log('TTS failed, but continuing without audio');
+        if (ttsResponse.ok) {
+          const audioArrayBuffer = await ttsResponse.arrayBuffer();
+          const base64Audio = btoa(
+            String.fromCharCode(...new Uint8Array(audioArrayBuffer))
+          );
+          audioUrl = `data:audio/mp3;base64,${base64Audio}`;
+          console.log('🔊 AUDIO GENERATED SUCCESSFULLY');
+        } else {
+          console.log('TTS failed, but continuing without audio');
+        }
+      } catch (error) {
+        console.log('TTS generation failed, continuing without audio:', error);
       }
-    } catch (error) {
-      console.log('TTS generation failed, continuing without audio:', error);
     }
 
     // Enhanced emotion detection

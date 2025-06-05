@@ -314,14 +314,15 @@ const MultimodalAI = () => {
     }
   }, [accessibilitySettings]);
 
-  // Enhanced AI interaction with REAL functionality
+  // Enhanced AI interaction with proper speaking control
   const handleAIInteraction = useCallback(async (
     input: string, 
     mode: 'text' | 'voice' | 'image' | 'video' | 'accessibility' | 'image_generation' | 'document' = 'text', 
-    attachments?: any[]
+    attachments?: any[],
+    shouldSpeak: boolean = false  // New parameter to control speaking
   ) => {
     try {
-      console.log("🧠 Starting AI interaction:", { input, mode, accessibility: accessibilitySettings });
+      console.log("🧠 Starting AI interaction:", { input, mode, shouldSpeak, accessibility: accessibilitySettings });
       
       setIsProcessing(true);
 
@@ -354,6 +355,7 @@ const MultimodalAI = () => {
           videoEnabled: isVideoOn,
           generateImage: shouldGenerateImage,
           analyzeFile: attachments && attachments.length > 0,
+          shouldSpeak: shouldSpeak,  // Pass the speaking control
           context: {
             settings: accessibilitySettings,
             currentEmotion,
@@ -381,8 +383,6 @@ const MultimodalAI = () => {
           id: Date.now().toString()
         };
         setConversation(prev => [...prev, errorMessage]);
-        
-        // Don't speak error messages automatically to avoid spam
         return;
       }
 
@@ -407,23 +407,20 @@ const MultimodalAI = () => {
 
       setConversation(prev => [...prev, aiMessage]);
 
-      // Speak the response (this is what makes it REAL voice AI)
-      if (aiResponse.text) {
-        await speakText(aiResponse.text, 'normal');
-      }
-
       // Handle generated images
       if (aiResponse.imageUrl) {
         toast.success("🎨 Image generated successfully!");
       }
 
-      // Handle audio responses
+      // Handle audio responses ONLY if audio was generated
       if (aiResponse.audioUrl && audioRef.current) {
         try {
           audioRef.current.src = aiResponse.audioUrl;
+          setIsSpeaking(true);
           await audioRef.current.play();
         } catch (audioError) {
           console.error('Audio playback error:', audioError);
+          setIsSpeaking(false);
         }
       }
 
@@ -453,8 +450,7 @@ const MultimodalAI = () => {
     conversation, 
     isEmergency, 
     isVideoOn,
-    uploadedFiles,
-    speakText
+    uploadedFiles
   ]);
 
   // REAL Voice Recognition
@@ -476,7 +472,7 @@ const MultimodalAI = () => {
         
         if (event.results[event.results.length - 1].isFinal) {
           setInputText(transcript);
-          handleAIInteraction(transcript, 'voice');
+          handleAIInteraction(transcript, 'voice', undefined, true); // Enable speaking for voice input
           setIsListening(false);
         }
       };
@@ -651,14 +647,11 @@ const MultimodalAI = () => {
     toast.success("Message updated and resent");
   }, [editingMessageId, editingText, conversation, handleAIInteraction]);
 
-  // Auto-speak quick action responses
+  // Auto-speak quick action responses with voice enabled
   const handleQuickAction = useCallback(async (actionType: string, prompt: string) => {
-    // Immediately speak what the user clicked
-    await speakText(`Starting ${actionType}`, 'high');
-    
-    // Then process the AI interaction
-    await handleAIInteraction(prompt, actionType === 'video' ? 'video' : actionType === 'voice' ? 'voice' : 'text');
-  }, [handleAIInteraction, speakText]);
+    // Process the AI interaction with speaking enabled for quick actions
+    await handleAIInteraction(prompt, actionType === 'video' ? 'video' : actionType === 'voice' ? 'voice' : 'text', undefined, true);
+  }, [handleAIInteraction]);
 
   // New Chat
   const startNewChat = useCallback(() => {
@@ -689,10 +682,11 @@ const MultimodalAI = () => {
     }
   }, [conversationHistory, speakText]);
 
-  // Auto-play audio responses
+  // Auto-play audio responses and handle end event
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.onended = () => setIsSpeaking(false);
+      audioRef.current.onerror = () => setIsSpeaking(false);
     }
   }, []);
 
@@ -868,7 +862,7 @@ const MultimodalAI = () => {
                   <Button
                     onClick={() => handleQuickAction('voice', "Please sing me a beautiful song with your voice and sing the actual lyrics")}
                     variant="outline"
-                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl border-gray-200"
+                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl"
                   >
                     <Music className="w-6 h-6" />
                     <span className="text-sm">Sing Song</span>
@@ -879,7 +873,7 @@ const MultimodalAI = () => {
                       setTimeout(() => handleQuickAction('video', "Tell me what you can see around me and describe my environment"), 2000);
                     }}
                     variant="outline"
-                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl border-gray-200"
+                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl"
                   >
                     <Eye className="w-6 h-6" />
                     <span className="text-sm">Describe Scene</span>
@@ -887,7 +881,7 @@ const MultimodalAI = () => {
                   <Button
                     onClick={() => handleQuickAction('voice', "I need emotional support and comfort right now")}
                     variant="outline"
-                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl border-gray-200"
+                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl"
                   >
                     <Heart className="w-6 h-6" />
                     <span className="text-sm">Emotional Support</span>
@@ -895,7 +889,7 @@ const MultimodalAI = () => {
                   <Button
                     onClick={() => handleQuickAction('voice', "Help me with my daily routine and remind me of important things")}
                     variant="outline"
-                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl border-gray-200"
+                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl"
                   >
                     <Clock className="w-6 h-6" />
                     <span className="text-sm">Daily Help</span>
@@ -906,15 +900,15 @@ const MultimodalAI = () => {
                       setTimeout(() => handleQuickAction('video', "Who is around me? Please recognize faces and tell me about people nearby"), 2000);
                     }}
                     variant="outline"
-                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl border-gray-200"
+                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl"
                   >
                     <Users className="w-6 h-6" />
                     <span className="text-sm">Recognize People</span>
                   </Button>
                   <Button
-                    onClick={() => handleQuickAction('image_generation', "Generate a beautiful creative image or anime artwork for me")}
+                    onClick={() => handleAIInteraction("Generate a beautiful creative image or anime artwork for me", 'image_generation', undefined, false)}
                     variant="outline"
-                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl border-gray-200"
+                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl"
                   >
                     <Palette className="w-6 h-6" />
                     <span className="text-sm">Create Image</span>
@@ -922,7 +916,7 @@ const MultimodalAI = () => {
                   <Button
                     onClick={startVideo}
                     variant="outline"
-                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl border-gray-200"
+                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl"
                   >
                     <Video className="w-6 h-6" />
                     <span className="text-sm">Start Camera</span>
@@ -983,8 +977,8 @@ const MultimodalAI = () => {
                     <div className={`max-w-[80%] group relative`}>
                       <div className={`rounded-2xl px-4 py-3 ${
                         message.type === 'user' 
-                          ? 'bg-white border border-gray-200 text-gray-900' 
-                          : 'bg-white border border-gray-200 text-gray-900'
+                          ? 'bg-white text-gray-900' 
+                          : 'bg-white text-gray-900'
                       }`}>
                         
                         {editingMessageId === message.id ? (
@@ -1102,7 +1096,7 @@ const MultimodalAI = () => {
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 placeholder="Message Nurath.AI..."
-                className={`resize-none bg-transparent border-0 px-4 py-3 pr-16 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-0 rounded-2xl ${
+                className={`resize-none bg-transparent px-4 py-3 pr-16 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-0 rounded-2xl ${
                   accessibilitySettings.fontSize === 'large' ? 'text-lg min-h-[80px]' : 
                   accessibilitySettings.fontSize === 'extra-large' ? 'text-xl min-h-[100px]' : 'text-base min-h-[60px]'
                 }`}
@@ -1110,7 +1104,7 @@ const MultimodalAI = () => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     if (inputText.trim()) {
-                      handleAIInteraction(inputText);
+                      handleAIInteraction(inputText, 'text', undefined, false); // Don't speak for typed messages
                       setInputText("");
                     }
                   }
@@ -1144,13 +1138,13 @@ const MultimodalAI = () => {
                 <Button
                   onClick={() => {
                     if (inputText.trim()) {
-                      handleAIInteraction(inputText);
+                      handleAIInteraction(inputText, 'text', undefined, false); // Don't speak for typed messages
                       setInputText("");
                     }
                   }}
                   disabled={!inputText.trim()}
                   size="sm"
-                  className="bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-xl border-0"
+                  className="bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-xl"
                 >
                   <Send className="w-4 h-4" />
                 </Button>
