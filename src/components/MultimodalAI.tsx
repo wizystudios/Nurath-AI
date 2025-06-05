@@ -42,10 +42,15 @@ import {
   Shield,
   Baby,
   Sparkles,
-  Copy
+  Copy,
+  User,
+  LogOut
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useNavigate } from "react-router-dom";
 
 interface RelationshipTag {
   id: string;
@@ -157,6 +162,11 @@ const MultimodalAI = () => {
     }
   ]);
   const [currentConversationId, setCurrentConversationId] = useState<string>('1');
+
+  const [currentMode, setCurrentMode] = useState<'text' | 'voice' | 'video'>('text');
+  const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
+  const navigate = useNavigate();
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -314,15 +324,40 @@ const MultimodalAI = () => {
     }
   }, [accessibilitySettings]);
 
-  // Enhanced AI interaction with proper speaking control
+  // Authentication check
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+      
+      if (user) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        setProfile(profileData);
+      }
+    };
+    
+    checkUser();
+    
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user || null);
+    });
+    
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Enhanced AI interaction with proper speaking control based on mode
   const handleAIInteraction = useCallback(async (
     input: string, 
     mode: 'text' | 'voice' | 'image' | 'video' | 'accessibility' | 'image_generation' | 'document' = 'text', 
     attachments?: any[],
-    shouldSpeak: boolean = false  // New parameter to control speaking
+    forceSpeak: boolean = false
   ) => {
     try {
-      console.log("🧠 Starting AI interaction:", { input, mode, shouldSpeak, accessibility: accessibilitySettings });
+      console.log("🧠 Starting AI interaction:", { input, mode, currentMode, forceSpeak });
       
       setIsProcessing(true);
 
@@ -347,6 +382,9 @@ const MultimodalAI = () => {
           (imageKeywords.some(keyword => input.toLowerCase().includes(keyword)) && 
            imageTypes.some(type => input.toLowerCase().includes(type)));
 
+      // Only speak if in voice mode, forced, or for specific quick actions
+      const shouldSpeak = currentMode === 'voice' || forceSpeak || mode === 'voice';
+
       const { data, error } = await supabase.functions.invoke('multimodal-ai', {
         body: {
           input,
@@ -355,16 +393,21 @@ const MultimodalAI = () => {
           videoEnabled: isVideoOn,
           generateImage: shouldGenerateImage,
           analyzeFile: attachments && attachments.length > 0,
-          shouldSpeak: shouldSpeak,  // Pass the speaking control
+          shouldSpeak: shouldSpeak,
           context: {
-            settings: accessibilitySettings,
+            settings: {
+              ...accessibilitySettings,
+              preferredVoice: 'shimmer', // Use female voice
+              speechSpeed: 'normal'
+            },
             currentEmotion,
             recognizedPeople,
             currentScene,
             detectedObjects,
             conversationHistory: conversation.slice(-10),
             emergencyMode: isEmergency,
-            uploadedFiles: uploadedFiles.map(f => ({ name: f.name, type: f.type, size: f.size }))
+            uploadedFiles: uploadedFiles.map(f => ({ name: f.name, type: f.type, size: f.size })),
+            userId: user?.id
           }
         }
       });
@@ -373,7 +416,7 @@ const MultimodalAI = () => {
 
       if (error) {
         console.error('🚨 AI Error:', error);
-        const errorText = data?.error || "I'm sorry, I'm having trouble right now. Please try again.";
+        const errorText = "I'm sorry, I'm having trouble right now. Please try again.";
         
         const errorMessage: ConversationMessage = {
           type: 'ai',
@@ -424,6 +467,30 @@ const MultimodalAI = () => {
         }
       }
 
+      // Save conversation if user is logged in
+      if (user) {
+        try {
+          await supabase.from('chat_messages').insert([
+            {
+              user_id: user.id,
+              conversation_id: currentConversationId,
+              role: 'user',
+              content: input,
+              type: mode
+            },
+            {
+              user_id: user.id,
+              conversation_id: currentConversationId,
+              role: 'assistant',
+              content: aiResponse.text,
+              type: 'text'
+            }
+          ]);
+        } catch (saveError) {
+          console.error('Error saving conversation:', saveError);
+        }
+      }
+
     } catch (error) {
       console.error('🚨 AI interaction error:', error);
       const errorText = "I'm sorry, I'm having technical difficulties. Please try speaking to me again.";
@@ -450,7 +517,10 @@ const MultimodalAI = () => {
     conversation, 
     isEmergency, 
     isVideoOn,
-    uploadedFiles
+    uploadedFiles,
+    currentMode,
+    user,
+    currentConversationId
   ]);
 
   // REAL Voice Recognition
@@ -647,40 +717,28 @@ const MultimodalAI = () => {
     toast.success("Message updated and resent");
   }, [editingMessageId, editingText, conversation, handleAIInteraction]);
 
-  // Auto-speak quick action responses with voice enabled
+  // Auto-speak quick action responses with voice enabled for specific actions
   const handleQuickAction = useCallback(async (actionType: string, prompt: string) => {
-    // Process the AI interaction with speaking enabled for quick actions
-    await handleAIInteraction(prompt, actionType === 'video' ? 'video' : actionType === 'voice' ? 'voice' : 'text', undefined, true);
+    // These actions should ALWAYS speak (real human-like interaction)
+    const shouldSpeak = ['sing', 'emotional', 'daily', 'emergency', 'recognize'].some(action => 
+      actionType.includes(action) || prompt.toLowerCase().includes(action)
+    );
+    
+    await handleAIInteraction(
+      prompt, 
+      actionType === 'video' ? 'video' : actionType === 'voice' ? 'voice' : 'text', 
+      undefined, 
+      shouldSpeak
+    );
   }, [handleAIInteraction]);
 
-  // New Chat
-  const startNewChat = useCallback(() => {
-    const newConversationId = Date.now().toString();
-    const newConversation = {
-      id: newConversationId,
-      title: 'New Chat',
-      date: 'Today',
-      messages: []
-    };
-    
-    setConversationHistory(prev => [newConversation, ...prev]);
-    setCurrentConversationId(newConversationId);
-    setConversation([]);
-    setInputText("");
-    speakText("Started new conversation", 'normal');
-    toast.success("Started new conversation");
-  }, [speakText]);
-
-  // Load conversation
-  const loadConversation = useCallback((conversationId: string) => {
-    const conv = conversationHistory.find(c => c.id === conversationId);
-    if (conv) {
-      setCurrentConversationId(conversationId);
-      setConversation(conv.messages);
-      setIsSidebarOpen(false);
-      speakText(`Loaded conversation: ${conv.title}`, 'normal');
-    }
-  }, [conversationHistory, speakText]);
+  // Handle logout
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setProfile(null);
+    toast.success("Logged out successfully");
+  };
 
   // Auto-play audio responses and handle end event
   useEffect(() => {
@@ -713,89 +771,83 @@ const MultimodalAI = () => {
             <div className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-40" onClick={() => setIsSidebarOpen(false)} />
             
             <div className="relative z-50 bg-gray-50 dark:bg-gray-800 h-full flex flex-col">
-              {/* Sidebar Header */}
+              {/* Sidebar Header with Profile */}
               <div className="p-3">
-                <div className="flex items-center justify-between mb-3">
-                  <Button 
-                    className="flex-1 justify-start bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-xl border-0"
-                    onClick={() => {
-                      const newConversationId = Date.now().toString();
-                      const newConversation = {
-                        id: newConversationId,
-                        title: 'New Chat',
-                        date: 'Today',
-                        messages: []
-                      };
-                      
-                      setConversationHistory(prev => [newConversation, ...prev]);
-                      setCurrentConversationId(newConversationId);
-                      setConversation([]);
-                      setInputText("");
-                      speakText("Started new conversation", 'normal');
-                      toast.success("Started new conversation");
-                    }}
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    New chat
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="md:hidden ml-2 rounded-xl"
-                    onClick={() => setIsSidebarOpen(false)}
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
+                {user ? (
+                  <div className="flex items-center space-x-3 mb-3 p-2 bg-white dark:bg-gray-700 rounded-xl">
+                    <Avatar className="w-10 h-10">
+                      <AvatarImage src={profile?.avatar_url} />
+                      <AvatarFallback>
+                        {profile?.full_name ? profile.full_name.charAt(0).toUpperCase() : user.email?.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                        {profile?.full_name || user.email}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                        {user.email}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleLogout}
+                      className="h-8 w-8 p-0"
+                    >
+                      <LogOut className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="mb-3">
+                    <Button 
+                      onClick={() => navigate('/auth')}
+                      className="w-full bg-blue-500 hover:bg-blue-600 text-white rounded-xl"
+                    >
+                      <User className="w-4 h-4 mr-2" />
+                      Login / Sign Up
+                    </Button>
+                  </div>
+                )}
+                
+                <Button 
+                  className="w-full justify-start bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-xl"
+                  onClick={startNewChat}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  New chat
+                </Button>
               </div>
 
-              {/* Chat History */}
-              <div className="flex-1 overflow-y-auto px-2">
-                <div className="space-y-1">
-                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 px-2 py-1">Recent</div>
-                  {conversationHistory.map((conv) => (
-                    <div key={conv.id} className="group relative">
-                      <button
-                        onClick={() => {
-                          setCurrentConversationId(conv.id);
-                          setConversation(conv.messages);
-                          setIsSidebarOpen(false);
-                          speakText(`Loaded conversation: ${conv.title}`, 'normal');
-                        }}
-                        className={`w-full text-left p-2 text-sm rounded-xl truncate transition-colors border-0 ${
-                          currentConversationId === conv.id 
-                            ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white' 
-                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                        }`}
-                      >
-                        {conv.title}
-                      </button>
-                      <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 flex space-x-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 w-6 p-0 rounded-lg border-0"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setConversationHistory(prev => prev.filter(c => c.id !== conv.id));
-                            speakText("Conversation deleted", 'normal');
-                            toast.success("Conversation deleted");
-                          }}
+              {/* Chat History - only show if logged in */}
+              {user && (
+                <div className="flex-1 overflow-y-auto px-2">
+                  <div className="space-y-1">
+                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 px-2 py-1">Recent</div>
+                    {conversationHistory.map((conv) => (
+                      <div key={conv.id} className="group relative">
+                        <button
+                          onClick={() => loadConversation(conv.id)}
+                          className={`w-full text-left p-2 text-sm rounded-xl truncate transition-colors ${
+                            currentConversationId === conv.id 
+                              ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white' 
+                              : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                          }`}
                         >
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
+                          {conv.title}
+                        </button>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Footer Settings */}
               <div className="p-2 space-y-1">
                 <Button 
                   variant="ghost" 
-                  className="w-full justify-start text-gray-700 dark:text-gray-300 rounded-xl border-0"
-                  onClick={() => speakText("Settings available. You can adjust voice, accessibility, and preferences.", 'normal')}
+                  className="w-full justify-start text-gray-700 dark:text-gray-300 rounded-xl"
+                  onClick={() => navigate('/profile')}
                 >
                   <Settings className="w-4 h-4 mr-2" />
                   Settings
@@ -809,17 +861,29 @@ const MultimodalAI = () => {
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <header className="flex items-center justify-between p-4 bg-white dark:bg-gray-900">
+        <header className="flex items-center justify-between p-4 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800">
           <div className="flex items-center space-x-4">
             <Button 
               variant="ghost" 
               size="sm"
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="text-gray-600 dark:text-gray-400 rounded-xl border-0"
+              className="text-gray-600 dark:text-gray-400 rounded-xl"
             >
               <Menu className="w-5 h-5" />
             </Button>
             <div className="font-semibold text-gray-900 dark:text-white">Nurath.AI</div>
+            
+            {/* Mode Selection */}
+            <Select value={currentMode} onValueChange={(value: 'text' | 'voice' | 'video') => setCurrentMode(value)}>
+              <SelectTrigger className="w-32 h-8 text-xs rounded-xl">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="text">💬 Text</SelectItem>
+                <SelectItem value="voice">🎤 Voice</SelectItem>
+                <SelectItem value="video">📹 Video</SelectItem>
+              </SelectContent>
+            </Select>
             
             {/* Status Badges */}
             {isListening && (
@@ -850,19 +914,24 @@ const MultimodalAI = () => {
             // Welcome State
             <div className="h-full flex flex-col items-center justify-center p-8">
               <div className="text-center max-w-4xl">
-                <h1 className={`font-bold text-gray-900 dark:text-white mb-8 ${
+                <h1 className={`font-bold text-gray-900 dark:text-white mb-8 animate-pulse ${
                   accessibilitySettings.fontSize === 'large' ? 'text-5xl' : 
                   accessibilitySettings.fontSize === 'extra-large' ? 'text-6xl' : 'text-4xl'
-                }`}>
+                }`} style={{ 
+                  background: 'linear-gradient(45deg, #667eea 0%, #764ba2 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  fontFamily: 'Inter, system-ui, sans-serif'
+                }}>
                   What can I help you with?
                 </h1>
                 
                 {/* Quick Actions */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                   <Button
-                    onClick={() => handleQuickAction('voice', "Please sing me a beautiful song with your voice and sing the actual lyrics")}
+                    onClick={() => handleQuickAction('sing', "Please sing me a beautiful song with your voice and sing the actual lyrics")}
                     variant="outline"
-                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl"
+                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl hover:scale-105 transition-transform"
                   >
                     <Music className="w-6 h-6" />
                     <span className="text-sm">Sing Song</span>
@@ -873,23 +942,23 @@ const MultimodalAI = () => {
                       setTimeout(() => handleQuickAction('video', "Tell me what you can see around me and describe my environment"), 2000);
                     }}
                     variant="outline"
-                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl"
+                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl hover:scale-105 transition-transform"
                   >
                     <Eye className="w-6 h-6" />
                     <span className="text-sm">Describe Scene</span>
                   </Button>
                   <Button
-                    onClick={() => handleQuickAction('voice', "I need emotional support and comfort right now")}
+                    onClick={() => handleQuickAction('emotional', "I need emotional support and comfort right now")}
                     variant="outline"
-                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl"
+                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl hover:scale-105 transition-transform"
                   >
                     <Heart className="w-6 h-6" />
                     <span className="text-sm">Emotional Support</span>
                   </Button>
                   <Button
-                    onClick={() => handleQuickAction('voice', "Help me with my daily routine and remind me of important things")}
+                    onClick={() => handleQuickAction('daily', "Help me with my daily routine and remind me of important things")}
                     variant="outline"
-                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl"
+                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl hover:scale-105 transition-transform"
                   >
                     <Clock className="w-6 h-6" />
                     <span className="text-sm">Daily Help</span>
@@ -897,10 +966,10 @@ const MultimodalAI = () => {
                   <Button
                     onClick={() => {
                       startVideo();
-                      setTimeout(() => handleQuickAction('video', "Who is around me? Please recognize faces and tell me about people nearby"), 2000);
+                      setTimeout(() => handleQuickAction('recognize', "Who is around me? Please recognize faces and tell me about people nearby"), 2000);
                     }}
                     variant="outline"
-                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl"
+                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl hover:scale-105 transition-transform"
                   >
                     <Users className="w-6 h-6" />
                     <span className="text-sm">Recognize People</span>
@@ -908,7 +977,7 @@ const MultimodalAI = () => {
                   <Button
                     onClick={() => handleAIInteraction("Generate a beautiful creative image or anime artwork for me", 'image_generation', undefined, false)}
                     variant="outline"
-                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl"
+                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl hover:scale-105 transition-transform"
                   >
                     <Palette className="w-6 h-6" />
                     <span className="text-sm">Create Image</span>
@@ -916,7 +985,7 @@ const MultimodalAI = () => {
                   <Button
                     onClick={startVideo}
                     variant="outline"
-                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl"
+                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl hover:scale-105 transition-transform"
                   >
                     <Video className="w-6 h-6" />
                     <span className="text-sm">Start Camera</span>
@@ -924,10 +993,10 @@ const MultimodalAI = () => {
                   <Button
                     onClick={() => {
                       setIsEmergency(true);
-                      handleQuickAction('voice', "This is an emergency situation. I need help.");
+                      handleQuickAction('emergency', "This is an emergency situation. I need help.");
                     }}
                     variant="outline"
-                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl border-red-200 text-red-600"
+                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl border-red-200 text-red-600 hover:scale-105 transition-transform"
                   >
                     <Shield className="w-6 h-6" />
                     <span className="text-sm">Emergency</span>
@@ -948,20 +1017,20 @@ const MultimodalAI = () => {
                       className="w-full h-64 object-cover"
                     />
                     <div className="p-4 flex flex-wrap gap-2">
-                      <Button onClick={takePhoto} size="sm" variant="outline" className="rounded-xl border-0">
+                      <Button onClick={takePhoto} size="sm" variant="outline" className="rounded-xl">
                         <Camera className="w-4 h-4 mr-2" />
                         Take Photo
                       </Button>
                       <Button 
-                        onClick={() => handleAIInteraction("Describe my surroundings and tell me where I am in detail", 'video')}
+                        onClick={() => handleAIInteraction("Describe my surroundings and tell me where I am in detail", 'video', undefined, true)}
                         size="sm" 
                         variant="outline"
-                        className="rounded-xl border-0"
+                        className="rounded-xl"
                       >
                         <MapPin className="w-4 h-4 mr-2" />
                         Describe Location
                       </Button>
-                      <Button onClick={stopVideo} size="sm" variant="destructive" className="rounded-xl border-0">
+                      <Button onClick={stopVideo} size="sm" variant="destructive" className="rounded-xl">
                         <VideoOff className="w-4 h-4" />
                         Stop Camera
                       </Button>
@@ -977,8 +1046,8 @@ const MultimodalAI = () => {
                     <div className={`max-w-[80%] group relative`}>
                       <div className={`rounded-2xl px-4 py-3 ${
                         message.type === 'user' 
-                          ? 'bg-white text-gray-900' 
-                          : 'bg-white text-gray-900'
+                          ? 'bg-white text-gray-900 shadow-sm border border-gray-100' 
+                          : 'bg-white text-gray-900 shadow-sm border border-gray-100'
                       }`}>
                         
                         {editingMessageId === message.id ? (
@@ -986,10 +1055,10 @@ const MultimodalAI = () => {
                             <Textarea
                               value={editingText}
                               onChange={(e) => setEditingText(e.target.value)}
-                              className="min-h-[60px] text-sm rounded-xl border-0"
+                              className="min-h-[60px] text-sm rounded-xl"
                             />
                             <div className="flex space-x-2">
-                              <Button size="sm" onClick={saveEdit} className="rounded-xl border-0">
+                              <Button size="sm" onClick={saveEdit} className="rounded-xl">
                                 Save
                               </Button>
                               <Button 
@@ -999,7 +1068,7 @@ const MultimodalAI = () => {
                                   setEditingMessageId(null);
                                   setEditingText("");
                                 }}
-                                className="rounded-xl border-0"
+                                className="rounded-xl"
                               >
                                 Cancel
                               </Button>
@@ -1055,7 +1124,7 @@ const MultimodalAI = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-6 w-6 p-0 border-0"
+                            className="h-6 w-6 p-0"
                             onClick={() => copyMessage(message.content)}
                           >
                             <Copy className="w-3 h-3" />
@@ -1064,7 +1133,7 @@ const MultimodalAI = () => {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-6 w-6 p-0 border-0"
+                              className="h-6 w-6 p-0"
                               onClick={() => editMessage(message.id, message.content)}
                             >
                               <Edit className="w-3 h-3" />
@@ -1073,7 +1142,7 @@ const MultimodalAI = () => {
                           <Button
                             variant="ghost"
                             size="sm" 
-                            className="h-6 w-6 p-0 border-0"
+                            className="h-6 w-6 p-0"
                             onClick={() => deleteMessage(message.id)}
                           >
                             <Trash2 className="w-3 h-3" />
@@ -1088,34 +1157,35 @@ const MultimodalAI = () => {
           )}
         </div>
 
-        {/* Input Area */}
-        <div className="bg-white dark:bg-gray-900 p-4">
+        {/* Input Area with more space */}
+        <div className="bg-white dark:bg-gray-900 p-6">
           <div className="max-w-3xl mx-auto">
             <div className="relative bg-gray-50 dark:bg-gray-800 rounded-2xl">
               <Textarea
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
-                placeholder="Message Nurath.AI..."
-                className={`resize-none bg-transparent px-4 py-3 pr-16 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-0 rounded-2xl ${
-                  accessibilitySettings.fontSize === 'large' ? 'text-lg min-h-[80px]' : 
-                  accessibilitySettings.fontSize === 'extra-large' ? 'text-xl min-h-[100px]' : 'text-base min-h-[60px]'
+                placeholder={`Message Nurath.AI... (${currentMode} mode)`}
+                className={`resize-none bg-transparent px-6 py-4 pr-20 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-0 rounded-2xl border-0 ${
+                  accessibilitySettings.fontSize === 'large' ? 'text-lg min-h-[100px]' : 
+                  accessibilitySettings.fontSize === 'extra-large' ? 'text-xl min-h-[120px]' : 'text-base min-h-[80px]'
                 }`}
                 onKeyPress={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     if (inputText.trim()) {
-                      handleAIInteraction(inputText, 'text', undefined, false); // Don't speak for typed messages
+                      handleAIInteraction(inputText, currentMode);
                       setInputText("");
                     }
                   }
                 }}
               />
-              <div className="absolute bottom-3 right-3 flex items-center space-x-2">
+              <div className="absolute bottom-4 right-4 flex items-center space-x-2">
                 <Button
                   size="sm"
                   variant="ghost"
                   onClick={() => fileInputRef.current?.click()}
-                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 rounded-xl border-0"
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 rounded-xl"
+                  title="Attach file"
                 >
                   <Paperclip className="w-4 h-4" />
                 </Button>
@@ -1123,7 +1193,8 @@ const MultimodalAI = () => {
                   size="sm"
                   variant="ghost"
                   onClick={isListening ? stopListening : startListening}
-                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 rounded-xl border-0"
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 rounded-xl"
+                  title={isListening ? "Stop listening" : "Start voice input"}
                 >
                   {isListening ? <StopCircle className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                 </Button>
@@ -1131,20 +1202,22 @@ const MultimodalAI = () => {
                   size="sm"
                   variant="ghost"
                   onClick={isVideoOn ? stopVideo : startVideo}
-                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 rounded-xl border-0"
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 rounded-xl"
+                  title={isVideoOn ? "Stop camera" : "Start camera"}
                 >
                   {isVideoOn ? <VideoOff className="w-4 h-4" /> : <Video className="w-4 h-4" />}
                 </Button>
                 <Button
                   onClick={() => {
                     if (inputText.trim()) {
-                      handleAIInteraction(inputText, 'text', undefined, false); // Don't speak for typed messages
+                      handleAIInteraction(inputText, currentMode);
                       setInputText("");
                     }
                   }}
                   disabled={!inputText.trim()}
                   size="sm"
                   className="bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-xl"
+                  title="Send message"
                 >
                   <Send className="w-4 h-4" />
                 </Button>

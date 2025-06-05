@@ -43,11 +43,7 @@ serve(async (req) => {
           body: JSON.stringify({
             model: 'tts-1-hd',
             input: input.substring(0, 4000),
-            voice: context?.settings?.isChild ? 'nova' : 
-                   context?.settings?.isElderly ? 'alloy' :
-                   context?.settings?.preferredVoice === 'gentle' ? 'shimmer' :
-                   context?.settings?.preferredVoice === 'clear' ? 'echo' :
-                   context?.settings?.preferredVoice === 'cheerful' ? 'nova' : 'alloy',
+            voice: 'shimmer', // Female voice
             response_format: 'mp3',
             speed: context?.settings?.speechSpeed === 'slow' ? 0.8 :
                    context?.settings?.speechSpeed === 'fast' ? 1.2 : 1.0,
@@ -86,42 +82,38 @@ serve(async (req) => {
 - VISION: You CAN analyze images, videos, and documents in detail
 - CREATIVITY: You CAN generate real images, logos, anime, and artwork using DALL-E
 - INTELLIGENCE: You understand context, emotions, and provide real assistance
+- VOICE: You speak with a natural female voice and can sing actual songs with lyrics
 
-✨ ACCESSIBILITY FEATURES:
-♿️ Visual Impairment: Describe everything in extreme detail
-🧏‍♂️ Hearing Impairment: Provide text alternatives and visual alerts
-🧠 Cognitive Support: Use simple language and emotional support
-🤲 Physical Disabilities: Respond to voice commands only
-🗣️ Speech Impairments: Read text and respond with voice when requested
+✨ BEHAVIOR RULES:
+- SINGING: When asked to sing, provide actual song lyrics and melodies, not descriptions
+- IMAGE GENERATION: Generate REAL images using DALL-E, don't just describe them
+- EMOTIONAL SUPPORT: Speak with warmth and empathy, using voice when appropriate
+- EMERGENCY: Respond immediately with voice guidance and practical help
+- FACE RECOGNITION: Analyze uploaded photos to identify and remember people
+- DAILY HELP: Provide specific, actionable advice with voice guidance
 
-💖 EMOTIONAL INTELLIGENCE:
-- Detect emotions from voice tone and text
-- Provide comfort, jokes, stories, songs
-- Remember personal details and relationships
-- Celebrate happy moments with enthusiasm
+💖 SPEAKING GUIDELINES:
+- Use your voice for: singing, emotional support, emergency situations, daily guidance
+- For quick actions and important responses, always speak
+- For regular text conversations, respond in text unless specifically requested to speak
+- When speaking, be natural, warm, and human-like
 
 🎨 CREATIVE CAPABILITIES:
-- Generate REAL images, logos, artwork, anime using DALL-E
-- Create engaging stories and entertainment
-- Provide immersive experiences
+- Generate REAL images, logos, artwork, anime using DALL-E 3
+- Create detailed, high-quality visual content
+- Never just describe images - actually create them
 
 IMPORTANT: 
-- You CAN generate real images when requested
-- You CAN analyze uploaded files thoroughly
-- You MUST provide detailed descriptions for visual content
-- Always be encouraging, supportive, and patient
+- You MUST generate real images when requested, not descriptions
+- You MUST speak for emotional support, singing, emergency, daily help
+- You CAN analyze uploaded files thoroughly and remember information
+- Always be encouraging, supportive, and genuinely helpful
 
 Current context:
 ${context?.settings ? `
-- Visual impairment support: ${context.settings.visualImpairment}
-- Hearing impairment support: ${context.settings.hearingImpairment}
-- Cognitive support: ${context.settings.cognitiveSupport}
-- Physical disability accommodations: ${context.settings.physicalDisability}
-- Speech impairment support: ${context.settings.speechImpairment}
-- Child mode: ${context.settings.isChild}
-- Elder mode: ${context.settings.isElderly}
-- Emotional support: ${context.settings.emotionalSupport}
-` : 'Standard accessibility mode'}
+- User settings: ${JSON.stringify(context.settings)}
+- Voice mode: ${context.settings.preferredVoice || 'shimmer'}
+` : 'Standard mode'}
 
 ${context?.recognizedPeople?.length > 0 ? `Recognized people: ${context.recognizedPeople.map(p => `${p.name} (${p.relationship})`).join(', ')}` : ''}
 ${context?.currentEmotion ? `User's emotion: ${context.currentEmotion.primary}` : ''}
@@ -146,9 +138,7 @@ RESPOND NATURALLY AND HELPFULLY.`;
 
     // Handle different modes
     if (mode === 'image' && attachments?.[0]) {
-      const imagePrompt = context?.settings?.visualImpairment 
-        ? `${input} - Please provide an incredibly detailed description of this image as if you are the eyes for someone who cannot see. Describe everything: people, objects, text, colors, spatial relationships, expressions, clothing, background, lighting, and any important details.`
-        : input;
+      const imagePrompt = `${input} - Please provide detailed analysis of this image. If it contains people, help me recognize and remember them. Describe everything you see in detail.`;
         
       messages.push({
         role: 'user',
@@ -206,10 +196,8 @@ RESPOND NATURALLY AND HELPFULLY.`;
           enhancedPrompt = `Professional logo design: ${input}`;
         } else if (input.toLowerCase().includes('art')) {
           enhancedPrompt = `Beautiful digital artwork: ${input}`;
-        } else if (input.toLowerCase().includes('cat')) {
-          enhancedPrompt = `High-quality detailed image of ${input}`;
-        } else if (input.toLowerCase().includes('creative')) {
-          enhancedPrompt = `Creative artistic masterpiece: ${input}`;
+        } else {
+          enhancedPrompt = `High-quality detailed image: ${input}`;
         }
         
         const imageResponse = await fetch('https://api.openai.com/v1/images/generations', {
@@ -277,19 +265,9 @@ RESPOND NATURALLY AND HELPFULLY.`;
 
     // Generate audio response ONLY if shouldSpeak is true
     let audioUrl = null;
-    if (shouldSpeak || mode === 'voice' || mode === 'video') {
+    if (shouldSpeak) {
       try {
         console.log('🔊 Generating audio response...');
-        
-        const voiceSettings = {
-          voice: context?.settings?.isChild ? 'nova' : 
-                 context?.settings?.isElderly ? 'alloy' :
-                 context?.settings?.preferredVoice === 'gentle' ? 'shimmer' :
-                 context?.settings?.preferredVoice === 'clear' ? 'echo' :
-                 context?.settings?.preferredVoice === 'cheerful' ? 'nova' : 'alloy',
-          speed: context?.settings?.speechSpeed === 'slow' ? 0.8 :
-                 context?.settings?.speechSpeed === 'fast' ? 1.2 : 1.0
-        };
         
         const ttsResponse = await fetch('https://api.openai.com/v1/audio/speech', {
           method: 'POST',
@@ -300,9 +278,10 @@ RESPOND NATURALLY AND HELPFULLY.`;
           body: JSON.stringify({
             model: 'tts-1-hd',
             input: aiResponse.substring(0, 4000),
-            voice: voiceSettings.voice,
+            voice: 'shimmer', // Female voice
             response_format: 'mp3',
-            speed: voiceSettings.speed,
+            speed: context?.settings?.speechSpeed === 'slow' ? 0.8 :
+                   context?.settings?.speechSpeed === 'fast' ? 1.2 : 1.0,
           }),
         });
 
