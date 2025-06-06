@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -208,33 +207,38 @@ const MultimodalAI = () => {
             voice.name.toLowerCase().includes('female') ||
             voice.name.toLowerCase().includes('woman') ||
             voice.name.toLowerCase().includes('samantha') ||
-            voice.name.toLowerCase().includes('alex')
+            voice.name.toLowerCase().includes('zira')
           ) || voices[0];
           utterance.voice = preferredVoice;
         }
 
         utterance.onstart = () => setIsSpeaking(true);
         utterance.onend = () => setIsSpeaking(false);
+        utterance.onerror = () => setIsSpeaking(false);
         
         synthesisRef.current = utterance;
         speechSynthesis.speak(utterance);
       }
 
-      // Also generate high-quality TTS via API for better voice
-      const { data, error } = await supabase.functions.invoke('multimodal-ai', {
-        body: {
-          input: text,
-          mode: 'tts',
-          context: { settings: accessibilitySettings }
-        }
-      });
+      // Also try to generate high-quality TTS via API
+      try {
+        const { data, error } = await supabase.functions.invoke('multimodal-ai', {
+          body: {
+            input: text,
+            mode: 'tts',
+            context: { settings: accessibilitySettings }
+          }
+        });
 
-      if (!error && data?.audioUrl) {
-        // Play the high-quality audio
-        if (audioRef.current) {
-          audioRef.current.src = data.audioUrl;
-          await audioRef.current.play();
+        if (!error && data?.audioUrl) {
+          // Play the high-quality audio
+          if (audioRef.current) {
+            audioRef.current.src = data.audioUrl;
+            await audioRef.current.play();
+          }
         }
+      } catch (apiError) {
+        console.log('API TTS failed, using browser TTS only:', apiError);
       }
     } catch (error) {
       console.error('TTS Error:', error);
@@ -342,7 +346,7 @@ const MultimodalAI = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Enhanced AI interaction
+  // Enhanced AI interaction with better error handling
   const handleAIInteraction = useCallback(async (
     input: string, 
     mode: 'text' | 'voice' | 'image' | 'video' | 'accessibility' | 'image_generation' | 'document' = 'text', 
@@ -375,7 +379,7 @@ const MultimodalAI = () => {
           (imageKeywords.some(keyword => input.toLowerCase().includes(keyword)) && 
            imageTypes.some(type => input.toLowerCase().includes(type)));
 
-      // Only speak if in voice mode, forced, or for specific quick actions
+      // Only speak if in voice mode, forced, or for specific actions
       const shouldSpeak = currentMode === 'voice' || forceSpeak || mode === 'voice';
 
       const { data, error } = await supabase.functions.invoke('multimodal-ai', {
@@ -409,7 +413,7 @@ const MultimodalAI = () => {
 
       if (error) {
         console.error('🚨 AI Error:', error);
-        const errorText = "I'm sorry, I'm having trouble right now. Please try again.";
+        const errorText = data?.text || "I'm sorry, I'm having trouble right now. Please try again.";
         
         const errorMessage: ConversationMessage = {
           type: 'ai',
@@ -419,6 +423,15 @@ const MultimodalAI = () => {
           id: Date.now().toString()
         };
         setConversation(prev => [...prev, errorMessage]);
+        
+        if (shouldSpeak) {
+          await speakText(errorText, 'high');
+        }
+        
+        // Show user-friendly error based on suggestions
+        if (data?.suggestions) {
+          toast.error(errorText);
+        }
         return;
       }
 
@@ -446,6 +459,7 @@ const MultimodalAI = () => {
         toast.success("🎨 Image generated successfully!");
       }
 
+      // Handle audio playback
       if (aiResponse.audioUrl && audioRef.current) {
         try {
           audioRef.current.src = aiResponse.audioUrl;
@@ -454,7 +468,14 @@ const MultimodalAI = () => {
         } catch (audioError) {
           console.error('Audio playback error:', audioError);
           setIsSpeaking(false);
+          // Fallback to browser TTS
+          if (shouldSpeak) {
+            await speakText(aiResponse.text, 'normal');
+          }
         }
+      } else if (shouldSpeak) {
+        // Use browser TTS as fallback
+        await speakText(aiResponse.text, 'normal');
       }
 
       // Save conversation if user is logged in
@@ -494,6 +515,10 @@ const MultimodalAI = () => {
       };
       setConversation(prev => [...prev, errorMessage]);
       
+      if (currentMode === 'voice' || forceSpeak) {
+        await speakText(errorText, 'high');
+      }
+      
       toast.error("Technical issue - please try again");
     } finally {
       setIsProcessing(false);
@@ -510,7 +535,8 @@ const MultimodalAI = () => {
     uploadedFiles,
     currentMode,
     user,
-    currentConversationId
+    currentConversationId,
+    speakText
   ]);
 
   // REAL Voice Recognition
@@ -550,7 +576,7 @@ const MultimodalAI = () => {
       recognition.start();
     } catch (error) {
       console.error("🚨 Voice recognition start error:", error);
-      toast.error("Could not start voice recognition. Please try typing instead.");
+      toast.error("Could not start voice recognition. Please check microphone permissions.");
     }
   }, [handleAIInteraction, setupVoiceRecognition]);
 
@@ -594,10 +620,10 @@ const MultimodalAI = () => {
       
     } catch (error) {
       console.error("🚨 Camera error:", error);
-      await speakText("Camera access denied. Please enable camera permissions.", 'high');
-      toast.error("Camera access needed");
+      await speakText("Camera access denied. Please enable camera permissions in your browser settings.", 'high');
+      toast.error("Camera access needed - please allow camera permissions");
     }
-  }, [accessibilitySettings, handleAIInteraction, speakText, currentMode]);
+  }, [handleAIInteraction, speakText, currentMode]);
 
   const stopVideo = useCallback(() => {
     if (videoRef.current?.srcObject) {
@@ -847,7 +873,7 @@ const MultimodalAI = () => {
         stopVideo();
       }
     }
-  }, [currentMode]);
+  }, [currentMode, startListening, stopListening, startVideo, stopVideo]);
 
   return (
     <div className={`flex h-screen bg-white dark:bg-gray-900 ${
@@ -1053,14 +1079,6 @@ const MultimodalAI = () => {
                   >
                     <Users className="w-6 h-6" />
                     <span className="text-sm">Recognize People</span>
-                  </Button>
-                  <Button
-                    onClick={() => handleAIInteraction("Generate a beautiful creative image or anime artwork for me", 'image_generation', undefined, false)}
-                    variant="outline"
-                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl hover:scale-105 transition-transform"
-                  >
-                    <Palette className="w-6 h-6" />
-                    <span className="text-sm">Create Image</span>
                   </Button>
                   <Button
                     onClick={() => setCurrentMode('video')}

@@ -41,9 +41,9 @@ serve(async (req) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'tts-1-hd',
+            model: 'tts-1',
             input: input.substring(0, 4000),
-            voice: 'shimmer', // Female voice
+            voice: 'shimmer',
             response_format: 'mp3',
             speed: context?.settings?.speechSpeed === 'slow' ? 0.8 :
                    context?.settings?.speechSpeed === 'fast' ? 1.2 : 1.0,
@@ -102,12 +102,6 @@ serve(async (req) => {
 - Generate REAL images, logos, artwork, anime using DALL-E 3
 - Create detailed, high-quality visual content
 - Never just describe images - actually create them
-
-IMPORTANT: 
-- You MUST generate real images when requested, not descriptions
-- You MUST speak for emotional support, singing, emergency, daily help
-- You CAN analyze uploaded files thoroughly and remember information
-- Always be encouraging, supportive, and genuinely helpful
 
 Current context:
 ${context?.settings ? `
@@ -188,7 +182,6 @@ RESPOND NATURALLY AND HELPFULLY.`;
       try {
         console.log('🎨 GENERATING REAL IMAGE with DALL-E...');
         
-        // Enhanced prompt for better image generation
         let enhancedPrompt = input;
         if (input.toLowerCase().includes('anime')) {
           enhancedPrompt = `High quality anime artwork: ${input}`;
@@ -229,24 +222,52 @@ RESPOND NATURALLY AND HELPFULLY.`;
       }
     }
 
-    // Get AI response
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: mode === 'image' || mode === 'video' || mode === 'document' ? 'gpt-4o' : 'gpt-4o-mini',
-        messages: messages,
-        max_tokens: 1000,
-        temperature: 0.7,
-      }),
-    });
+    // Get AI response with proper error handling
+    let response;
+    try {
+      response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openAIApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: mode === 'image' || mode === 'video' || mode === 'document' ? 'gpt-4o-mini' : 'gpt-4o-mini',
+          messages: messages,
+          max_tokens: 1000,
+          temperature: 0.7,
+        }),
+      });
+    } catch (error) {
+      console.error('🚨 OpenAI request failed:', error);
+      throw new Error('Failed to connect to AI service');
+    }
 
     if (!response.ok) {
       const errorData = await response.text();
       console.error('OpenAI API error:', errorData);
+      
+      // Handle specific error cases
+      if (response.status === 429) {
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: 'Rate limit reached. Please wait a moment and try again.',
+          text: 'I apologize, but I\'m experiencing high demand right now. Please wait a moment and try again.'
+        }), {
+          status: 200, // Return 200 so frontend can handle gracefully
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      } else if (response.status === 401) {
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: 'API key issue. Please contact support.',
+          text: 'I\'m having technical difficulties with my API access. Please contact support.'
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
       throw new Error(`OpenAI API error: ${response.status}`);
     }
 
@@ -276,9 +297,9 @@ RESPOND NATURALLY AND HELPFULLY.`;
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'tts-1-hd',
+            model: 'tts-1',
             input: aiResponse.substring(0, 4000),
-            voice: 'shimmer', // Female voice
+            voice: 'shimmer',
             response_format: 'mp3',
             speed: context?.settings?.speechSpeed === 'slow' ? 0.8 :
                    context?.settings?.speechSpeed === 'fast' ? 1.2 : 1.0,
@@ -356,20 +377,43 @@ RESPOND NATURALLY AND HELPFULLY.`;
   } catch (error) {
     console.error('🚨 Error in multimodal-ai function:', error);
     
-    // Provide user-friendly error messages
+    // Provide user-friendly error messages based on error type
     let errorMessage = 'I apologize, but I\'m having technical difficulties. Please try again.';
+    let suggestions = [
+      "Try a simpler request",
+      "Check your internet connection", 
+      "Contact support if this persists"
+    ];
     
-    if (error.message.includes('Rate limit')) {
-      errorMessage = error.message;
+    if (error.message.includes('Rate limit') || error.message.includes('quota')) {
+      errorMessage = 'I\'m experiencing high demand right now. Please wait a moment and try again.';
+      suggestions = [
+        "Wait a few minutes and try again",
+        "Try a shorter message",
+        "Use text mode instead of voice"
+      ];
     } else if (error.message.includes('API key')) {
-      errorMessage = 'API configuration issue. Please contact support.';
+      errorMessage = 'There\'s an issue with my configuration. Please contact support.';
+      suggestions = [
+        "Contact support for assistance",
+        "Try again later"
+      ];
+    } else if (error.message.includes('network') || error.message.includes('connect')) {
+      errorMessage = 'I\'m having trouble connecting to my services. Please check your internet connection.';
+      suggestions = [
+        "Check your internet connection",
+        "Try refreshing the page",
+        "Try again in a moment"
+      ];
     }
     
     return new Response(JSON.stringify({ 
       success: false, 
-      error: errorMessage
+      error: errorMessage,
+      text: errorMessage,
+      suggestions: suggestions
     }), {
-      status: 500,
+      status: 200, // Return 200 so frontend handles gracefully
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
