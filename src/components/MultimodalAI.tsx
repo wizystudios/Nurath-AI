@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,73 +16,24 @@ import {
   Send,
   Paperclip,
   Music,
-  Smile,
-  BookOpen,
+  Clock,
   Eye,
   MessageCircle,
   Camera,
   Image as ImageIcon,
   StopCircle,
-  Palette,
-  Zap,
-  MapPin,
   Menu,
   Plus,
-  Search,
   Settings,
-  Share,
-  Edit,
-  Trash2,
-  Phone,
-  PhoneCall,
   X,
-  VolumeX,
-  Accessibility,
-  AlertTriangle,
-  Clock,
   Shield,
-  Baby,
-  Sparkles,
-  Copy,
-  User,
-  LogOut
+  Sparkles
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useNavigate } from "react-router-dom";
 import UserAuthButton from "@/components/UserAuthButton";
-
-interface RelationshipTag {
-  id: string;
-  name: string;
-  relationship: string;
-  imageUrl?: string;
-  voicePattern?: string;
-}
-
-interface EmotionState {
-  primary: string;
-  confidence: number;
-  tone: 'happy' | 'sad' | 'angry' | 'excited' | 'calm' | 'confused' | 'stressed' | 'anxious';
-  description?: string;
-}
-
-interface AIResponse {
-  text: string;
-  audioUrl?: string;
-  emotion?: EmotionState;
-  recognizedFaces?: RelationshipTag[];
-  environmentDescription?: string;
-  suggestions?: string[];
-  imageUrl?: string;
-  accessibility?: {
-    sceneDescription?: string;
-    objectDetection?: string[];
-    navigationHelp?: string;
-    emotionalSupport?: string;
-  };
-}
 
 interface ConversationMessage {
   type: 'user' | 'ai';
@@ -91,27 +43,6 @@ interface ConversationMessage {
   hasAudio?: boolean;
   id: string;
   imageUrl?: string;
-  accessibility?: {
-    altText?: string;
-    audioDescription?: string;
-  };
-}
-
-interface AccessibilitySettings {
-  visualImpairment: boolean;
-  hearingImpairment: boolean;
-  cognitiveSupport: boolean;
-  physicalDisability: boolean;
-  speechImpairment: boolean;
-  isChild: boolean;
-  isElderly: boolean;
-  emergencyContact?: string;
-  preferredVoice: 'gentle' | 'clear' | 'cheerful' | 'calm';
-  fontSize: 'small' | 'medium' | 'large' | 'extra-large';
-  speechSpeed: 'slow' | 'normal' | 'fast';
-  enableVibration: boolean;
-  autoDescribeImages: boolean;
-  emotionalSupport: boolean;
 }
 
 const MultimodalAI = () => {
@@ -119,33 +50,12 @@ const MultimodalAI = () => {
   const [isVideoOn, setIsVideoOn] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [inputText, setInputText] = useState("");
-  const [currentEmotion, setCurrentEmotion] = useState<EmotionState | null>(null);
-  const [recognizedPeople, setRecognizedPeople] = useState<RelationshipTag[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
-  const [editingText, setEditingText] = useState("");
   const [conversation, setConversation] = useState<ConversationMessage[]>([]);
-  const [isEmergency, setIsEmergency] = useState(false);
-  const [currentScene, setCurrentScene] = useState<string>("");
-  const [detectedObjects, setDetectedObjects] = useState<string[]>([]);
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [accessibilitySettings, setAccessibilitySettings] = useState<AccessibilitySettings>({
-    visualImpairment: false,
-    hearingImpairment: false,
-    cognitiveSupport: false,
-    physicalDisability: false,
-    speechImpairment: false,
-    isChild: false,
-    isElderly: false,
-    preferredVoice: 'gentle',
-    fontSize: 'medium',
-    speechSpeed: 'normal',
-    enableVibration: true,
-    autoDescribeImages: true,
-    emotionalSupport: true
-  });
-
+  const [currentMode, setCurrentMode] = useState<'text' | 'voice' | 'video'>('text');
+  const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
   const [conversationHistory, setConversationHistory] = useState<Array<{
     id: string;
     title: string;
@@ -154,112 +64,139 @@ const MultimodalAI = () => {
   }>>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string>('');
 
-  const [currentMode, setCurrentMode] = useState<'text' | 'voice' | 'video'>('text');
-  const [user, setUser] = useState<any>(null);
-  const [profile, setProfile] = useState<any>(null);
-  const navigate = useNavigate();
-
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const vibrationRef = useRef<number | null>(null);
-  const synthesisRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const navigate = useNavigate();
 
-  // REAL Voice Recognition Setup
+  // Initialize recognition with better browser support
   const setupVoiceRecognition = useCallback(() => {
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-      toast.error("Voice recognition not supported in this browser");
+      toast.error("Voice recognition not supported - please try Chrome or Edge browser");
       return null;
     }
 
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
     
-    recognition.continuous = true;
-    recognition.interimResults = true;
+    recognition.continuous = false;
+    recognition.interimResults = false;
     recognition.lang = 'en-US';
+    recognition.maxAlternatives = 1;
     
     return recognition;
   }, []);
 
-  // REAL Text-to-Speech Function
+  // Enhanced TTS with better error handling
   const speakText = useCallback(async (text: string, priority: 'low' | 'normal' | 'high' = 'normal') => {
     try {
-      if (priority === 'high' && synthesisRef.current) {
+      console.log('🔊 Starting TTS for:', text.substring(0, 50) + '...');
+      
+      if (priority === 'high' && 'speechSynthesis' in window) {
         speechSynthesis.cancel();
       }
 
       setIsSpeaking(true);
 
-      // Use browser TTS first for immediate response
+      // Try browser TTS first for immediate feedback
       if ('speechSynthesis' in window) {
         const utterance = new SpeechSynthesisUtterance(text);
-        utterance.rate = accessibilitySettings.speechSpeed === 'slow' ? 0.7 : 
-                        accessibilitySettings.speechSpeed === 'fast' ? 1.3 : 1.0;
-        utterance.pitch = accessibilitySettings.isChild ? 1.2 : 
-                         accessibilitySettings.isElderly ? 0.9 : 1.0;
-        utterance.volume = 0.9;
+        utterance.rate = 0.9;
+        utterance.pitch = 1.0;
+        utterance.volume = 0.8;
 
+        // Get available voices and select a female voice
         const voices = speechSynthesis.getVoices();
         if (voices.length > 0) {
-          const preferredVoice = voices.find(voice => 
+          const femaleVoice = voices.find(voice => 
             voice.name.toLowerCase().includes('female') ||
-            voice.name.toLowerCase().includes('woman') ||
             voice.name.toLowerCase().includes('samantha') ||
-            voice.name.toLowerCase().includes('zira')
-          ) || voices[0];
-          utterance.voice = preferredVoice;
+            voice.name.toLowerCase().includes('zira') ||
+            voice.gender === 'female'
+          ) || voices.find(voice => voice.lang.startsWith('en')) || voices[0];
+          
+          if (femaleVoice) {
+            utterance.voice = femaleVoice;
+          }
         }
 
-        utterance.onstart = () => setIsSpeaking(true);
-        utterance.onend = () => setIsSpeaking(false);
-        utterance.onerror = () => setIsSpeaking(false);
+        utterance.onstart = () => {
+          console.log('🔊 Browser TTS started');
+          setIsSpeaking(true);
+        };
         
-        synthesisRef.current = utterance;
+        utterance.onend = () => {
+          console.log('🔊 Browser TTS ended');
+          setIsSpeaking(false);
+        };
+        
+        utterance.onerror = (event) => {
+          console.error('🔊 Browser TTS error:', event);
+          setIsSpeaking(false);
+        };
+
         speechSynthesis.speak(utterance);
       }
 
-      // Also try to generate high-quality TTS via API
+      // Also try high-quality TTS via API
       try {
+        console.log('🔊 Attempting API TTS...');
         const { data, error } = await supabase.functions.invoke('multimodal-ai', {
           body: {
-            input: text,
+            input: text.substring(0, 4000), // Limit text length
             mode: 'tts',
-            context: { settings: accessibilitySettings }
+            context: { 
+              settings: { 
+                speechSpeed: 'normal',
+                preferredVoice: 'shimmer'
+              }
+            }
           }
         });
 
         if (!error && data?.audioUrl) {
-          // Play the high-quality audio
+          console.log('🔊 API TTS successful');
           if (audioRef.current) {
             audioRef.current.src = data.audioUrl;
-            await audioRef.current.play();
+            audioRef.current.oncanplaythrough = () => {
+              audioRef.current?.play().catch(err => {
+                console.error('Audio play error:', err);
+              });
+            };
+            audioRef.current.onended = () => setIsSpeaking(false);
+            audioRef.current.onerror = () => setIsSpeaking(false);
           }
+        } else {
+          console.log('🔊 API TTS failed, using browser TTS only');
         }
       } catch (apiError) {
-        console.log('API TTS failed, using browser TTS only:', apiError);
+        console.log('🔊 API TTS error:', apiError);
       }
     } catch (error) {
-      console.error('TTS Error:', error);
+      console.error('🔊 TTS Error:', error);
       setIsSpeaking(false);
+      toast.error('Speech synthesis failed');
     }
-  }, [accessibilitySettings]);
+  }, []);
 
-  // REAL File Analysis Function
+  // Enhanced file analysis
   const analyzeFile = useCallback(async (file: File) => {
     try {
+      console.log('📁 Analyzing file:', file.name, file.type);
       setIsProcessing(true);
+      
       const reader = new FileReader();
       
       return new Promise((resolve, reject) => {
         reader.onload = async (e) => {
           try {
             const base64Data = e.target?.result as string;
+            console.log('📁 File read successfully, size:', base64Data.length);
             
             const { data, error } = await supabase.functions.invoke('multimodal-ai', {
               body: {
-                input: `Please analyze this ${file.type.includes('image') ? 'image' : 'document'} in detail and provide insights.`,
+                input: `Please analyze this ${file.type.includes('image') ? 'image' : 'document'} thoroughly. Describe everything you can see or find in detail.`,
                 mode: file.type.includes('image') ? 'image' : 'document',
                 attachments: [{
                   type: file.type,
@@ -267,95 +204,58 @@ const MultimodalAI = () => {
                   name: file.name,
                   size: file.size
                 }],
+                analyzeFile: true,
                 context: {
-                  settings: accessibilitySettings,
-                  fileAnalysis: true
+                  fileAnalysis: true,
+                  fileName: file.name,
+                  fileType: file.type
                 }
               }
             });
 
-            if (error) throw error;
+            if (error) {
+              console.error('📁 Analysis error:', error);
+              throw new Error(error.message || 'File analysis failed');
+            }
             
-            setUploadedFiles(prev => [...prev, file]);
+            console.log('📁 Analysis successful');
             resolve(data);
           } catch (err) {
+            console.error('📁 Analysis processing error:', err);
             reject(err);
           }
         };
         
-        reader.onerror = reject;
+        reader.onerror = (err) => {
+          console.error('📁 File read error:', err);
+          reject(new Error('Failed to read file'));
+        };
+        
         reader.readAsDataURL(file);
       });
     } catch (error) {
-      console.error('File analysis error:', error);
+      console.error('📁 File analysis setup error:', error);
       throw error;
     } finally {
       setIsProcessing(false);
     }
-  }, [accessibilitySettings]);
-
-  // Authentication check
-  useEffect(() => {
-    const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-      
-      if (user) {
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-        setProfile(profileData);
-
-        // Load conversation history for logged in users
-        const { data: conversations } = await supabase
-          .from('chat_messages')
-          .select('conversation_id, created_at')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false });
-
-        if (conversations) {
-          const uniqueConversations = conversations.reduce((acc: any[], msg) => {
-            if (!acc.find(c => c.id === msg.conversation_id)) {
-              acc.push({
-                id: msg.conversation_id,
-                title: `Chat ${new Date(msg.created_at).toLocaleDateString()}`,
-                date: new Date(msg.created_at).toLocaleDateString(),
-                messages: []
-              });
-            }
-            return acc;
-          }, []);
-          setConversationHistory(uniqueConversations);
-        }
-      }
-    };
-    
-    checkUser();
-    
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user || null);
-      if (!session?.user) {
-        setProfile(null);
-        setConversationHistory([]);
-        setConversation([]);
-      }
-    });
-    
-    return () => subscription.unsubscribe();
   }, []);
 
   // Enhanced AI interaction with better error handling
   const handleAIInteraction = useCallback(async (
     input: string, 
-    mode: 'text' | 'voice' | 'image' | 'video' | 'accessibility' | 'image_generation' | 'document' = 'text', 
+    mode: 'text' | 'voice' | 'image' | 'video' | 'image_generation' | 'document' = 'text', 
     attachments?: any[],
     forceSpeak: boolean = false
   ) => {
     try {
-      console.log("🧠 Starting AI interaction:", { input, mode, currentMode, forceSpeak });
+      console.log("🧠 AI Interaction:", { input: input.substring(0, 50), mode, forceSpeak });
       
+      if (!input.trim() && !attachments?.length) {
+        toast.error("Please provide some input");
+        return;
+      }
+
       setIsProcessing(true);
 
       const newMessage: ConversationMessage = {
@@ -363,10 +263,7 @@ const MultimodalAI = () => {
         content: input,
         timestamp: new Date(),
         attachments,
-        id: Date.now().toString(),
-        accessibility: {
-          altText: mode === 'voice' ? 'Voice message' : mode === 'image' ? 'Image message' : undefined
-        }
+        id: Date.now().toString()
       };
 
       setConversation(prev => [...prev, newMessage]);
@@ -382,6 +279,7 @@ const MultimodalAI = () => {
       // Only speak if in voice mode, forced, or for specific actions
       const shouldSpeak = currentMode === 'voice' || forceSpeak || mode === 'voice';
 
+      console.log("🧠 Calling Supabase function...");
       const { data, error } = await supabase.functions.invoke('multimodal-ai', {
         body: {
           input,
@@ -392,69 +290,33 @@ const MultimodalAI = () => {
           analyzeFile: attachments && attachments.length > 0,
           shouldSpeak: shouldSpeak,
           context: {
-            settings: {
-              ...accessibilitySettings,
-              preferredVoice: 'shimmer',
-              speechSpeed: 'normal'
-            },
-            currentEmotion,
-            recognizedPeople,
-            currentScene,
-            detectedObjects,
-            conversationHistory: conversation.slice(-10),
-            emergencyMode: isEmergency,
-            uploadedFiles: uploadedFiles.map(f => ({ name: f.name, type: f.type, size: f.size })),
-            userId: user?.id
+            currentMode,
+            userId: user?.id,
+            conversationHistory: conversation.slice(-5) // Send last 5 messages for context
           }
         }
       });
 
-      setIsProcessing(false);
-
       if (error) {
         console.error('🚨 AI Error:', error);
-        const errorText = data?.text || "I'm sorry, I'm having trouble right now. Please try again.";
-        
-        const errorMessage: ConversationMessage = {
-          type: 'ai',
-          content: errorText,
-          timestamp: new Date(),
-          hasAudio: false,
-          id: Date.now().toString()
-        };
-        setConversation(prev => [...prev, errorMessage]);
-        
-        if (shouldSpeak) {
-          await speakText(errorText, 'high');
-        }
-        
-        // Show user-friendly error based on suggestions
-        if (data?.suggestions) {
-          toast.error(errorText);
-        }
-        return;
+        throw new Error(error.message || 'AI service temporarily unavailable');
       }
+
+      console.log("🧠 AI Response received:", data?.text?.substring(0, 50));
 
       const aiResponse = data;
-
-      if (aiResponse.emotion) {
-        setCurrentEmotion(aiResponse.emotion);
-      }
-
       const aiMessage: ConversationMessage = {
         type: 'ai',
-        content: aiResponse.text,
+        content: aiResponse.text || 'I apologize, but I had trouble processing your request.',
         timestamp: new Date(),
         hasAudio: !!aiResponse.audioUrl,
-        id: Date.now().toString(),
-        imageUrl: aiResponse.imageUrl,
-        accessibility: {
-          audioDescription: aiResponse.accessibility?.sceneDescription
-        }
+        id: (Date.now() + 1).toString(),
+        imageUrl: aiResponse.imageUrl
       };
 
       setConversation(prev => [...prev, aiMessage]);
 
+      // Handle image generation success
       if (aiResponse.imageUrl) {
         toast.success("🎨 Image generated successfully!");
       }
@@ -462,11 +324,14 @@ const MultimodalAI = () => {
       // Handle audio playback
       if (aiResponse.audioUrl && audioRef.current) {
         try {
+          console.log('🔊 Playing API audio response');
           audioRef.current.src = aiResponse.audioUrl;
           setIsSpeaking(true);
+          audioRef.current.onended = () => setIsSpeaking(false);
+          audioRef.current.onerror = () => setIsSpeaking(false);
           await audioRef.current.play();
         } catch (audioError) {
-          console.error('Audio playback error:', audioError);
+          console.error('🔊 Audio playback error:', audioError);
           setIsSpeaking(false);
           // Fallback to browser TTS
           if (shouldSpeak) {
@@ -474,7 +339,7 @@ const MultimodalAI = () => {
           }
         }
       } else if (shouldSpeak) {
-        // Use browser TTS as fallback
+        // Use browser TTS
         await speakText(aiResponse.text, 'normal');
       }
 
@@ -504,14 +369,14 @@ const MultimodalAI = () => {
 
     } catch (error) {
       console.error('🚨 AI interaction error:', error);
-      const errorText = "I'm sorry, I'm having technical difficulties. Please try speaking to me again.";
+      const errorText = error.message || "I'm having technical difficulties. Please try again.";
       
       const errorMessage: ConversationMessage = {
         type: 'ai',
         content: errorText,
         timestamp: new Date(),
         hasAudio: false,
-        id: Date.now().toString()
+        id: (Date.now() + 2).toString()
       };
       setConversation(prev => [...prev, errorMessage]);
       
@@ -519,27 +384,13 @@ const MultimodalAI = () => {
         await speakText(errorText, 'high');
       }
       
-      toast.error("Technical issue - please try again");
+      toast.error(errorText);
     } finally {
       setIsProcessing(false);
     }
-  }, [
-    accessibilitySettings, 
-    currentEmotion, 
-    recognizedPeople, 
-    currentScene, 
-    detectedObjects, 
-    conversation, 
-    isEmergency, 
-    isVideoOn,
-    uploadedFiles,
-    currentMode,
-    user,
-    currentConversationId,
-    speakText
-  ]);
+  }, [currentMode, isVideoOn, conversation, user, currentConversationId, speakText]);
 
-  // REAL Voice Recognition
+  // Enhanced voice recognition
   const startListening = useCallback(async () => {
     try {
       const recognition = setupVoiceRecognition();
@@ -549,33 +400,36 @@ const MultimodalAI = () => {
       
       recognition.onstart = () => {
         setIsListening(true);
-        toast.success("🎤 Listening...");
+        console.log("🎤 Voice recognition started");
+        toast.success("🎤 Listening... Speak now!");
       };
 
       recognition.onresult = (event) => {
-        const transcript = event.results[event.results.length - 1][0].transcript;
-        console.log("🎤 Voice input:", transcript);
+        const transcript = event.results[0][0].transcript;
+        console.log("🎤 Voice input received:", transcript);
         
-        if (event.results[event.results.length - 1].isFinal) {
+        if (transcript.trim()) {
           setInputText(transcript);
           handleAIInteraction(transcript, 'voice', undefined, true);
-          setIsListening(false);
         }
+        setIsListening(false);
       };
 
       recognition.onerror = (error) => {
         console.error("🚨 Speech recognition error:", error);
         setIsListening(false);
-        toast.error("Voice recognition error. Please try again.");
+        toast.error(`Voice recognition error: ${error.error}. Please check microphone permissions.`);
       };
 
       recognition.onend = () => {
+        console.log("🎤 Voice recognition ended");
         setIsListening(false);
       };
 
       recognition.start();
     } catch (error) {
       console.error("🚨 Voice recognition start error:", error);
+      setIsListening(false);
       toast.error("Could not start voice recognition. Please check microphone permissions.");
     }
   }, [handleAIInteraction, setupVoiceRecognition]);
@@ -587,48 +441,73 @@ const MultimodalAI = () => {
     }
   }, []);
 
-  // REAL Camera Functions
+  // Enhanced camera functions with better error handling
   const startVideo = useCallback(async () => {
     try {
-      console.log("📹 Starting REAL camera...");
+      console.log("📹 Starting camera...");
+      
+      // Check if getUserMedia is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Camera access not supported in this browser");
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { 
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
+          width: { ideal: 1280, min: 640 },
+          height: { ideal: 720, min: 480 },
           facingMode: 'user'
         }, 
-        audio: true 
+        audio: false // Start with video only to avoid audio feedback
       });
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
-      }
-      setIsVideoOn(true);
-      
-      if (currentMode === 'video') {
-        await speakText("Camera activated. I can now see your environment.", 'normal');
+        setIsVideoOn(true);
+        console.log("📹 Camera started successfully");
         toast.success("🎥 Camera activated!");
         
-        setTimeout(() => {
-          handleAIInteraction(
-            "Please describe what you see in detail, including people, objects, text, colors, and spatial relationships. Help me understand my surroundings completely.", 
-            'video'
-          );
-        }, 2000);
+        if (currentMode === 'video') {
+          await speakText("Camera is now active. I can see your environment.", 'normal');
+          
+          // Auto-analyze after a short delay
+          setTimeout(() => {
+            handleAIInteraction(
+              "Please describe everything you can see in my environment in detail, including any people, objects, and surroundings.", 
+              'video',
+              undefined,
+              true
+            );
+          }, 2000);
+        }
       }
       
     } catch (error) {
       console.error("🚨 Camera error:", error);
-      await speakText("Camera access denied. Please enable camera permissions in your browser settings.", 'high');
-      toast.error("Camera access needed - please allow camera permissions");
+      let errorMessage = "Camera access failed. ";
+      
+      if (error.name === 'NotFoundError') {
+        errorMessage += "No camera found. Please connect a camera and try again.";
+      } else if (error.name === 'NotAllowedError') {
+        errorMessage += "Camera permission denied. Please allow camera access in your browser settings.";
+      } else if (error.name === 'NotReadableError') {
+        errorMessage += "Camera is being used by another application.";
+      } else {
+        errorMessage += error.message || "Unknown camera error.";
+      }
+      
+      await speakText(errorMessage, 'high');
+      toast.error(errorMessage);
     }
   }, [handleAIInteraction, speakText, currentMode]);
 
   const stopVideo = useCallback(() => {
     if (videoRef.current?.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach(track => track.stop());
+      stream.getTracks().forEach(track => {
+        track.stop();
+        console.log("📹 Camera track stopped");
+      });
       videoRef.current.srcObject = null;
     }
     setIsVideoOn(false);
@@ -638,15 +517,16 @@ const MultimodalAI = () => {
     toast.info("Camera stopped");
   }, [speakText, currentMode]);
 
-  // File Upload with REAL Analysis
+  // File upload with proper analysis
   const handleFileUpload = useCallback(async (files: FileList) => {
     const file = files[0];
     if (!file) return;
 
-    console.log("📁 REAL file upload and analysis:", file.name, file.type);
-    await speakText("Processing your file, please wait.", 'normal');
-
+    console.log("📁 File upload started:", file.name, file.type, file.size);
+    
     try {
+      await speakText(`Processing your ${file.type.includes('image') ? 'image' : 'document'} file. Please wait.`, 'normal');
+      
       const analysisResult = await analyzeFile(file);
       
       const fileType = file.type.startsWith('image/') ? 'image' : 
@@ -655,86 +535,141 @@ const MultimodalAI = () => {
       await handleAIInteraction(
         `I've uploaded a ${fileType} file named "${file.name}". Please analyze it thoroughly and tell me everything you can discover from it.`,
         fileType as any,
-        [analysisResult]
+        [{ 
+          type: file.type, 
+          data: analysisResult, 
+          name: file.name, 
+          size: file.size 
+        }],
+        true
       );
     } catch (error) {
-      console.error('File upload error:', error);
-      await speakText("Sorry, I had trouble analyzing that file. Please try again.", 'high');
+      console.error('📁 File upload error:', error);
+      await speakText("Sorry, I had trouble analyzing that file. Please try again with a different file.", 'high');
+      toast.error('File analysis failed');
     }
   }, [analyzeFile, handleAIInteraction, speakText]);
 
-  // Take Photo with REAL Analysis
-  const takePhoto = useCallback(() => {
+  // Take photo and analyze
+  const takePhoto = useCallback(async () => {
     if (!videoRef.current || !isVideoOn) {
-      speakText("Please turn on the camera first", 'high');
-      toast.error("Camera needed");
+      const message = "Please turn on the camera first to take a photo.";
+      await speakText(message, 'high');
+      toast.error(message);
       return;
     }
 
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    
-    canvas.width = videoRef.current.videoWidth;
-    canvas.height = videoRef.current.videoHeight;
-    
-    ctx?.drawImage(videoRef.current, 0, 0);
-    
-    canvas.toBlob(async (blob) => {
-      if (blob) {
-        const file = new File([blob], 'photo.jpg', { type: 'image/jpeg' });
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-          const base64Data = e.target?.result as string;
-          
-          await handleAIInteraction(
-            "I just took a photo. Please describe everything you see in great detail - people, objects, surroundings, and help me understand my environment completely.",
-            'image',
-            [{ type: 'image', data: base64Data, name: 'accessibility-photo.jpg' }]
-          );
-        };
-        reader.readAsDataURL(file);
-        await speakText("Photo captured. Analyzing what I can see.", 'normal');
-        toast.success("📸 Photo captured and analyzing...");
-      }
-    }, 'image/jpeg', 0.8);
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      canvas.width = videoRef.current.videoWidth || 640;
+      canvas.height = videoRef.current.videoHeight || 480;
+      
+      ctx?.drawImage(videoRef.current, 0, 0);
+      
+      canvas.toBlob(async (blob) => {
+        if (blob) {
+          const file = new File([blob], 'photo.jpg', { type: 'image/jpeg' });
+          const reader = new FileReader();
+          reader.onload = async (e) => {
+            const base64Data = e.target?.result as string;
+            
+            await handleAIInteraction(
+              "I just took a photo. Please describe everything you see in great detail - people, objects, surroundings, colors, and help me understand my environment completely.",
+              'image',
+              [{ type: 'image', data: base64Data, name: 'photo.jpg' }],
+              true
+            );
+          };
+          reader.readAsDataURL(file);
+          await speakText("Photo captured. Analyzing what I can see.", 'normal');
+          toast.success("📸 Photo captured and analyzing...");
+        }
+      }, 'image/jpeg', 0.9);
+    } catch (error) {
+      console.error('📸 Photo capture error:', error);
+      toast.error('Failed to capture photo');
+    }
   }, [isVideoOn, handleAIInteraction, speakText]);
 
-  // Message Actions
-  const copyMessage = useCallback((content: string) => {
-    navigator.clipboard.writeText(content);
-    toast.success("Message copied!");
-  }, []);
+  // Authentication check
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+      
+      if (user) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        setProfile(profileData);
 
-  const editMessage = useCallback((messageId: string, content: string) => {
-    setEditingMessageId(messageId);
-    setEditingText(content);
-  }, []);
+        // Create initial conversation if none exists
+        if (!currentConversationId) {
+          const newConversationId = Date.now().toString();
+          setCurrentConversationId(newConversationId);
+        }
+      }
+    };
+    
+    checkUser();
+    
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user || null);
+      if (!session?.user) {
+        setProfile(null);
+        setConversationHistory([]);
+        setConversation([]);
+      }
+    });
+    
+    return () => subscription.unsubscribe();
+  }, [currentConversationId]);
 
-  const deleteMessage = useCallback((messageId: string) => {
-    setConversation(prev => prev.filter(msg => msg.id !== messageId));
-    toast.success("Message deleted");
-  }, []);
-
-  const saveEdit = useCallback(async () => {
-    if (!editingMessageId || !editingText.trim()) return;
-
-    setConversation(prev => prev.map(msg => 
-      msg.id === editingMessageId 
-        ? { ...msg, content: editingText.trim() }
-        : msg
-    ));
-
-    const message = conversation.find(m => m.id === editingMessageId);
-    if (message?.type === 'user') {
-      await handleAIInteraction(editingText.trim());
+  // Handle user login/signup/logout
+  const handleLogin = useCallback(async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      toast.error(error.message);
+      return;
     }
+    toast.success("Logged in successfully!");
+  }, []);
 
-    setEditingMessageId(null);
-    setEditingText("");
-    toast.success("Message updated and resent");
-  }, [editingMessageId, editingText, conversation, handleAIInteraction]);
+  const handleSignup = useCallback(async (email: string, password: string, name: string) => {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { full_name: name } }
+    });
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("Account created successfully! Please check your email.");
+  }, []);
 
-  // Auto-speak quick action responses with voice enabled for specific actions
+  const handleLogout = useCallback(async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setProfile(null);
+    setConversationHistory([]);
+    setConversation([]);
+    toast.success("Logged out successfully");
+  }, []);
+
+  // Start new chat
+  const startNewChat = useCallback(() => {
+    const newConversationId = Date.now().toString();
+    setCurrentConversationId(newConversationId);
+    setConversation([]);
+    toast.success("New chat started");
+  }, []);
+
+  // Quick action handler with proper voice response
   const handleQuickAction = useCallback(async (actionType: string, prompt: string) => {
     const shouldSpeak = ['sing', 'emotional', 'daily', 'emergency', 'recognize'].some(action => 
       actionType.includes(action) || prompt.toLowerCase().includes(action)
@@ -748,138 +683,25 @@ const MultimodalAI = () => {
     );
   }, [handleAIInteraction]);
 
-  // Handle user login
-  const handleLogin = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
-
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-
-    toast.success("Logged in successfully!");
-  }, []);
-
-  // Handle user signup
-  const handleSignup = useCallback(async (email: string, password: string, name: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: name
-        }
-      }
-    });
-
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-
-    toast.success("Account created successfully! Please check your email.");
-  }, []);
-
-  // Handle logout
-  const handleLogout = useCallback(async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setProfile(null);
-    setConversationHistory([]);
-    setConversation([]);
-    toast.success("Logged out successfully");
-  }, []);
-
-  // Auto-play audio responses and handle end event
+  // Auto-setup when mode changes
   useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.onended = () => setIsSpeaking(false);
-      audioRef.current.onerror = () => setIsSpeaking(false);
-    }
-  }, []);
-
-  // Start a new chat
-  const startNewChat = useCallback(() => {
-    const newConversationId = Date.now().toString();
-    setCurrentConversationId(newConversationId);
-    setConversation([]);
-    
-    if (user) {
-      const newConversation = {
-        id: newConversationId,
-        title: 'New Chat',
-        date: 'Today',
-        messages: []
-      };
-      
-      setConversationHistory(prev => [newConversation, ...prev]);
-    }
-    
-    toast.success("New chat started");
-  }, [user]);
-
-  // Load a conversation
-  const loadConversation = useCallback(async (conversationId: string) => {
-    setCurrentConversationId(conversationId);
-    
-    if (user) {
-      try {
-        const { data: messages, error } = await supabase
-          .from('chat_messages')
-          .select('*')
-          .eq('conversation_id', conversationId)
-          .order('created_at', { ascending: true });
-
-        if (!error && messages) {
-          const formattedMessages: ConversationMessage[] = messages.map(msg => ({
-            type: msg.role as 'user' | 'ai',
-            content: msg.content,
-            timestamp: new Date(msg.created_at),
-            id: msg.id,
-            hasAudio: false
-          }));
-          setConversation(formattedMessages);
-        }
-      } catch (error) {
-        console.error('Error loading conversation:', error);
-        toast.error("Failed to load conversation");
-      }
-    } else {
-      setConversation([]);
-    }
-  }, [user]);
-
-  // Mode change effects
-  useEffect(() => {
-    if (currentMode === 'voice') {
-      if (!isListening) {
-        startListening();
-      }
-    } else {
-      if (isListening) {
-        stopListening();
-      }
+    if (currentMode === 'voice' && !isListening && !isProcessing) {
+      // Auto-start listening when switching to voice mode
+      setTimeout(() => startListening(), 500);
+    } else if (currentMode !== 'voice' && isListening) {
+      stopListening();
     }
 
-    if (currentMode === 'video') {
-      if (!isVideoOn) {
-        startVideo();
-      }
-    } else {
-      if (isVideoOn) {
-        stopVideo();
-      }
+    if (currentMode === 'video' && !isVideoOn) {
+      // Auto-start video when switching to video mode
+      setTimeout(() => startVideo(), 500);
+    } else if (currentMode !== 'video' && isVideoOn) {
+      stopVideo();
     }
-  }, [currentMode, startListening, stopListening, startVideo, stopVideo]);
+  }, [currentMode, startListening, stopListening, startVideo, stopVideo, isListening, isVideoOn, isProcessing]);
 
   return (
-    <div className={`flex h-screen bg-white dark:bg-gray-900 ${
-      accessibilitySettings.fontSize === 'large' ? 'text-lg' : 
-      accessibilitySettings.fontSize === 'extra-large' ? 'text-xl' : 'text-base'
-    }`}>
+    <div className="flex h-screen bg-white dark:bg-gray-900">
       {/* Sidebar */}
       <div className={`${isSidebarOpen ? 'w-64' : 'w-0'} transition-all duration-300 bg-gray-50 dark:bg-gray-800 flex flex-col overflow-hidden md:relative fixed inset-y-0 left-0 z-50`}>
         {isSidebarOpen && (
@@ -887,7 +709,7 @@ const MultimodalAI = () => {
             <div className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-40" onClick={() => setIsSidebarOpen(false)} />
             
             <div className="relative z-50 bg-gray-50 dark:bg-gray-800 h-full flex flex-col">
-              {/* Sidebar Header with Profile */}
+              {/* Profile & New Chat */}
               <div className="p-3">
                 <UserAuthButton
                   isLoggedIn={!!user}
@@ -906,31 +728,8 @@ const MultimodalAI = () => {
                 </Button>
               </div>
 
-              {/* Chat History - only show if logged in */}
-              {user && (
-                <div className="flex-1 overflow-y-auto px-2">
-                  <div className="space-y-1">
-                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 px-2 py-1">Recent</div>
-                    {conversationHistory.map((conv) => (
-                      <div key={conv.id} className="group relative">
-                        <button
-                          onClick={() => loadConversation(conv.id)}
-                          className={`w-full text-left p-2 text-sm rounded-xl truncate transition-colors ${
-                            currentConversationId === conv.id 
-                              ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white' 
-                              : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                          }`}
-                        >
-                          {conv.title}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Footer Settings */}
-              <div className="p-2 space-y-1">
+              {/* Settings */}
+              <div className="p-2 space-y-1 mt-auto">
                 <Button 
                   variant="ghost" 
                   className="w-full justify-start text-gray-700 dark:text-gray-300 rounded-xl"
@@ -960,7 +759,7 @@ const MultimodalAI = () => {
             </Button>
             <div className="font-semibold text-gray-900 dark:text-white">Nurath.AI</div>
             
-            {/* Compact Mode Selection - Icons Only */}
+            {/* Mode Selection - Icons Only */}
             <div className="flex items-center bg-white dark:bg-gray-800 rounded-full p-1 border border-gray-200 dark:border-gray-700">
               <Button
                 variant={currentMode === 'text' ? 'default' : 'ghost'}
@@ -1020,10 +819,7 @@ const MultimodalAI = () => {
             // Welcome State
             <div className="h-full flex flex-col items-center justify-center p-8">
               <div className="text-center max-w-4xl">
-                <h1 className={`font-bold text-gray-900 dark:text-white mb-8 animate-fade-in ${
-                  accessibilitySettings.fontSize === 'large' ? 'text-5xl' : 
-                  accessibilitySettings.fontSize === 'extra-large' ? 'text-6xl' : 'text-4xl'
-                }`} style={{ 
+                <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-8 animate-pulse" style={{ 
                   background: 'linear-gradient(45deg, #667eea 0%, #764ba2 100%)',
                   WebkitBackgroundClip: 'text',
                   WebkitTextFillColor: 'transparent',
@@ -1089,15 +885,20 @@ const MultimodalAI = () => {
                     <span className="text-sm">Start Camera</span>
                   </Button>
                   <Button
-                    onClick={() => {
-                      setIsEmergency(true);
-                      handleQuickAction('emergency', "This is an emergency situation. I need help.");
-                    }}
+                    onClick={() => handleQuickAction('emergency', "This is an emergency situation. I need help.")}
                     variant="outline"
                     className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl border-red-200 text-red-600 hover:scale-105 transition-transform"
                   >
                     <Shield className="w-6 h-6" />
                     <span className="text-sm">Emergency</span>
+                  </Button>
+                  <Button
+                    onClick={() => handleQuickAction('image', "Generate a beautiful anime artwork for me")}
+                    variant="outline"
+                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl hover:scale-105 transition-transform"
+                  >
+                    <Sparkles className="w-6 h-6" />
+                    <span className="text-sm">Generate Art</span>
                   </Button>
                 </div>
               </div>
@@ -1120,13 +921,13 @@ const MultimodalAI = () => {
                         Take Photo
                       </Button>
                       <Button 
-                        onClick={() => handleAIInteraction("Describe my surroundings and tell me where I am in detail", 'video', undefined, true)}
+                        onClick={() => handleAIInteraction("Describe my surroundings in detail", 'video', undefined, true)}
                         size="sm" 
                         variant="outline"
                         className="rounded-xl"
                       >
-                        <MapPin className="w-4 h-4 mr-2" />
-                        Describe Location
+                        <Eye className="w-4 h-4 mr-2" />
+                        Analyze Scene
                       </Button>
                       <Button onClick={stopVideo} size="sm" variant="destructive" className="rounded-xl">
                         <VideoOff className="w-4 h-4" />
@@ -1138,115 +939,41 @@ const MultimodalAI = () => {
               )}
 
               {/* Messages */}
-              <div className="space-y-6 p-4">
+              <div className="space-y-4 p-4">
                 {conversation.map((message) => (
                   <div key={message.id} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[80%] group relative`}>
-                      <div className={`rounded-2xl px-4 py-3 ${
-                        message.type === 'user' 
-                          ? 'bg-white text-gray-900 shadow-sm border border-gray-100' 
-                          : 'bg-white text-gray-900 shadow-sm border border-gray-100'
-                      }`}>
-                        
-                        {editingMessageId === message.id ? (
-                          <div className="space-y-2">
-                            <Textarea
-                              value={editingText}
-                              onChange={(e) => setEditingText(e.target.value)}
-                              className="min-h-[60px] text-sm rounded-xl"
-                            />
-                            <div className="flex space-x-2">
-                              <Button size="sm" onClick={saveEdit} className="rounded-xl">
-                                Save
-                              </Button>
-                              <Button 
-                                size="sm" 
-                                variant="outline" 
-                                onClick={() => {
-                                  setEditingMessageId(null);
-                                  setEditingText("");
-                                }}
-                                className="rounded-xl"
-                              >
-                                Cancel
-                              </Button>
-                            </div>
-                          </div>
-                        ) : (
-                          <>
-                            <div className="flex items-center gap-2 mb-2">
-                              <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                                message.type === 'user' 
-                                  ? 'bg-blue-500' 
-                                  : 'bg-purple-500'
-                              }`}>
-                                {message.type === 'user' ? <Users className="w-3 h-3 text-white" /> : <Brain className="w-3 h-3 text-white" />}
-                              </div>
-                              <span className="font-medium text-sm">
-                                {message.type === 'user' ? 'You' : 'Nurath.AI'}
-                              </span>
-                              {message.hasAudio && (
-                                <div className="flex items-center gap-1">
-                                  <Volume2 className="w-4 h-4 text-green-400" />
-                                </div>
-                              )}
-                            </div>
-                            
-                            <p className={`leading-relaxed ${
-                              accessibilitySettings.fontSize === 'large' ? 'text-lg' : 
-                              accessibilitySettings.fontSize === 'extra-large' ? 'text-xl' : 'text-sm'
-                            }`}>
-                              {message.content}
-                            </p>
-                            
-                            {message.imageUrl && (
-                              <div className="mt-2">
-                                <img 
-                                  src={message.imageUrl} 
-                                  alt={message.accessibility?.altText || "Generated content"} 
-                                  className="max-w-full h-auto rounded-xl"
-                                />
-                              </div>
-                            )}
-                            
-                            <span className="text-xs opacity-70 mt-2 block">
-                              {message.timestamp.toLocaleTimeString()}
-                            </span>
-                          </>
-                        )}
+                    <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                      message.type === 'user' 
+                        ? 'bg-blue-500 text-white' 
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+                    }`}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className={`w-5 h-5 rounded-full flex items-center justify-center ${
+                          message.type === 'user' ? 'bg-blue-400' : 'bg-purple-500'
+                        }`}>
+                          {message.type === 'user' ? <Users className="w-3 h-3 text-white" /> : <Brain className="w-3 h-3 text-white" />}
+                        </div>
+                        <span className="font-medium text-xs">
+                          {message.type === 'user' ? 'You' : 'Nurath.AI'}
+                        </span>
+                        {message.hasAudio && <Volume2 className="w-4 h-4 text-green-400" />}
                       </div>
                       
-                      {/* Hover Actions */}
-                      {editingMessageId !== message.id && (
-                        <div className="absolute -bottom-8 right-2 opacity-0 group-hover:opacity-100 flex space-x-1 bg-white rounded-xl shadow-lg p-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0"
-                            onClick={() => copyMessage(message.content)}
-                          >
-                            <Copy className="w-3 h-3" />
-                          </Button>
-                          {message.type === 'user' && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 w-6 p-0"
-                              onClick={() => editMessage(message.id, message.content)}
-                            >
-                              <Edit className="w-3 h-3" />
-                            </Button>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="sm" 
-                            className="h-6 w-6 p-0"
-                            onClick={() => deleteMessage(message.id)}
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
+                      <p className="text-sm leading-relaxed">{message.content}</p>
+                      
+                      {message.imageUrl && (
+                        <div className="mt-2">
+                          <img 
+                            src={message.imageUrl} 
+                            alt="Generated content" 
+                            className="max-w-full h-auto rounded-xl"
+                          />
                         </div>
                       )}
+                      
+                      <span className="text-xs opacity-70 mt-1 block">
+                        {message.timestamp.toLocaleTimeString()}
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -1256,7 +983,7 @@ const MultimodalAI = () => {
         </div>
 
         {/* Input Area - Dynamic based on mode */}
-        <div className="bg-white dark:bg-gray-900 p-6">
+        <div className="bg-white dark:bg-gray-900 p-6 border-t border-gray-100 dark:border-gray-800">
           <div className="max-w-3xl mx-auto">
             {currentMode === 'text' && (
               <div className="relative bg-gray-50 dark:bg-gray-800 rounded-2xl">
@@ -1264,10 +991,7 @@ const MultimodalAI = () => {
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   placeholder="Message Nurath.AI..."
-                  className={`resize-none bg-transparent px-6 py-4 pr-20 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-0 rounded-2xl border-0 ${
-                    accessibilitySettings.fontSize === 'large' ? 'text-lg min-h-[120px]' : 
-                    accessibilitySettings.fontSize === 'extra-large' ? 'text-xl min-h-[140px]' : 'text-base min-h-[100px]'
-                  }`}
+                  className="resize-none bg-transparent px-6 py-4 pr-20 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-0 rounded-2xl border-0 min-h-[80px]"
                   onKeyPress={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
@@ -1295,7 +1019,7 @@ const MultimodalAI = () => {
                         setInputText("");
                       }
                     }}
-                    disabled={!inputText.trim()}
+                    disabled={!inputText.trim() || isProcessing}
                     size="sm"
                     className="bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-xl"
                     title="Send message"
@@ -1316,11 +1040,12 @@ const MultimodalAI = () => {
                       <Mic className="w-12 h-12 text-white" />
                     </div>
                     <p className="text-lg font-medium text-gray-900 dark:text-white">
-                      {isListening ? 'Listening...' : 'Tap to speak'}
+                      {isListening ? 'Listening... Speak now!' : 'Tap to speak with AI'}
                     </p>
                     <Button
                       onClick={isListening ? stopListening : startListening}
                       size="lg"
+                      disabled={isProcessing}
                       className={`rounded-full ${
                         isListening ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-500 hover:bg-blue-600'
                       }`}
@@ -1342,12 +1067,13 @@ const MultimodalAI = () => {
                       <Video className="w-12 h-12 text-white" />
                     </div>
                     <p className="text-lg font-medium text-gray-900 dark:text-white">
-                      {isVideoOn ? 'Video call active' : 'Start video call'}
+                      {isVideoOn ? 'Video call active - I can see you!' : 'Start video call with AI'}
                     </p>
                     <div className="flex space-x-4">
                       <Button
                         onClick={isVideoOn ? stopVideo : startVideo}
                         size="lg"
+                        disabled={isProcessing}
                         className={`rounded-full ${
                           isVideoOn ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'
                         }`}
@@ -1360,6 +1086,7 @@ const MultimodalAI = () => {
                           size="lg"
                           variant="outline"
                           className="rounded-full"
+                          disabled={isProcessing}
                         >
                           <Camera className="w-6 h-6" />
                         </Button>
