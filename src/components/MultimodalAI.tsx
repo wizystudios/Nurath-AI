@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -63,6 +62,7 @@ const MultimodalAI = () => {
     messages: ConversationMessage[];
   }>>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string>('');
+  const [currentLanguage, setCurrentLanguage] = useState('en');
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -82,13 +82,13 @@ const MultimodalAI = () => {
     
     recognition.continuous = false;
     recognition.interimResults = false;
-    recognition.lang = 'en-US';
+    recognition.lang = currentLanguage === 'sw' ? 'sw-KE' : 'en-US';
     recognition.maxAlternatives = 1;
     
     return recognition;
-  }, []);
+  }, [currentLanguage]);
 
-  // Enhanced TTS with better error handling
+  // Enhanced TTS with better voice quality and Swahili support
   const speakText = useCallback(async (text: string, priority: 'low' | 'normal' | 'high' = 'normal') => {
     try {
       console.log('🔊 Starting TTS for:', text.substring(0, 50) + '...');
@@ -99,26 +99,79 @@ const MultimodalAI = () => {
 
       setIsSpeaking(true);
 
-      // Try browser TTS first for immediate feedback
+      // Enhanced browser TTS with better quality settings
       if ('speechSynthesis' in window) {
         const utterance = new SpeechSynthesisUtterance(text);
-        utterance.rate = 0.9;
-        utterance.pitch = 1.0;
-        utterance.volume = 0.8;
+        
+        // Better voice settings for quality
+        utterance.rate = 0.85; // Slightly slower for clarity
+        utterance.pitch = 1.1; // Slightly higher pitch for pleasantness
+        utterance.volume = 0.9; // Higher volume
 
-        // Get available voices and select a female voice
-        const voices = speechSynthesis.getVoices();
+        // Wait for voices to load
+        const getVoices = () => {
+          return new Promise<SpeechSynthesisVoice[]>((resolve) => {
+            let voices = speechSynthesis.getVoices();
+            if (voices.length > 0) {
+              resolve(voices);
+            } else {
+              speechSynthesis.onvoiceschanged = () => {
+                voices = speechSynthesis.getVoices();
+                resolve(voices);
+              };
+            }
+          });
+        };
+
+        const voices = await getVoices();
+        console.log('🔊 Available voices:', voices.map(v => `${v.name} (${v.lang})`));
+
         if (voices.length > 0) {
-          const femaleVoice = voices.find(voice => 
-            voice.name.toLowerCase().includes('female') ||
-            voice.name.toLowerCase().includes('samantha') ||
-            voice.name.toLowerCase().includes('zira') ||
-            // Remove the gender check that was causing the error
-            voice.name.toLowerCase().includes('woman')
-          ) || voices.find(voice => voice.lang.startsWith('en')) || voices[0];
+          let selectedVoice = null;
+
+          // Language-specific voice selection
+          if (currentLanguage === 'sw') {
+            // Look for Swahili voices first
+            selectedVoice = voices.find(voice => 
+              voice.lang.startsWith('sw') || 
+              voice.lang.includes('sw-') ||
+              voice.name.toLowerCase().includes('swahili')
+            );
+            
+            // Fallback to African English voices
+            if (!selectedVoice) {
+              selectedVoice = voices.find(voice => 
+                voice.lang.startsWith('en-KE') || 
+                voice.lang.startsWith('en-TZ') || 
+                voice.lang.startsWith('en-UG')
+              );
+            }
+            
+            utterance.lang = 'sw-KE';
+          } else {
+            // English voice selection with preference for female voices
+            selectedVoice = voices.find(voice => 
+              voice.lang.startsWith('en') && (
+                voice.name.toLowerCase().includes('female') ||
+                voice.name.toLowerCase().includes('samantha') ||
+                voice.name.toLowerCase().includes('zira') ||
+                voice.name.toLowerCase().includes('woman') ||
+                voice.name.toLowerCase().includes('alex') ||
+                voice.name.toLowerCase().includes('karen')
+              )
+            );
+            
+            utterance.lang = 'en-US';
+          }
+
+          // Final fallback
+          if (!selectedVoice) {
+            selectedVoice = voices.find(voice => voice.lang.startsWith('en')) || voices[0];
+          }
           
-          if (femaleVoice) {
-            utterance.voice = femaleVoice;
+          if (selectedVoice) {
+            utterance.voice = selectedVoice;
+            console.log('🔊 Selected voice:', selectedVoice.name, selectedVoice.lang);
           }
         }
 
@@ -140,17 +193,18 @@ const MultimodalAI = () => {
         speechSynthesis.speak(utterance);
       }
 
-      // Also try high-quality TTS via API
+      // Also try high-quality TTS via API for better quality
       try {
         console.log('🔊 Attempting API TTS...');
         const { data, error } = await supabase.functions.invoke('multimodal-ai', {
           body: {
-            input: text.substring(0, 4000), // Limit text length
+            input: text.substring(0, 4000),
             mode: 'tts',
             context: { 
               settings: { 
                 speechSpeed: 'normal',
-                preferredVoice: 'shimmer'
+                preferredVoice: 'shimmer',
+                language: currentLanguage
               }
             }
           }
@@ -179,7 +233,7 @@ const MultimodalAI = () => {
       setIsSpeaking(false);
       toast.error('Speech synthesis failed');
     }
-  }, []);
+  }, [currentLanguage]);
 
   // Enhanced file analysis
   const analyzeFile = useCallback(async (file: File) => {
@@ -209,7 +263,8 @@ const MultimodalAI = () => {
                 context: {
                   fileAnalysis: true,
                   fileName: file.name,
-                  fileType: file.type
+                  fileType: file.type,
+                  language: currentLanguage
                 }
               }
             });
@@ -240,7 +295,7 @@ const MultimodalAI = () => {
     } finally {
       setIsProcessing(false);
     }
-  }, []);
+  }, [currentLanguage]);
 
   // Enhanced AI interaction with better error handling
   const handleAIInteraction = useCallback(async (
@@ -293,7 +348,8 @@ const MultimodalAI = () => {
           context: {
             currentMode,
             userId: user?.id,
-            conversationHistory: conversation.slice(-5) // Send last 5 messages for context
+            language: currentLanguage,
+            conversationHistory: conversation.slice(-5)
           }
         }
       });
@@ -389,9 +445,9 @@ const MultimodalAI = () => {
     } finally {
       setIsProcessing(false);
     }
-  }, [currentMode, isVideoOn, conversation, user, currentConversationId, speakText]);
+  }, [currentMode, isVideoOn, conversation, user, currentConversationId, speakText, currentLanguage]);
 
-  // Enhanced voice recognition
+  // Enhanced voice recognition with language support
   const startListening = useCallback(async () => {
     try {
       const recognition = setupVoiceRecognition();
@@ -402,7 +458,7 @@ const MultimodalAI = () => {
       recognition.onstart = () => {
         setIsListening(true);
         console.log("🎤 Voice recognition started");
-        toast.success("🎤 Listening... Speak now!");
+        toast.success(`🎤 Listening in ${currentLanguage === 'sw' ? 'Swahili' : 'English'}... Speak now!`);
       };
 
       recognition.onresult = (event) => {
@@ -433,7 +489,7 @@ const MultimodalAI = () => {
       setIsListening(false);
       toast.error("Could not start voice recognition. Please check microphone permissions.");
     }
-  }, [handleAIInteraction, setupVoiceRecognition]);
+  }, [handleAIInteraction, setupVoiceRecognition, currentLanguage]);
 
   const stopListening = useCallback(() => {
     if (recognitionRef.current) {
@@ -442,7 +498,7 @@ const MultimodalAI = () => {
     }
   }, []);
 
-  // Enhanced camera functions with better error handling
+  // Enhanced camera functions with better error handling and constraints
   const startVideo = useCallback(async () => {
     try {
       console.log("📹 Starting camera...");
@@ -452,35 +508,89 @@ const MultimodalAI = () => {
         throw new Error("Camera access not supported in this browser");
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
-          width: { ideal: 1280, min: 640 },
-          height: { ideal: 720, min: 480 },
-          facingMode: 'user'
-        }, 
-        audio: false // Start with video only to avoid audio feedback
-      });
+      // Try with different constraint sets for better compatibility
+      const constraintSets = [
+        // High quality constraints
+        { 
+          video: { 
+            width: { ideal: 1280, min: 640 },
+            height: { ideal: 720, min: 480 },
+            facingMode: 'user',
+            frameRate: { ideal: 30, min: 15 }
+          }, 
+          audio: false 
+        },
+        // Medium quality constraints
+        { 
+          video: { 
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            facingMode: 'user'
+          }, 
+          audio: false 
+        },
+        // Basic constraints
+        { 
+          video: true, 
+          audio: false 
+        }
+      ];
+
+      let stream = null;
+      let lastError = null;
+
+      for (const constraints of constraintSets) {
+        try {
+          console.log("📹 Trying constraints:", constraints);
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+          break;
+        } catch (error) {
+          console.log("📹 Constraints failed:", error);
+          lastError = error;
+          continue;
+        }
+      }
+
+      if (!stream) {
+        throw lastError || new Error("Could not access camera with any configuration");
+      }
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-        setIsVideoOn(true);
-        console.log("📹 Camera started successfully");
-        toast.success("🎥 Camera activated!");
         
-        if (currentMode === 'video') {
-          await speakText("Camera is now active. I can see your environment.", 'normal');
-          
-          // Auto-analyze after a short delay
-          setTimeout(() => {
-            handleAIInteraction(
-              "Please describe everything you can see in my environment in detail, including any people, objects, and surroundings.", 
-              'video',
-              undefined,
-              true
-            );
-          }, 2000);
-        }
+        // Wait for video to be ready
+        videoRef.current.onloadedmetadata = () => {
+          if (videoRef.current) {
+            videoRef.current.play().then(() => {
+              setIsVideoOn(true);
+              console.log("📹 Camera started successfully");
+              toast.success("🎥 Camera activated! Video call is now active.");
+              
+              if (currentMode === 'video') {
+                speakText("Camera is now active. I can see your environment through the video feed.", 'normal');
+                
+                // Auto-analyze after a short delay
+                setTimeout(() => {
+                  handleAIInteraction(
+                    "Please describe everything you can see in my video feed in detail, including any people, objects, and surroundings.", 
+                    'video',
+                    undefined,
+                    true
+                  );
+                }, 3000);
+              }
+            }).catch((playError) => {
+              console.error("📹 Play error:", playError);
+              throw new Error("Could not start video playback");
+            });
+          }
+        };
+
+        videoRef.current.onerror = (error) => {
+          console.error("📹 Video element error:", error);
+          stopVideo();
+          toast.error("Video playback error occurred");
+        };
       }
       
     } catch (error) {
@@ -490,15 +600,18 @@ const MultimodalAI = () => {
       if (error.name === 'NotFoundError') {
         errorMessage += "No camera found. Please connect a camera and try again.";
       } else if (error.name === 'NotAllowedError') {
-        errorMessage += "Camera permission denied. Please allow camera access in your browser settings.";
+        errorMessage += "Camera permission denied. Please allow camera access in your browser settings and refresh the page.";
       } else if (error.name === 'NotReadableError') {
-        errorMessage += "Camera is being used by another application.";
+        errorMessage += "Camera is being used by another application. Please close other applications using the camera.";
+      } else if (error.name === 'OverconstrainedError') {
+        errorMessage += "Camera constraints not supported. Trying with basic settings...";
       } else {
-        errorMessage += error.message || "Unknown camera error.";
+        errorMessage += error.message || "Unknown camera error occurred.";
       }
       
       await speakText(errorMessage, 'high');
       toast.error(errorMessage);
+      setIsVideoOn(false);
     }
   }, [handleAIInteraction, speakText, currentMode]);
 
@@ -507,15 +620,15 @@ const MultimodalAI = () => {
       const stream = videoRef.current.srcObject as MediaStream;
       stream.getTracks().forEach(track => {
         track.stop();
-        console.log("📹 Camera track stopped");
+        console.log("📹 Camera track stopped:", track.kind);
       });
       videoRef.current.srcObject = null;
     }
     setIsVideoOn(false);
     if (currentMode === 'video') {
-      speakText("Camera stopped", 'normal');
+      speakText("Camera stopped. Video call ended.", 'normal');
     }
-    toast.info("Camera stopped");
+    toast.info("📹 Camera stopped - Video call ended");
   }, [speakText, currentMode]);
 
   // File upload with proper analysis
@@ -608,6 +721,11 @@ const MultimodalAI = () => {
           .single();
         setProfile(profileData);
 
+        // Set language preference from profile
+        if (profileData?.language_preference) {
+          setCurrentLanguage(profileData.language_preference);
+        }
+
         // Create initial conversation if none exists
         if (!currentConversationId) {
           const newConversationId = Date.now().toString();
@@ -684,7 +802,7 @@ const MultimodalAI = () => {
     );
   }, [handleAIInteraction]);
 
-  // Auto-setup when mode changes
+  // Auto-setup when mode changes with better video handling
   useEffect(() => {
     if (currentMode === 'voice' && !isListening && !isProcessing) {
       // Auto-start listening when switching to voice mode
@@ -695,11 +813,12 @@ const MultimodalAI = () => {
 
     if (currentMode === 'video' && !isVideoOn) {
       // Auto-start video when switching to video mode
-      setTimeout(() => startVideo(), 500);
+      setTimeout(() => startVideo(), 1000);
     } else if (currentMode !== 'video' && isVideoOn) {
-      stopVideo();
+      // Don't auto-stop video when switching modes - let user control it
+      // stopVideo();
     }
-  }, [currentMode, startListening, stopListening, startVideo, stopVideo, isListening, isVideoOn, isProcessing]);
+  }, [currentMode, startListening, stopListening, startVideo, isListening, isVideoOn, isProcessing]);
 
   return (
     <div className="flex h-screen bg-white dark:bg-gray-900">
@@ -714,19 +833,40 @@ const MultimodalAI = () => {
               <div className="p-3">
                 <UserAuthButton
                   isLoggedIn={!!user}
-                  onLogin={handleLogin}
-                  onSignup={handleSignup}
-                  onLogout={handleLogout}
+                  onLogin={async () => {}}
+                  onSignup={async () => {}}
+                  onLogout={async () => {}}
                   username={profile?.full_name || user?.email}
                 />
                 
                 <Button 
                   className="w-full justify-start bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-xl mt-3"
-                  onClick={startNewChat}
+                  onClick={() => {
+                    const newConversationId = Date.now().toString();
+                    setCurrentConversationId(newConversationId);
+                    setConversation([]);
+                    toast.success("New chat started");
+                  }}
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   New chat
                 </Button>
+
+                {/* Language Toggle */}
+                <div className="mt-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-start rounded-xl"
+                    onClick={() => {
+                      const newLang = currentLanguage === 'en' ? 'sw' : 'en';
+                      setCurrentLanguage(newLang);
+                      toast.success(`Language changed to ${newLang === 'sw' ? 'Swahili' : 'English'}`);
+                    }}
+                  >
+                    🌍 {currentLanguage === 'sw' ? 'Kiswahili' : 'English'}
+                  </Button>
+                </div>
               </div>
 
               {/* Settings */}
@@ -795,19 +935,25 @@ const MultimodalAI = () => {
             {isListening && (
               <Badge variant="outline" className="border-red-500/30 text-red-400 bg-red-500/10 animate-pulse rounded-full">
                 <Mic className="w-3 h-3 mr-1" />
-                Listening
+                {currentLanguage === 'sw' ? 'Sikiliza' : 'Listening'}
               </Badge>
             )}
             {isSpeaking && (
               <Badge variant="outline" className="border-green-500/30 text-green-400 bg-green-500/10 animate-pulse rounded-full">
                 <Volume2 className="w-3 h-3 mr-1" />
-                Speaking
+                {currentLanguage === 'sw' ? 'Ninazungumza' : 'Speaking'}
               </Badge>
             )}
             {isProcessing && (
               <Badge variant="outline" className="border-blue-500/30 text-blue-400 bg-blue-500/10 animate-pulse rounded-full">
                 <Brain className="w-3 h-3 mr-1" />
-                Processing
+                {currentLanguage === 'sw' ? 'Ninachakua' : 'Processing'}
+              </Badge>
+            )}
+            {isVideoOn && (
+              <Badge variant="outline" className="border-purple-500/30 text-purple-400 bg-purple-500/10 rounded-full">
+                <Video className="w-3 h-3 mr-1" />
+                {currentLanguage === 'sw' ? 'Video imewashwa' : 'Video Active'}
               </Badge>
             )}
           </div>
@@ -826,113 +972,161 @@ const MultimodalAI = () => {
                   WebkitTextFillColor: 'transparent',
                   fontFamily: 'Inter, system-ui, sans-serif'
                 }}>
-                  What can I help you with?
+                  {currentLanguage === 'sw' ? 'Nini ninaweza kukusaidia?' : 'What can I help you with?'}
                 </h1>
                 
                 {/* Quick Actions */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                   <Button
-                    onClick={() => handleQuickAction('sing', "Please sing me a beautiful song with your voice and sing the actual lyrics")}
+                    onClick={() => handleAIInteraction(
+                      currentLanguage === 'sw' 
+                        ? "Tafadhali nisimulie wimbo mzuri kwa sauti yako na uimbe maneno halisi" 
+                        : "Please sing me a beautiful song with your voice and sing the actual lyrics", 
+                      'text', undefined, true
+                    )}
                     variant="outline"
                     className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl hover:scale-105 transition-transform"
                   >
                     <Music className="w-6 h-6" />
-                    <span className="text-sm">Sing Song</span>
+                    <span className="text-sm">{currentLanguage === 'sw' ? 'Imba Wimbo' : 'Sing Song'}</span>
                   </Button>
                   <Button
                     onClick={() => {
                       setCurrentMode('video');
-                      setTimeout(() => handleQuickAction('video', "Tell me what you can see around me and describe my environment"), 2000);
+                      setTimeout(() => handleAIInteraction(
+                        currentLanguage === 'sw' 
+                          ? "Niambie unachoweza kuona karibu nami na ueleze mazingira yangu" 
+                          : "Tell me what you can see around me and describe my environment", 
+                        'video', undefined, true
+                      ), 3000);
                     }}
                     variant="outline"
                     className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl hover:scale-105 transition-transform"
                   >
                     <Eye className="w-6 h-6" />
-                    <span className="text-sm">Describe Scene</span>
+                    <span className="text-sm">{currentLanguage === 'sw' ? 'Eleza Eneo' : 'Describe Scene'}</span>
                   </Button>
                   <Button
-                    onClick={() => handleQuickAction('emotional', "I need emotional support and comfort right now")}
+                    onClick={() => handleAIInteraction(
+                      currentLanguage === 'sw' 
+                        ? "Nahitaji msaada wa kihisia na faraja sasa hivi" 
+                        : "I need emotional support and comfort right now", 
+                      'text', undefined, true
+                    )}
                     variant="outline"
                     className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl hover:scale-105 transition-transform"
                   >
                     <Heart className="w-6 h-6" />
-                    <span className="text-sm">Emotional Support</span>
+                    <span className="text-sm">{currentLanguage === 'sw' ? 'Msaada wa Kihisia' : 'Emotional Support'}</span>
                   </Button>
                   <Button
-                    onClick={() => handleQuickAction('daily', "Help me with my daily routine and remind me of important things")}
+                    onClick={() => handleAIInteraction(
+                      currentLanguage === 'sw' 
+                        ? "Nisaidie na ratiba yangu ya kila siku na unikumbushe mambo muhimu" 
+                        : "Help me with my daily routine and remind me of important things", 
+                      'text', undefined, true
+                    )}
                     variant="outline"
                     className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl hover:scale-105 transition-transform"
                   >
                     <Clock className="w-6 h-6" />
-                    <span className="text-sm">Daily Help</span>
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setCurrentMode('video');
-                      setTimeout(() => handleQuickAction('recognize', "Who is around me? Please recognize faces and tell me about people nearby"), 2000);
-                    }}
-                    variant="outline"
-                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl hover:scale-105 transition-transform"
-                  >
-                    <Users className="w-6 h-6" />
-                    <span className="text-sm">Recognize People</span>
-                  </Button>
-                  <Button
-                    onClick={() => setCurrentMode('video')}
-                    variant="outline"
-                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl hover:scale-105 transition-transform"
-                  >
-                    <Video className="w-6 h-6" />
-                    <span className="text-sm">Start Camera</span>
-                  </Button>
-                  <Button
-                    onClick={() => handleQuickAction('emergency', "This is an emergency situation. I need help.")}
-                    variant="outline"
-                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl border-red-200 text-red-600 hover:scale-105 transition-transform"
-                  >
-                    <Shield className="w-6 h-6" />
-                    <span className="text-sm">Emergency</span>
-                  </Button>
-                  <Button
-                    onClick={() => handleQuickAction('image', "Generate a beautiful anime artwork for me")}
-                    variant="outline"
-                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl hover:scale-105 transition-transform"
-                  >
-                    <Sparkles className="w-6 h-6" />
-                    <span className="text-sm">Generate Art</span>
+                    <span className="text-sm">{currentLanguage === 'sw' ? 'Msaada wa Kila Siku' : 'Daily Help'}</span>
                   </Button>
                 </div>
               </div>
             </div>
           ) : (
             <div className="max-w-3xl mx-auto w-full">
-              {/* Video Feed */}
-              {isVideoOn && currentMode === 'video' && (
+              {/* Video Feed - Enhanced */}
+              {isVideoOn && (
                 <div className="p-4">
                   <div className="bg-gray-100 dark:bg-gray-800 rounded-2xl overflow-hidden">
-                    <video
-                      ref={videoRef}
-                      autoPlay
-                      muted
-                      className="w-full h-64 object-cover"
-                    />
+                    <div className="relative">
+                      <video
+                        ref={videoRef}
+                        autoPlay
+                        muted
+                        className="w-full h-64 md:h-80 object-cover"
+                        style={{ transform: 'scaleX(-1)' }} // Mirror effect for better UX
+                      />
+                      <div className="absolute top-2 right-2">
+                        <Badge variant="outline" className="border-green-500/30 text-green-400 bg-green-500/10">
+                          <Video className="w-3 h-3 mr-1" />
+                          {currentLanguage === 'sw' ? 'Mzunguko' : 'Live'}
+                        </Badge>
+                      </div>
+                    </div>
                     <div className="p-4 flex flex-wrap gap-2">
-                      <Button onClick={takePhoto} size="sm" variant="outline" className="rounded-xl">
+                      <Button 
+                        onClick={async () => {
+                          if (videoRef.current && isVideoOn) {
+                            try {
+                              const canvas = document.createElement('canvas');
+                              const ctx = canvas.getContext('2d');
+                              
+                              canvas.width = videoRef.current.videoWidth || 640;
+                              canvas.height = videoRef.current.videoHeight || 480;
+                              
+                              ctx?.drawImage(videoRef.current, 0, 0);
+                              
+                              canvas.toBlob(async (blob) => {
+                                if (blob) {
+                                  const file = new File([blob], 'photo.jpg', { type: 'image/jpeg' });
+                                  const reader = new FileReader();
+                                  reader.onload = async (e) => {
+                                    const base64Data = e.target?.result as string;
+                                    
+                                    await handleAIInteraction(
+                                      currentLanguage === 'sw' 
+                                        ? "Nimepiga picha. Tafadhali eleza kila unachokiona kwa undani - watu, vitu, mazingira, rangi, na unisaidie kuelewa mazingira yangu kikamilifu." 
+                                        : "I just took a photo. Please describe everything you see in great detail - people, objects, surroundings, colors, and help me understand my environment completely.",
+                                      'image',
+                                      [{ type: 'image', data: base64Data, name: 'photo.jpg' }],
+                                      true
+                                    );
+                                  };
+                                  reader.readAsDataURL(file);
+                                  await speakText(
+                                    currentLanguage === 'sw' 
+                                      ? "Picha imenaswa. Ninachambua ninachoweza kuona." 
+                                      : "Photo captured. Analyzing what I can see.", 
+                                    'normal'
+                                  );
+                                  toast.success("📸 Photo captured and analyzing...");
+                                }
+                              }, 'image/jpeg', 0.9);
+                            } catch (error) {
+                              console.error('📸 Photo capture error:', error);
+                              toast.error('Failed to capture photo');
+                            }
+                          } else {
+                            toast.error("Please turn on the camera first to take a photo.");
+                          }
+                        }}
+                        size="sm" 
+                        variant="outline" 
+                        className="rounded-xl"
+                      >
                         <Camera className="w-4 h-4 mr-2" />
-                        Take Photo
+                        {currentLanguage === 'sw' ? 'Piga Picha' : 'Take Photo'}
                       </Button>
                       <Button 
-                        onClick={() => handleAIInteraction("Describe my surroundings in detail", 'video', undefined, true)}
+                        onClick={() => handleAIInteraction(
+                          currentLanguage === 'sw' 
+                            ? "Eleza mazingira yangu kwa undani" 
+                            : "Describe my surroundings in detail", 
+                          'video', undefined, true
+                        )}
                         size="sm" 
                         variant="outline"
                         className="rounded-xl"
                       >
                         <Eye className="w-4 h-4 mr-2" />
-                        Analyze Scene
+                        {currentLanguage === 'sw' ? 'Changua Eneo' : 'Analyze Scene'}
                       </Button>
                       <Button onClick={stopVideo} size="sm" variant="destructive" className="rounded-xl">
-                        <VideoOff className="w-4 h-4" />
-                        Stop Camera
+                        <VideoOff className="w-4 h-4 mr-2" />
+                        {currentLanguage === 'sw' ? 'Zima Kamera' : 'Stop Camera'}
                       </Button>
                     </div>
                   </div>
@@ -955,7 +1149,9 @@ const MultimodalAI = () => {
                           {message.type === 'user' ? <Users className="w-3 h-3 text-white" /> : <Brain className="w-3 h-3 text-white" />}
                         </div>
                         <span className="font-medium text-xs">
-                          {message.type === 'user' ? 'You' : 'Nurath.AI'}
+                          {message.type === 'user' 
+                            ? (currentLanguage === 'sw' ? 'Wewe' : 'You') 
+                            : 'Nurath.AI'}
                         </span>
                         {message.hasAudio && <Volume2 className="w-4 h-4 text-green-400" />}
                       </div>
@@ -991,7 +1187,7 @@ const MultimodalAI = () => {
                 <Textarea
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
-                  placeholder="Message Nurath.AI..."
+                  placeholder={currentLanguage === 'sw' ? 'Andika ujumbe kwa Nurath.AI...' : 'Message Nurath.AI...'}
                   className="resize-none bg-transparent px-6 py-4 pr-20 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-0 rounded-2xl border-0 min-h-[80px]"
                   onKeyPress={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
@@ -1007,9 +1203,56 @@ const MultimodalAI = () => {
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={() => {
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.accept = 'image/*,video/*,.pdf,.doc,.docx,.txt';
+                      input.onchange = (e) => {
+                        const files = (e.target as HTMLInputElement).files;
+                        if (files && files[0]) {
+                          const file = files[0];
+                          console.log("📁 File upload started:", file.name, file.type, file.size);
+                          
+                          speakText(
+                            currentLanguage === 'sw' 
+                              ? `Ninachakata faili yako ya ${file.type.includes('image') ? 'picha' : 'hati'}. Tafadhali subiri.` 
+                              : `Processing your ${file.type.includes('image') ? 'image' : 'document'} file. Please wait.`, 
+                            'normal'
+                          ).then(() => {
+                            return analyzeFile(file);
+                          }).then((analysisResult) => {
+                            const fileType = file.type.startsWith('image/') ? 'image' : 
+                                            file.type.startsWith('video/') ? 'video' : 'document';
+
+                            return handleAIInteraction(
+                              currentLanguage === 'sw' 
+                                ? `Nimepakua faili ya ${fileType} iitwayo "${file.name}". Tafadhali ichambue kikamilifu na uniambie kila unachoweza kugundua kutoka kwake.` 
+                                : `I've uploaded a ${fileType} file named "${file.name}". Please analyze it thoroughly and tell me everything you can discover from it.`,
+                              fileType as any,
+                              [{ 
+                                type: file.type, 
+                                data: analysisResult, 
+                                name: file.name, 
+                                size: file.size 
+                              }],
+                              true
+                            );
+                          }).catch((error) => {
+                            console.error('📁 File upload error:', error);
+                            speakText(
+                              currentLanguage === 'sw' 
+                                ? "Samahani, nimepata shida kuchambua faili hiyo. Tafadhali jaribu tena na faili nyingine." 
+                                : "Sorry, I had trouble analyzing that file. Please try again with a different file.", 
+                              'high'
+                            );
+                            toast.error('File analysis failed');
+                          });
+                        }
+                      };
+                      input.click();
+                    }}
                     className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 rounded-xl"
-                    title="Attach file"
+                    title={currentLanguage === 'sw' ? 'Ambatisha faili' : 'Attach file'}
                   >
                     <Paperclip className="w-4 h-4" />
                   </Button>
@@ -1023,7 +1266,7 @@ const MultimodalAI = () => {
                     disabled={!inputText.trim() || isProcessing}
                     size="sm"
                     className="bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-xl"
-                    title="Send message"
+                    title={currentLanguage === 'sw' ? 'Tuma ujumbe' : 'Send message'}
                   >
                     <Send className="w-4 h-4" />
                   </Button>
@@ -1041,7 +1284,12 @@ const MultimodalAI = () => {
                       <Mic className="w-12 h-12 text-white" />
                     </div>
                     <p className="text-lg font-medium text-gray-900 dark:text-white">
-                      {isListening ? 'Listening... Speak now!' : 'Tap to speak with AI'}
+                      {isListening 
+                        ? (currentLanguage === 'sw' ? 'Sikiliza... Sema sasa!' : 'Listening... Speak now!') 
+                        : (currentLanguage === 'sw' ? 'Bonyeza kuzungumza na AI' : 'Tap to speak with AI')}
+                    </p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      {currentLanguage === 'sw' ? 'Lugha: Kiswahili' : 'Language: English'}
                     </p>
                     <Button
                       onClick={isListening ? stopListening : startListening}
@@ -1068,7 +1316,9 @@ const MultimodalAI = () => {
                       <Video className="w-12 h-12 text-white" />
                     </div>
                     <p className="text-lg font-medium text-gray-900 dark:text-white">
-                      {isVideoOn ? 'Video call active - I can see you!' : 'Start video call with AI'}
+                      {isVideoOn 
+                        ? (currentLanguage === 'sw' ? 'Simu ya video imewashwa - Ninaweza kukuona!' : 'Video call active - I can see you!') 
+                        : (currentLanguage === 'sw' ? 'Anza simu ya video na AI' : 'Start video call with AI')}
                     </p>
                     <div className="flex space-x-4">
                       <Button
@@ -1081,17 +1331,6 @@ const MultimodalAI = () => {
                       >
                         {isVideoOn ? <VideoOff className="w-6 h-6" /> : <Video className="w-6 h-6" />}
                       </Button>
-                      {isVideoOn && (
-                        <Button
-                          onClick={takePhoto}
-                          size="lg"
-                          variant="outline"
-                          className="rounded-full"
-                          disabled={isProcessing}
-                        >
-                          <Camera className="w-6 h-6" />
-                        </Button>
-                      )}
                     </div>
                   </div>
                 </div>
