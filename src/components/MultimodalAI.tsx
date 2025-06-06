@@ -113,7 +113,8 @@ const MultimodalAI = () => {
             voice.name.toLowerCase().includes('female') ||
             voice.name.toLowerCase().includes('samantha') ||
             voice.name.toLowerCase().includes('zira') ||
-            voice.gender === 'female'
+            // Remove the gender check that was causing the error
+            voice.name.toLowerCase().includes('woman')
           ) || voices.find(voice => voice.lang.startsWith('en')) || voices[0];
           
           if (femaleVoice) {
