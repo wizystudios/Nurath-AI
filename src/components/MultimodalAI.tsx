@@ -26,7 +26,9 @@ import {
   Settings,
   X,
   Shield,
-  Sparkles
+  Sparkles,
+  FileText,
+  File
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -63,6 +65,7 @@ const MultimodalAI = () => {
   }>>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string>('');
   const [currentLanguage, setCurrentLanguage] = useState('en');
+  const [attachedFiles, setAttachedFiles] = useState<any[]>([]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -245,26 +248,30 @@ const MultimodalAI = () => {
   // Enhanced file analysis
   const analyzeFile = useCallback(async (file: File) => {
     try {
-      console.log('📁 Analyzing file:', file.name, file.type);
+      console.log('📁 Analyzing file:', file.name, file.type, 'Size:', file.size);
       setIsProcessing(true);
       
-      const reader = new FileReader();
-      
       return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        
         reader.onload = async (e) => {
           try {
-            const base64Data = e.target?.result as string;
-            console.log('📁 File read successfully, size:', base64Data.length);
+            const result = e.target?.result;
+            if (!result) {
+              throw new Error('Failed to read file content');
+            }
             
-            // Return the base64 data for further processing
-            resolve({
+            const fileData = {
               type: file.type,
-              data: base64Data,
+              data: result as string,
               name: file.name,
               size: file.size
-            });
+            };
+            
+            console.log('📁 File processed successfully:', file.name);
+            resolve(fileData);
           } catch (err) {
-            console.error('📁 Analysis processing error:', err);
+            console.error('📁 File processing error:', err);
             reject(err);
           }
         };
@@ -274,10 +281,11 @@ const MultimodalAI = () => {
           reject(new Error('Failed to read file'));
         };
         
+        // Read file as data URL (base64)
         reader.readAsDataURL(file);
       });
     } catch (error) {
-      console.error('📁 File analysis setup error:', error);
+      console.error('📁 File analysis error:', error);
       throw error;
     } finally {
       setIsProcessing(false);
@@ -618,38 +626,60 @@ const MultimodalAI = () => {
     toast.info("📹 Camera stopped - Video call ended");
   }, [speakText, currentMode]);
 
-  // File upload with proper analysis
+  // FIXED: Proper file upload handling
   const handleFileUpload = useCallback(async (files: FileList) => {
+    if (!files || files.length === 0) return;
+    
     const file = files[0];
-    if (!file) return;
-
     console.log("📁 File upload started:", file.name, file.type, file.size);
     
     try {
-      // Only speak for file uploads if in voice mode
-      if (currentMode === 'voice') {
-        await speakText(`Processing your ${file.type.includes('image') ? 'image' : 'document'} file. Please wait.`, 'normal');
-      }
+      toast.info(`📁 Processing ${file.name}...`);
       
+      // Process the file
       const fileData = await analyzeFile(file);
       
-      const fileType = file.type.startsWith('image/') ? 'image' : 
-                      file.type.startsWith('video/') ? 'video' : 'document';
-
+      // Add to attached files
+      setAttachedFiles(prev => [...prev, fileData]);
+      
+      // Determine file type and mode
+      let mode: 'image' | 'document' | 'text' = 'document';
+      let prompt = `I've uploaded a file named "${file.name}". Please analyze it thoroughly and tell me everything you can discover from it.`;
+      
+      if (file.type.startsWith('image/')) {
+        mode = 'image';
+        prompt = `I've uploaded an image file named "${file.name}". Please analyze this image in detail and describe everything you can see.`;
+      } else if (file.type.includes('pdf') || file.type.includes('doc') || file.type.includes('text')) {
+        mode = 'document';
+        prompt = `I've uploaded a document file named "${file.name}". Please analyze it thoroughly and tell me everything you can discover from it.`;
+      }
+      
+      // Automatically process the file
       await handleAIInteraction(
-        `I've uploaded a ${fileType} file named "${file.name}". Please analyze it thoroughly and tell me everything you can discover from it.`,
-        fileType as any,
+        prompt,
+        mode,
         [fileData],
         currentMode === 'voice' // Only speak in voice mode
       );
+      
+      toast.success(`📁 ${file.name} uploaded and analyzed successfully!`);
     } catch (error) {
       console.error('📁 File upload error:', error);
-      if (currentMode === 'voice') {
-        await speakText("Sorry, I had trouble analyzing that file. Please try again with a different file.", 'high');
-      }
-      toast.error('File analysis failed');
+      toast.error(`Failed to process ${file.name}. Please try again.`);
     }
-  }, [analyzeFile, handleAIInteraction, speakText, currentMode]);
+  }, [analyzeFile, handleAIInteraction, currentMode]);
+
+  // FIXED: File input click handler
+  const handleFileInputClick = useCallback(() => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  }, []);
+
+  // Remove attached file
+  const removeAttachedFile = useCallback((index: number) => {
+    setAttachedFiles(prev => prev.filter((_, i) => i !== index));
+  }, []);
 
   // Take photo and analyze
   const takePhoto = useCallback(async () => {
@@ -1224,9 +1254,41 @@ const MultimodalAI = () => {
           )}
         </div>
 
-        {/* Input Area - Dynamic based on mode */}
+        {/* Input Area - Enhanced with file attachment display */}
         <div className="bg-white dark:bg-gray-900 p-6 border-t border-gray-100 dark:border-gray-800">
           <div className="max-w-3xl mx-auto">
+            {/* Attached Files Display */}
+            {attachedFiles.length > 0 && (
+              <div className="mb-4">
+                <div className="flex flex-wrap gap-2">
+                  {attachedFiles.map((file, index) => (
+                    <div key={index} className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-lg px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        {file.type?.startsWith('image/') ? (
+                          <ImageIcon className="w-4 h-4 text-blue-500" />
+                        ) : file.type?.includes('pdf') ? (
+                          <FileText className="w-4 h-4 text-red-500" />
+                        ) : (
+                          <File className="w-4 h-4 text-gray-500" />
+                        )}
+                        <span className="text-sm text-gray-700 dark:text-gray-300 truncate max-w-32">
+                          {file.name}
+                        </span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeAttachedFile(index)}
+                        className="h-6 w-6 p-0 text-gray-500 hover:text-red-500"
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {currentMode === 'text' && (
               <div className="relative bg-gray-50 dark:bg-gray-800 rounded-2xl">
                 <Textarea
@@ -1237,10 +1299,10 @@ const MultimodalAI = () => {
                   onKeyPress={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
-                      if (inputText.trim()) {
-                        // FIXED: Don't force speaking in text mode
-                        handleAIInteraction(inputText, currentMode, undefined, false);
+                      if (inputText.trim() || attachedFiles.length > 0) {
+                        handleAIInteraction(inputText, currentMode, attachedFiles.length > 0 ? attachedFiles : undefined, false);
                         setInputText("");
+                        setAttachedFiles([]);
                       }
                     }
                   }}
@@ -1249,18 +1311,7 @@ const MultimodalAI = () => {
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => {
-                      const input = document.createElement('input');
-                      input.type = 'file';
-                      input.accept = 'image/*,video/*,.pdf,.doc,.docx,.txt';
-                      input.onchange = (e) => {
-                        const files = (e.target as HTMLInputElement).files;
-                        if (files && files[0]) {
-                          handleFileUpload(files);
-                        }
-                      };
-                      input.click();
-                    }}
+                    onClick={handleFileInputClick}
                     className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 rounded-xl"
                     title={currentLanguage === 'sw' ? 'Ambatisha faili' : 'Attach file'}
                   >
@@ -1268,13 +1319,13 @@ const MultimodalAI = () => {
                   </Button>
                   <Button
                     onClick={() => {
-                      if (inputText.trim()) {
-                        // FIXED: Don't force speaking in text mode
-                        handleAIInteraction(inputText, currentMode, undefined, false);
+                      if (inputText.trim() || attachedFiles.length > 0) {
+                        handleAIInteraction(inputText, currentMode, attachedFiles.length > 0 ? attachedFiles : undefined, false);
                         setInputText("");
+                        setAttachedFiles([]);
                       }
                     }}
-                    disabled={!inputText.trim() || isProcessing}
+                    disabled={(!inputText.trim() && attachedFiles.length === 0) || isProcessing}
                     size="sm"
                     className="bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-xl"
                     title={currentLanguage === 'sw' ? 'Tuma ujumbe' : 'Send message'}
@@ -1396,12 +1447,12 @@ const MultimodalAI = () => {
         </div>
       </div>
 
-      {/* Hidden Elements */}
+      {/* Enhanced File Input */}
       <input
         ref={fileInputRef}
         type="file"
         hidden
-        accept="image/*,video/*,.pdf,.doc,.docx,.txt"
+        accept="image/*,video/*,.pdf,.doc,.docx,.txt,.csv,.xlsx,.ppt,.pptx"
         onChange={(e) => e.target.files && handleFileUpload(e.target.files)}
       />
       <audio ref={audioRef} preload="auto" />
