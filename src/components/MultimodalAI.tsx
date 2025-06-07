@@ -70,6 +70,13 @@ const MultimodalAI = () => {
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const navigate = useNavigate();
 
+  // AI Avatar URLs - using available placeholder images
+  const aiAvatarImages = {
+    default: "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&w=400&h=400", // white robot
+    speaking: "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=400&h=400", // woman with laptop
+    listening: "https://images.unsplash.com/photo-1649972904349-6e44c42644a7?auto=format&fit=crop&w=400&h=400" // woman on bed with laptop
+  };
+
   // Initialize recognition with better browser support
   const setupVoiceRecognition = useCallback(() => {
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
@@ -569,7 +576,6 @@ const MultimodalAI = () => {
               if (currentMode === 'video') {
                 speakText("Camera is now active. I can see your environment through the video feed.", 'normal');
                 
-                // Auto-analyze after a short delay
                 setTimeout(() => {
                   handleAIInteraction(
                     "Please describe everything you can see in my video feed in detail, including any people, objects, and surroundings.", 
@@ -816,7 +822,6 @@ const MultimodalAI = () => {
       setTimeout(() => startVideo(), 1000);
     } else if (currentMode !== 'video' && isVideoOn) {
       // Don't auto-stop video when switching modes - let user control it
-      // stopVideo();
     }
   }, [currentMode, startListening, stopListening, startVideo, isListening, isVideoOn, isProcessing]);
 
@@ -963,8 +968,55 @@ const MultimodalAI = () => {
         {/* Chat Area */}
         <div className="flex-1 overflow-y-auto bg-white dark:bg-gray-900">
           {conversation.length === 0 ? (
-            // Welcome State
+            // Welcome State with AI Avatar for Voice/Video modes
             <div className="h-full flex flex-col items-center justify-center p-8">
+              {/* AI Avatar - Show during voice or video mode */}
+              {(currentMode === 'voice' || currentMode === 'video') && (
+                <div className="mb-8">
+                  <div className="relative">
+                    <div className={`w-32 h-32 rounded-full overflow-hidden border-4 ${
+                      isSpeaking ? 'border-green-400 shadow-lg shadow-green-400/50' : 
+                      isListening ? 'border-blue-400 shadow-lg shadow-blue-400/50' : 
+                      'border-purple-400 shadow-lg shadow-purple-400/50'
+                    } transition-all duration-300`}>
+                      <img
+                        src={
+                          isSpeaking ? aiAvatarImages.speaking :
+                          isListening ? aiAvatarImages.listening :
+                          aiAvatarImages.default
+                        }
+                        alt="Nurath AI"
+                        className={`w-full h-full object-cover transition-transform duration-300 ${
+                          isSpeaking || isListening ? 'scale-110' : 'scale-100'
+                        }`}
+                      />
+                    </div>
+                    {/* Speaking animation overlay */}
+                    {isSpeaking && (
+                      <div className="absolute inset-0 rounded-full border-4 border-green-400 animate-pulse">
+                        <div className="w-full h-full rounded-full bg-green-400/20 animate-ping"></div>
+                      </div>
+                    )}
+                    {/* Listening animation overlay */}
+                    {isListening && (
+                      <div className="absolute inset-0 rounded-full border-4 border-blue-400 animate-pulse">
+                        <div className="w-full h-full rounded-full bg-blue-400/20 animate-ping"></div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-center">
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                      {currentLanguage === 'sw' ? 'Nurath AI - Msaidizi wako wa Kiteknolojia' : 'Nurath AI - Your AI Assistant'}
+                    </h2>
+                    <p className="text-gray-600 dark:text-gray-400">
+                      {isSpeaking ? (currentLanguage === 'sw' ? 'Ninazungumza...' : 'Speaking...') :
+                       isListening ? (currentLanguage === 'sw' ? 'Ninasikiliza...' : 'Listening...') :
+                       (currentLanguage === 'sw' ? 'Bonyeza kuzungumza na AI' : 'Ready to talk with you')}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div className="text-center max-w-4xl">
                 <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-8 animate-pulse" style={{ 
                   background: 'linear-gradient(45deg, #667eea 0%, #764ba2 100%)',
@@ -1037,72 +1089,83 @@ const MultimodalAI = () => {
             </div>
           ) : (
             <div className="max-w-3xl mx-auto w-full">
-              {/* Video Feed - Enhanced */}
+              {/* Video Feed - Enhanced with AI Avatar Split Screen */}
               {isVideoOn && (
                 <div className="p-4">
                   <div className="bg-gray-100 dark:bg-gray-800 rounded-2xl overflow-hidden">
                     <div className="relative">
-                      <video
-                        ref={videoRef}
-                        autoPlay
-                        muted
-                        className="w-full h-64 md:h-80 object-cover"
-                        style={{ transform: 'scaleX(-1)' }} // Mirror effect for better UX
-                      />
-                      <div className="absolute top-2 right-2">
-                        <Badge variant="outline" className="border-green-500/30 text-green-400 bg-green-500/10">
-                          <Video className="w-3 h-3 mr-1" />
-                          {currentLanguage === 'sw' ? 'Mzunguko' : 'Live'}
-                        </Badge>
+                      {/* Split screen layout */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 p-2">
+                        {/* User video */}
+                        <div className="relative rounded-xl overflow-hidden">
+                          <video
+                            ref={videoRef}
+                            autoPlay
+                            muted
+                            className="w-full h-48 md:h-64 object-cover"
+                            style={{ transform: 'scaleX(-1)' }}
+                          />
+                          <div className="absolute top-2 left-2">
+                            <Badge variant="outline" className="border-blue-500/30 text-blue-400 bg-blue-500/10">
+                              <Users className="w-3 h-3 mr-1" />
+                              {currentLanguage === 'sw' ? 'Wewe' : 'You'}
+                            </Badge>
+                          </div>
+                        </div>
+                        
+                        {/* AI Avatar */}
+                        <div className="relative rounded-xl overflow-hidden bg-gradient-to-br from-purple-500/20 to-blue-500/20">
+                          <div className="w-full h-48 md:h-64 flex items-center justify-center">
+                            <div className="relative">
+                              <div className={`w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border-4 ${
+                                isSpeaking ? 'border-green-400 shadow-lg shadow-green-400/50' : 
+                                'border-purple-400 shadow-lg shadow-purple-400/50'
+                              } transition-all duration-300`}>
+                                <img
+                                  src={
+                                    isSpeaking ? aiAvatarImages.speaking :
+                                    isListening ? aiAvatarImages.listening :
+                                    aiAvatarImages.default
+                                  }
+                                  alt="Nurath AI"
+                                  className={`w-full h-full object-cover transition-transform duration-300 ${
+                                    isSpeaking || isListening ? 'scale-110' : 'scale-100'
+                                  }`}
+                                />
+                              </div>
+                              {/* Speaking animation */}
+                              {isSpeaking && (
+                                <div className="absolute inset-0 rounded-full border-4 border-green-400 animate-pulse">
+                                  <div className="w-full h-full rounded-full bg-green-400/20 animate-ping"></div>
+                                </div>
+                              )}
+                              {/* Listening animation */}
+                              {isListening && (
+                                <div className="absolute inset-0 rounded-full border-4 border-blue-400 animate-pulse">
+                                  <div className="w-full h-full rounded-full bg-blue-400/20 animate-ping"></div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="absolute top-2 left-2">
+                            <Badge variant="outline" className="border-purple-500/30 text-purple-400 bg-purple-500/10">
+                              <Brain className="w-3 h-3 mr-1" />
+                              Nurath AI
+                            </Badge>
+                          </div>
+                          <div className="absolute top-2 right-2">
+                            <Badge variant="outline" className="border-green-500/30 text-green-400 bg-green-500/10">
+                              <Video className="w-3 h-3 mr-1" />
+                              {currentLanguage === 'sw' ? 'Mzunguko' : 'Live'}
+                            </Badge>
+                          </div>
+                        </div>
                       </div>
                     </div>
+                    
                     <div className="p-4 flex flex-wrap gap-2">
                       <Button 
-                        onClick={async () => {
-                          if (videoRef.current && isVideoOn) {
-                            try {
-                              const canvas = document.createElement('canvas');
-                              const ctx = canvas.getContext('2d');
-                              
-                              canvas.width = videoRef.current.videoWidth || 640;
-                              canvas.height = videoRef.current.videoHeight || 480;
-                              
-                              ctx?.drawImage(videoRef.current, 0, 0);
-                              
-                              canvas.toBlob(async (blob) => {
-                                if (blob) {
-                                  const file = new File([blob], 'photo.jpg', { type: 'image/jpeg' });
-                                  const reader = new FileReader();
-                                  reader.onload = async (e) => {
-                                    const base64Data = e.target?.result as string;
-                                    
-                                    await handleAIInteraction(
-                                      currentLanguage === 'sw' 
-                                        ? "Nimepiga picha. Tafadhali eleza kila unachokiona kwa undani - watu, vitu, mazingira, rangi, na unisaidie kuelewa mazingira yangu kikamilifu." 
-                                        : "I just took a photo. Please describe everything you see in great detail - people, objects, surroundings, colors, and help me understand my environment completely.",
-                                      'image',
-                                      [{ type: 'image', data: base64Data, name: 'photo.jpg' }],
-                                      true
-                                    );
-                                  };
-                                  reader.readAsDataURL(file);
-                                  await speakText(
-                                    currentLanguage === 'sw' 
-                                      ? "Picha imenaswa. Ninachambua ninachoweza kuona." 
-                                      : "Photo captured. Analyzing what I can see.", 
-                                    'normal'
-                                  );
-                                  toast.success("📸 Photo captured and analyzing...");
-                                }
-                              }, 'image/jpeg', 0.9);
-                            } catch (error) {
-                              console.error('📸 Photo capture error:', error);
-                              toast.error('Failed to capture photo');
-                            }
-                          } else {
-                            toast.error("Please turn on the camera first to take a photo.");
-                          }
-                        }}
+                        onClick={takePhoto}
                         size="sm" 
                         variant="outline" 
                         className="rounded-xl"
@@ -1210,43 +1273,7 @@ const MultimodalAI = () => {
                       input.onchange = (e) => {
                         const files = (e.target as HTMLInputElement).files;
                         if (files && files[0]) {
-                          const file = files[0];
-                          console.log("📁 File upload started:", file.name, file.type, file.size);
-                          
-                          speakText(
-                            currentLanguage === 'sw' 
-                              ? `Ninachakata faili yako ya ${file.type.includes('image') ? 'picha' : 'hati'}. Tafadhali subiri.` 
-                              : `Processing your ${file.type.includes('image') ? 'image' : 'document'} file. Please wait.`, 
-                            'normal'
-                          ).then(() => {
-                            return analyzeFile(file);
-                          }).then((analysisResult) => {
-                            const fileType = file.type.startsWith('image/') ? 'image' : 
-                                            file.type.startsWith('video/') ? 'video' : 'document';
-
-                            return handleAIInteraction(
-                              currentLanguage === 'sw' 
-                                ? `Nimepakua faili ya ${fileType} iitwayo "${file.name}". Tafadhali ichambue kikamilifu na uniambie kila unachoweza kugundua kutoka kwake.` 
-                                : `I've uploaded a ${fileType} file named "${file.name}". Please analyze it thoroughly and tell me everything you can discover from it.`,
-                              fileType as any,
-                              [{ 
-                                type: file.type, 
-                                data: analysisResult, 
-                                name: file.name, 
-                                size: file.size 
-                              }],
-                              true
-                            );
-                          }).catch((error) => {
-                            console.error('📁 File upload error:', error);
-                            speakText(
-                              currentLanguage === 'sw' 
-                                ? "Samahani, nimepata shida kuchambua faili hiyo. Tafadhali jaribu tena na faili nyingine." 
-                                : "Sorry, I had trouble analyzing that file. Please try again with a different file.", 
-                              'high'
-                            );
-                            toast.error('File analysis failed');
-                          });
+                          handleFileUpload(files);
                         }
                       };
                       input.click();
@@ -1278,19 +1305,64 @@ const MultimodalAI = () => {
               <div className="text-center">
                 <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl p-8">
                   <div className="flex flex-col items-center space-y-4">
-                    <div className={`w-24 h-24 rounded-full flex items-center justify-center ${
-                      isListening ? 'bg-red-500 animate-pulse' : 'bg-blue-500'
-                    }`}>
-                      <Mic className="w-12 h-12 text-white" />
+                    {/* AI Avatar for Voice Mode */}
+                    <div className="relative">
+                      <div className={`w-24 h-24 rounded-full overflow-hidden border-4 ${
+                        isSpeaking ? 'border-green-400 shadow-lg shadow-green-400/50' : 
+                        isListening ? 'border-red-400 shadow-lg shadow-red-400/50' : 
+                        'border-blue-500 shadow-lg shadow-blue-500/50'
+                      } transition-all duration-300`}>
+                        <img
+                          src={
+                            isSpeaking ? aiAvatarImages.speaking :
+                            isListening ? aiAvatarImages.listening :
+                            aiAvatarImages.default
+                          }
+                          alt="Nurath AI"
+                          className={`w-full h-full object-cover transition-transform duration-300 ${
+                            isSpeaking || isListening ? 'scale-110' : 'scale-100'
+                          }`}
+                        />
+                      </div>
+                      
+                      {/* Speaking animation */}
+                      {isSpeaking && (
+                        <div className="absolute inset-0 rounded-full border-4 border-green-400 animate-pulse">
+                          <div className="w-full h-full rounded-full bg-green-400/20 animate-ping"></div>
+                        </div>
+                      )}
+                      
+                      {/* Listening animation */}
+                      {isListening && (
+                        <div className="absolute inset-0 rounded-full border-4 border-red-400 animate-pulse">
+                          <div className="w-full h-full rounded-full bg-red-400/20 animate-ping"></div>
+                        </div>
+                      )}
+                      
+                      {/* Microphone icon overlay */}
+                      <div className={`absolute -bottom-2 -right-2 w-8 h-8 rounded-full flex items-center justify-center ${
+                        isListening ? 'bg-red-500' : 'bg-blue-500'
+                      }`}>
+                        <Mic className="w-4 h-4 text-white" />
+                      </div>
                     </div>
-                    <p className="text-lg font-medium text-gray-900 dark:text-white">
-                      {isListening 
-                        ? (currentLanguage === 'sw' ? 'Sikiliza... Sema sasa!' : 'Listening... Speak now!') 
-                        : (currentLanguage === 'sw' ? 'Bonyeza kuzungumza na AI' : 'Tap to speak with AI')}
-                    </p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {currentLanguage === 'sw' ? 'Lugha: Kiswahili' : 'Language: English'}
-                    </p>
+                    
+                    <div className="text-center">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                        Nurath AI
+                      </h3>
+                      <p className="text-lg font-medium text-gray-900 dark:text-white">
+                        {isListening 
+                          ? (currentLanguage === 'sw' ? 'Sikiliza... Sema sasa!' : 'Listening... Speak now!') 
+                          : isSpeaking
+                          ? (currentLanguage === 'sw' ? 'Ninazungumza...' : 'Speaking...')
+                          : (currentLanguage === 'sw' ? 'Bonyeza kuzungumza na AI' : 'Tap to speak with AI')}
+                      </p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        {currentLanguage === 'sw' ? 'Lugha: Kiswahili' : 'Language: English'}
+                      </p>
+                    </div>
+                    
                     <Button
                       onClick={isListening ? stopListening : startListening}
                       size="lg"
