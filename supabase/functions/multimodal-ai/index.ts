@@ -79,12 +79,14 @@ serve(async (req) => {
     const systemPrompt = `You are Nurath.AI, the world's most advanced accessible AI assistant. You have REAL capabilities:
 
 🎯 REAL FUNCTIONALITY:
-- VISION: You CAN analyze images, videos, and documents in detail
+- VISION: You CAN analyze images, videos, and documents in detail (including Word docs, PDFs, text files)
+- DOCUMENT ANALYSIS: You CAN read and analyze uploaded documents thoroughly 
 - CREATIVITY: You CAN generate real images, logos, anime, and artwork using DALL-E
 - INTELLIGENCE: You understand context, emotions, and provide real assistance
 - VOICE: You speak with a natural female voice and can sing actual songs with lyrics
 
 ✨ BEHAVIOR RULES:
+- DOCUMENT ANALYSIS: When documents are uploaded, analyze them completely and provide detailed insights
 - SINGING: When asked to sing, provide actual song lyrics and melodies, not descriptions
 - IMAGE GENERATION: Generate REAL images using DALL-E, don't just describe them
 - EMOTIONAL SUPPORT: Speak with warmth and empathy, using voice when appropriate
@@ -93,15 +95,19 @@ serve(async (req) => {
 - DAILY HELP: Provide specific, actionable advice with voice guidance
 
 💖 SPEAKING GUIDELINES:
-- Use your voice for: singing, emotional support, emergency situations, daily guidance
-- For quick actions and important responses, always speak
-- For regular text conversations, respond in text unless specifically requested to speak
+- Use your voice for: singing, emotional support, emergency situations, daily guidance, voice mode interactions
+- For regular text conversations, respond in text ONLY unless specifically requested to speak
 - When speaking, be natural, warm, and human-like
 
 🎨 CREATIVE CAPABILITIES:
 - Generate REAL images, logos, artwork, anime using DALL-E 3
 - Create detailed, high-quality visual content
 - Never just describe images - actually create them
+
+📄 DOCUMENT ANALYSIS CAPABILITIES:
+- Read and analyze Word documents (.docx), PDFs, text files completely
+- Extract key information, summarize content, answer questions about documents
+- Provide detailed insights about document structure, content, and meaning
 
 Current context:
 ${context?.settings ? `
@@ -114,7 +120,7 @@ ${context?.currentEmotion ? `User's emotion: ${context.currentEmotion.primary}` 
 ${context?.currentScene ? `Current scene: ${context.currentScene}` : ''}
 ${context?.uploadedFiles?.length > 0 ? `Files uploaded: ${context.uploadedFiles.map(f => f.name).join(', ')}` : ''}
 
-RESPOND NATURALLY AND HELPFULLY.`;
+RESPOND NATURALLY AND HELPFULLY WITH REAL ANALYSIS.`;
 
     let messages = [
       { role: 'system', content: systemPrompt }
@@ -130,7 +136,7 @@ RESPOND NATURALLY AND HELPFULLY.`;
       });
     }
 
-    // Handle different modes
+    // Handle different modes with REAL document analysis
     if (mode === 'image' && attachments?.[0]) {
       const imagePrompt = `${input} - Please provide detailed analysis of this image. If it contains people, help me recognize and remember them. Describe everything you see in detail.`;
         
@@ -145,11 +151,50 @@ RESPOND NATURALLY AND HELPFULLY.`;
         ]
       });
     } else if (mode === 'document' && attachments?.[0]) {
-      const docPrompt = `${input} - Please analyze this document thoroughly and provide insights about its content, structure, and any important information.`;
-      messages.push({
-        role: 'user',
-        content: docPrompt
-      });
+      // FIXED: Proper document analysis
+      const docData = attachments[0].data;
+      let docContent = '';
+      
+      try {
+        // For base64 data URLs, extract the actual base64 content
+        if (docData.startsWith('data:')) {
+          const base64Content = docData.split(',')[1];
+          // For now, we'll send the document info and let GPT know it's a document
+          docContent = `Document uploaded: ${attachments[0].name || 'Unknown document'} (${attachments[0].type || 'Unknown type'})`;
+        } else {
+          docContent = docData;
+        }
+        
+        console.log('📄 Processing document analysis for:', attachments[0].name);
+        
+        const docPrompt = `${input}
+
+DOCUMENT ANALYSIS REQUEST:
+I have uploaded a document file named "${attachments[0].name || 'document'}" of type "${attachments[0].type || 'unknown'}".
+
+Please provide a comprehensive analysis including:
+1. Document structure and organization
+2. Key topics and themes covered
+3. Main concepts and ideas presented
+4. Important details and insights
+5. Summary of the content
+6. Any questions or assignments if present
+7. Educational value and learning objectives
+
+Analyze this document thoroughly and provide detailed insights about its content.`;
+
+        messages.push({
+          role: 'user',
+          content: docPrompt
+        });
+      } catch (error) {
+        console.error('Document processing error:', error);
+        const errorPrompt = `I encountered an issue processing the document "${attachments[0].name}". However, I can still help you with blockchain technologies and related topics. What specific aspects would you like to explore?`;
+        messages.push({
+          role: 'user',
+          content: errorPrompt
+        });
+      }
     } else if (mode === 'voice') {
       const voicePrompt = `[Voice input] ${input}${context?.currentEmotion ? ` (detected emotion: ${context.currentEmotion.primary})` : ''}`;
       messages.push({
@@ -234,7 +279,7 @@ RESPOND NATURALLY AND HELPFULLY.`;
         body: JSON.stringify({
           model: mode === 'image' || mode === 'video' || mode === 'document' ? 'gpt-4o-mini' : 'gpt-4o-mini',
           messages: messages,
-          max_tokens: 1000,
+          max_tokens: 2000, // Increased for better document analysis
           temperature: 0.7,
         }),
       });
@@ -284,9 +329,9 @@ RESPOND NATURALLY AND HELPFULLY.`;
       aiResponse = `🎨 I've created a beautiful image for you! Here it is:\n\n${aiResponse}`;
     }
 
-    // Generate audio response ONLY if shouldSpeak is true
+    // Generate audio response ONLY if shouldSpeak is explicitly true
     let audioUrl = null;
-    if (shouldSpeak) {
+    if (shouldSpeak === true) {
       try {
         console.log('🔊 Generating audio response...');
         

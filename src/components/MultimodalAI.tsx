@@ -256,33 +256,13 @@ const MultimodalAI = () => {
             const base64Data = e.target?.result as string;
             console.log('📁 File read successfully, size:', base64Data.length);
             
-            const { data, error } = await supabase.functions.invoke('multimodal-ai', {
-              body: {
-                input: `Please analyze this ${file.type.includes('image') ? 'image' : 'document'} thoroughly. Describe everything you can see or find in detail.`,
-                mode: file.type.includes('image') ? 'image' : 'document',
-                attachments: [{
-                  type: file.type,
-                  data: base64Data,
-                  name: file.name,
-                  size: file.size
-                }],
-                analyzeFile: true,
-                context: {
-                  fileAnalysis: true,
-                  fileName: file.name,
-                  fileType: file.type,
-                  language: currentLanguage
-                }
-              }
+            // Return the base64 data for further processing
+            resolve({
+              type: file.type,
+              data: base64Data,
+              name: file.name,
+              size: file.size
             });
-
-            if (error) {
-              console.error('📁 Analysis error:', error);
-              throw new Error(error.message || 'File analysis failed');
-            }
-            
-            console.log('📁 Analysis successful');
-            resolve(data);
           } catch (err) {
             console.error('📁 Analysis processing error:', err);
             reject(err);
@@ -302,9 +282,9 @@ const MultimodalAI = () => {
     } finally {
       setIsProcessing(false);
     }
-  }, [currentLanguage]);
+  }, []);
 
-  // Enhanced AI interaction with better error handling
+  // Enhanced AI interaction with better error handling and controlled speaking
   const handleAIInteraction = useCallback(async (
     input: string, 
     mode: 'text' | 'voice' | 'image' | 'video' | 'image_generation' | 'document' = 'text', 
@@ -339,8 +319,8 @@ const MultimodalAI = () => {
           (imageKeywords.some(keyword => input.toLowerCase().includes(keyword)) && 
            imageTypes.some(type => input.toLowerCase().includes(type)));
 
-      // Only speak if in voice mode, forced, or for specific actions
-      const shouldSpeak = currentMode === 'voice' || forceSpeak || mode === 'voice';
+      // FIXED: Only speak when explicitly requested or in voice/video modes
+      const shouldSpeak = forceSpeak || mode === 'voice' || mode === 'video';
 
       console.log("🧠 Calling Supabase function...");
       const { data, error } = await supabase.functions.invoke('multimodal-ai', {
@@ -351,7 +331,7 @@ const MultimodalAI = () => {
           videoEnabled: isVideoOn,
           generateImage: shouldGenerateImage,
           analyzeFile: attachments && attachments.length > 0,
-          shouldSpeak: shouldSpeak,
+          shouldSpeak: shouldSpeak, // Explicitly control when to speak
           context: {
             currentMode,
             userId: user?.id,
@@ -385,7 +365,7 @@ const MultimodalAI = () => {
         toast.success("🎨 Image generated successfully!");
       }
 
-      // Handle audio playback
+      // Handle audio playback ONLY when audio is provided
       if (aiResponse.audioUrl && audioRef.current) {
         try {
           console.log('🔊 Playing API audio response');
@@ -397,13 +377,13 @@ const MultimodalAI = () => {
         } catch (audioError) {
           console.error('🔊 Audio playback error:', audioError);
           setIsSpeaking(false);
-          // Fallback to browser TTS
+          // Only fallback to browser TTS if we were supposed to speak
           if (shouldSpeak) {
             await speakText(aiResponse.text, 'normal');
           }
         }
       } else if (shouldSpeak) {
-        // Use browser TTS
+        // Use browser TTS only when explicitly requested
         await speakText(aiResponse.text, 'normal');
       }
 
@@ -444,7 +424,8 @@ const MultimodalAI = () => {
       };
       setConversation(prev => [...prev, errorMessage]);
       
-      if (currentMode === 'voice' || forceSpeak) {
+      // Only speak errors in voice/video modes or when forced
+      if (forceSpeak || mode === 'voice' || mode === 'video') {
         await speakText(errorText, 'high');
       }
       
@@ -645,9 +626,12 @@ const MultimodalAI = () => {
     console.log("📁 File upload started:", file.name, file.type, file.size);
     
     try {
-      await speakText(`Processing your ${file.type.includes('image') ? 'image' : 'document'} file. Please wait.`, 'normal');
+      // Only speak for file uploads if in voice mode
+      if (currentMode === 'voice') {
+        await speakText(`Processing your ${file.type.includes('image') ? 'image' : 'document'} file. Please wait.`, 'normal');
+      }
       
-      const analysisResult = await analyzeFile(file);
+      const fileData = await analyzeFile(file);
       
       const fileType = file.type.startsWith('image/') ? 'image' : 
                       file.type.startsWith('video/') ? 'video' : 'document';
@@ -655,20 +639,17 @@ const MultimodalAI = () => {
       await handleAIInteraction(
         `I've uploaded a ${fileType} file named "${file.name}". Please analyze it thoroughly and tell me everything you can discover from it.`,
         fileType as any,
-        [{ 
-          type: file.type, 
-          data: analysisResult, 
-          name: file.name, 
-          size: file.size 
-        }],
-        true
+        [fileData],
+        currentMode === 'voice' // Only speak in voice mode
       );
     } catch (error) {
       console.error('📁 File upload error:', error);
-      await speakText("Sorry, I had trouble analyzing that file. Please try again with a different file.", 'high');
+      if (currentMode === 'voice') {
+        await speakText("Sorry, I had trouble analyzing that file. Please try again with a different file.", 'high');
+      }
       toast.error('File analysis failed');
     }
-  }, [analyzeFile, handleAIInteraction, speakText]);
+  }, [analyzeFile, handleAIInteraction, speakText, currentMode]);
 
   // Take photo and analyze
   const takePhoto = useCallback(async () => {
@@ -1119,6 +1100,7 @@ const MultimodalAI = () => {
                             <div className="relative">
                               <div className={`w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border-4 ${
                                 isSpeaking ? 'border-green-400 shadow-lg shadow-green-400/50' : 
+                                isListening ? 'border-purple-400 shadow-lg shadow-purple-400/50' : 
                                 'border-purple-400 shadow-lg shadow-purple-400/50'
                               } transition-all duration-300`}>
                                 <img
@@ -1256,7 +1238,8 @@ const MultimodalAI = () => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
                       if (inputText.trim()) {
-                        handleAIInteraction(inputText, currentMode);
+                        // FIXED: Don't force speaking in text mode
+                        handleAIInteraction(inputText, currentMode, undefined, false);
                         setInputText("");
                       }
                     }
@@ -1286,7 +1269,8 @@ const MultimodalAI = () => {
                   <Button
                     onClick={() => {
                       if (inputText.trim()) {
-                        handleAIInteraction(inputText, currentMode);
+                        // FIXED: Don't force speaking in text mode
+                        handleAIInteraction(inputText, currentMode, undefined, false);
                         setInputText("");
                       }
                     }}
