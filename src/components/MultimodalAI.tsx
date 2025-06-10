@@ -245,23 +245,23 @@ const MultimodalAI = () => {
     }
   }, [currentLanguage]);
 
-  // Enhanced file analysis - FIXED: Corrected Promise constructor syntax
+  // Enhanced file analysis - FIXED: Simplified Promise structure
   const analyzeFile = useCallback(async (file: File): Promise<any> => {
     try {
       console.log('📁 Analyzing file:', file.name, file.type, 'Size:', file.size);
       setIsProcessing(true);
       
-      return new Promise((resolve, reject) => {
+      const fileData = await new Promise((resolve, reject) => {
         const reader = new FileReader();
         
-        reader.onload = async (e) => {
+        reader.onload = (e) => {
           try {
             const result = e.target?.result;
             if (!result) {
               throw new Error('Failed to read file content');
             }
             
-            const fileData = {
+            const processedFileData = {
               type: file.type,
               data: result as string,
               name: file.name,
@@ -269,7 +269,7 @@ const MultimodalAI = () => {
             };
             
             console.log('📁 File processed successfully:', file.name);
-            resolve(fileData);
+            resolve(processedFileData);
           } catch (err) {
             console.error('📁 File processing error:', err);
             reject(err);
@@ -284,6 +284,8 @@ const MultimodalAI = () => {
         // Read file as data URL (base64)
         reader.readAsDataURL(file);
       });
+      
+      return fileData;
     } catch (error) {
       console.error('📁 File analysis error:', error);
       throw error;
