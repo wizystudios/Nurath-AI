@@ -245,7 +245,7 @@ const MultimodalAI = () => {
     }
   }, [currentLanguage]);
 
-  // Enhanced file analysis - FIXED: Corrected Promise syntax
+  // Enhanced file analysis - FIXED: Corrected Promise constructor syntax
   const analyzeFile = useCallback(async (file: File): Promise<any> => {
     try {
       console.log('📁 Analyzing file:', file.name, file.type, 'Size:', file.size);
