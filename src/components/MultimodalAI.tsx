@@ -245,13 +245,13 @@ const MultimodalAI = () => {
     }
   }, [currentLanguage]);
 
-  // Enhanced file analysis - FIXED: Simplified Promise structure
+  // Enhanced file analysis - FIXED: Corrected Promise syntax
   const analyzeFile = useCallback(async (file: File): Promise<any> => {
     try {
       console.log('📁 Analyzing file:', file.name, file.type, 'Size:', file.size);
       setIsProcessing(true);
       
-      const fileData = await new Promise((resolve, reject) => {
+      const fileData = await new Promise<any>((resolve, reject) => {
         const reader = new FileReader();
         
         reader.onload = (e) => {
