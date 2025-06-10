@@ -251,7 +251,7 @@ const MultimodalAI = () => {
       console.log('📁 Analyzing file:', file.name, file.type, 'Size:', file.size);
       setIsProcessing(true);
       
-      return new Promise((resolve, reject) => {
+      return new Promise<any>((resolve, reject) => {
         const reader = new FileReader();
         
         reader.onload = async (e) => {
