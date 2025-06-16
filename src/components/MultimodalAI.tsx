@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -246,12 +247,12 @@ const MultimodalAI = () => {
   }, [currentLanguage]);
 
   // Enhanced file analysis - FIXED: Corrected Promise constructor syntax
-  const analyzeFile = useCallback(async (file: File): Promise<any> => {
+  const analyzeFile = useCallback(async (file: File) => {
     try {
       console.log('📁 Analyzing file:', file.name, file.type, 'Size:', file.size);
       setIsProcessing(true);
       
-      const fileData = await new Promise<any>((resolve, reject) => {
+      const fileData = await new Promise((resolve, reject) => {
         const reader = new FileReader();
         
         reader.onload = (e) => {
