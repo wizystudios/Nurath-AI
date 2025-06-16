@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -251,7 +252,7 @@ const MultimodalAI = () => {
       console.log('📁 Analyzing file:', file.name, file.type, 'Size:', file.size);
       setIsProcessing(true);
       
-      const fileData = await new Promise((resolve, reject) => {
+      const fileData = await new Promise<any>((resolve, reject) => {
         const reader = new FileReader();
         
         reader.onload = (e) => {
@@ -683,7 +684,6 @@ const MultimodalAI = () => {
     setAttachedFiles(prev => prev.filter((_, i) => i !== index));
   }, []);
 
-  // Take photo and analyze
   const takePhoto = useCallback(async () => {
     if (!videoRef.current || !isVideoOn) {
       const message = "Please turn on the camera first to take a photo.";
