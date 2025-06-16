@@ -1120,7 +1120,7 @@ const MultimodalAI = () => {
                           />
                           <div className="absolute top-2 left-2">
                             <Badge variant="outline" className="border-blue-500/30 text-blue-400 bg-blue-500/10">
-                              <Users className="w-3 h-3 mr-1" />
+                              <Users className="w-3 h-3 text-white" />
                               {currentLanguage === 'sw' ? 'Wewe' : 'You'}
                             </Badge>
                           </div>
