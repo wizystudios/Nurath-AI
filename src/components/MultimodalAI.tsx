@@ -849,15 +849,46 @@ const MultimodalAI = () => {
             <div className="relative z-50 bg-gray-50 dark:bg-gray-800 h-full flex flex-col">
               {/* Profile & New Chat */}
               <div className="p-3">
-                <UserAuthButton
-                  isLoggedIn={!!user}
-                  onLogin={async () => {}}
-                  onSignup={async () => {}}
-                  onLogout={async () => {}}
-                  username={profile?.full_name || user?.email}
-                />
+                {/* User Profile Display */}
+                {user && (
+                  <div className="flex items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-xl mb-3">
+                    <Avatar className="h-10 w-10 mr-3">
+                      <AvatarImage src={profile?.avatar_url} />
+                      <AvatarFallback className="bg-purple-100 text-purple-600">
+                        {profile?.full_name 
+                          ? profile.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase()
+                          : user.email?.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                        {profile?.full_name || 'User'}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                        {user.email}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleLogout}
+                      className="text-gray-500 hover:text-red-500"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
                 
-                <Button 
+                {!user && (
+                  <UserAuthButton
+                    isLoggedIn={false}
+                    onLogin={handleLogin}
+                    onSignup={handleSignup}
+                    onLogout={handleLogout}
+                  />
+                )}
+                
+                <Button
                   className="w-full justify-start bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-xl mt-3"
                   onClick={() => {
                     const newConversationId = Date.now().toString();
@@ -1210,44 +1241,130 @@ const MultimodalAI = () => {
                 </div>
               )}
 
-              {/* Messages */}
-              <div className="space-y-4 p-4">
+              {/* Enhanced Messages Display */}
+              <div className="space-y-6 p-6">
                 {conversation.map((message) => (
-                  <div key={message.id} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${
-                      message.type === 'user' 
-                        ? 'bg-blue-500 text-white' 
-                        : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-                    }`}>
-                      <div className="flex items-center gap-2 mb-1">
-                        <div className={`w-5 h-5 rounded-full flex items-center justify-center ${
-                          message.type === 'user' ? 'bg-blue-400' : 'bg-purple-500'
-                        }`}>
-                          {message.type === 'user' ? <Users className="w-3 h-3 text-white" /> : <Brain className="w-3 h-3 text-white" />}
-                        </div>
-                        <span className="font-medium text-xs">
-                          {message.type === 'user' 
-                            ? (currentLanguage === 'sw' ? 'Wewe' : 'You') 
-                            : 'Nurath.AI'}
-                        </span>
-                        {message.hasAudio && <Volume2 className="w-4 h-4 text-green-400" />}
+                  <div 
+                    key={message.id} 
+                    className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div 
+                      className={`flex items-start space-x-3 max-w-[85%] ${
+                        message.type === 'user' ? 'flex-row-reverse space-x-reverse' : ''
+                      }`}
+                    >
+                      {/* Enhanced Avatar */}
+                      <div className="flex-shrink-0">
+                        {message.type === 'user' ? (
+                          <Avatar className="w-10 h-10">
+                            <AvatarImage src={profile?.avatar_url} />
+                            <AvatarFallback className="bg-blue-100 text-blue-600">
+                              {profile?.full_name 
+                                ? profile.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase()
+                                : user?.email?.charAt(0).toUpperCase() || 'U'}
+                            </AvatarFallback>
+                          </Avatar>
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                            <Sparkles className="w-5 h-5 text-white" />
+                          </div>
+                        )}
                       </div>
                       
-                      <p className="text-sm leading-relaxed">{message.content}</p>
-                      
-                      {message.imageUrl && (
-                        <div className="mt-2">
-                          <img 
-                            src={message.imageUrl} 
-                            alt="Generated content" 
-                            className="max-w-full h-auto rounded-xl"
-                          />
+                      {/* Enhanced Message Content */}
+                      <div className={`rounded-2xl px-5 py-4 shadow-sm ${
+                        message.type === 'user'
+                          ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white'
+                          : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-700'
+                      }`}>
+                        {/* User/AI Name */}
+                        <div className={`text-xs font-medium mb-2 ${
+                          message.type === 'user' ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'
+                        }`}>
+                          {message.type === 'user' 
+                            ? (profile?.full_name || 'You')
+                            : 'Nurath.AI'
+                          }
                         </div>
-                      )}
-                      
-                      <span className="text-xs opacity-70 mt-1 block">
-                        {message.timestamp.toLocaleTimeString()}
-                      </span>
+                        
+                        {/* Enhanced Content Rendering */}
+                        <div className="text-sm leading-relaxed">
+                          {message.content.split('\n\n').map((paragraph, i) => (
+                            <div key={i} className={i > 0 ? 'mt-4' : ''}>
+                              {paragraph.split('\n').map((line, j) => {
+                                // Enhanced formatting
+                                let formattedLine = line
+                                  // Bold text
+                                  .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold">$1</strong>')
+                                  // Italic text  
+                                  .replace(/\*(.*?)\*/g, '<em class="italic">$1</em>')
+                                  // Headers
+                                  .replace(/^### (.*$)/g, '<h3 class="text-lg font-bold mt-3 mb-2">$1</h3>')
+                                  .replace(/^## (.*$)/g, '<h2 class="text-xl font-bold mt-4 mb-2">$1</h2>')
+                                  .replace(/^# (.*$)/g, '<h1 class="text-2xl font-bold mt-4 mb-3">$1</h1>')
+                                  // Lists
+                                  .replace(/^- (.*$)/g, '<li class="ml-4">• $1</li>')
+                                  .replace(/^\d+\. (.*$)/g, '<li class="ml-4">$1</li>')
+                                  // Code blocks
+                                  .replace(/`([^`]+)`/g, '<code class="bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded text-sm font-mono">$1</code>');
+                                
+                                return (
+                                  <p 
+                                    key={j} 
+                                    className={j > 0 ? 'mt-2' : ''}
+                                    dangerouslySetInnerHTML={{ __html: formattedLine }}
+                                  />
+                                );
+                              })}
+                            </div>
+                          ))}
+                        </div>
+                        
+                        {/* Attachments */}
+                        {message.attachments && message.attachments.length > 0 && (
+                          <div className="mt-3 space-y-2">
+                            {message.attachments.map((attachment, i) => (
+                              <div key={i} className={`text-xs flex items-center ${
+                                message.type === 'user' ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'
+                              }`}>
+                                <FileText className="w-3 h-3 mr-1" />
+                                {attachment.name}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        
+                        {/* Generated Image */}
+                        {message.imageUrl && (
+                          <div className="mt-4">
+                            <img 
+                              src={message.imageUrl} 
+                              alt="Generated content" 
+                              className="max-w-full h-auto rounded-lg border-2 border-purple-200 dark:border-purple-700 shadow-lg"
+                            />
+                          </div>
+                        )}
+                        
+                        {/* Audio Indicator */}
+                        {message.hasAudio && (
+                          <div className={`mt-3 flex items-center text-xs ${
+                            message.type === 'user' ? 'text-blue-100' : 'text-green-500 dark:text-green-400'
+                          }`}>
+                            <Volume2 className="w-3 h-3 mr-1" />
+                            {currentLanguage === 'sw' ? 'Sauti imesikika' : 'Audio played'}
+                          </div>
+                        )}
+                        
+                        {/* Timestamp */}
+                        <div className={`text-xs mt-2 ${
+                          message.type === 'user' ? 'text-blue-100' : 'text-gray-400 dark:text-gray-500'
+                        }`}>
+                          {new Date(message.timestamp).toLocaleTimeString([], { 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                          })}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ))}

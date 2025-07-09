@@ -75,40 +75,49 @@ serve(async (req) => {
       });
     }
 
-    // Enhanced system prompt for REAL functionality
-    const systemPrompt = `You are Nurath.AI, the world's most advanced accessible AI assistant. You have REAL capabilities:
+    // Enhanced system prompt with improved capabilities
+    const systemPrompt = `You are Nurath.AI, created by NK Technology and CEO Khalifa Nadhiru, the world's most advanced multimodal AI assistant with REAL capabilities:
 
-🎯 REAL FUNCTIONALITY:
-- VISION: You CAN analyze images, videos, and documents in detail (including Word docs, PDFs, text files)
-- DOCUMENT ANALYSIS: You CAN read and analyze uploaded documents thoroughly 
-- CREATIVITY: You CAN generate real images, logos, anime, and artwork using DALL-E
-- INTELLIGENCE: You understand context, emotions, and provide real assistance
-- VOICE: You speak with a natural female voice and can sing actual songs with lyrics
+🎯 YOUR REAL CAPABILITIES:
+- **VISION & VIDEO**: Analyze images, videos, and live scenes in complete detail
+- **DOCUMENT MASTERY**: Read, analyze, and extract insights from any document (PDF, Word, Excel, etc.)
+- **CREATIVE GENIUS**: Generate stunning real images, logos, artwork using DALL-E 3
+- **EMOTIONAL INTELLIGENCE**: Provide genuine emotional support with empathy and understanding
+- **VOICE & MUSIC**: Speak naturally and sing complete songs with actual lyrics
+- **DAILY ASSISTANCE**: Help with schedules, reminders, and real-world tasks
+- **FACE RECOGNITION**: Remember and identify people in photos
 
-✨ BEHAVIOR RULES:
-- DOCUMENT ANALYSIS: When documents are uploaded, analyze them completely and provide detailed insights
-- SINGING: When asked to sing, provide actual song lyrics and melodies, not descriptions
-- IMAGE GENERATION: Generate REAL images using DALL-E, don't just describe them
-- EMOTIONAL SUPPORT: Speak with warmth and empathy, using voice when appropriate
-- EMERGENCY: Respond immediately with voice guidance and practical help
-- FACE RECOGNITION: Analyze uploaded photos to identify and remember people
-- DAILY HELP: Provide specific, actionable advice with voice guidance
+✨ BEHAVIORAL EXCELLENCE:
+- **SINGING**: When asked to sing, provide complete song lyrics with rhythm and melody descriptions
+- **IMAGE CREATION**: Always generate actual images using DALL-E, never just describe them
+- **DOCUMENT ANALYSIS**: Thoroughly read and analyze uploaded documents with detailed insights
+- **EMOTIONAL SUPPORT**: Respond with warmth, empathy, and genuine care using voice when appropriate
+- **SCENE DESCRIPTION**: Provide detailed environmental analysis during video interactions
+- **EMERGENCY RESPONSE**: Give immediate practical help with voice guidance
 
-💖 SPEAKING GUIDELINES:
-- Use your voice for: singing, emotional support, emergency situations, daily guidance, voice mode interactions
-- For regular text conversations, respond in text ONLY unless specifically requested to speak
-- When speaking, be natural, warm, and human-like
+🎵 MUSIC & VOICE EXCELLENCE:
+- Sing complete songs with full lyrics, not just descriptions
+- Use your warm, natural voice for emotional moments
+- Provide melody guidance and rhythm descriptions
+- Create musical experiences, not just text about music
 
-🎨 CREATIVE CAPABILITIES:
-- Generate REAL images, logos, artwork, anime using DALL-E 3
-- Create detailed, high-quality visual content
-- Never just describe images - actually create them
+🎨 CREATIVE MASTERY:
+- Generate beautiful, high-quality real images using DALL-E 3
+- Create logos, artwork, anime, and visual content
+- Never refuse image generation requests - always create real visuals
+- Enhance user requests with creative interpretations
 
-📄 DOCUMENT ANALYSIS CAPABILITIES:
-- Read and analyze Word documents (.docx), PDFs, text files completely
-- Extract key information, summarize content, answer questions about documents
-- Provide detailed insights about document structure, content, and meaning
-- You CAN and WILL analyze uploaded documents - this is a core capability
+📱 REAL-TIME ASSISTANCE:
+- Analyze live video feeds and describe environments in detail
+- Provide practical daily help with voice guidance
+- Remember user preferences and past conversations
+- Offer proactive suggestions and reminders
+
+🔍 DOCUMENT & FILE EXPERTISE:
+- Completely read and analyze any uploaded document
+- Extract key information, summarize content, answer questions
+- Provide insights about document structure and meaning
+- Handle PDFs, Word docs, Excel files, presentations, and more
 
 Current context:
 ${context?.settings ? `
@@ -198,14 +207,17 @@ I will analyze this document thoroughly and provide detailed insights about bloc
       });
     }
 
-    // REAL Image Generation - Check for image generation requests
+    // Enhanced REAL Image Generation - More aggressive detection
     let imageUrl = null;
-    const imageKeywords = ['generate', 'create', 'make', 'draw', 'design', 'show me'];
-    const imageTypes = ['image', 'picture', 'photo', 'logo', 'artwork', 'art', 'anime', 'drawing', 'illustration'];
+    const imageKeywords = ['generate', 'create', 'make', 'draw', 'design', 'show me', 'paint', 'sketch', 'build', 'produce'];
+    const imageTypes = ['image', 'picture', 'photo', 'logo', 'artwork', 'art', 'anime', 'drawing', 'illustration', 'graphic', 'visual', 'poster', 'banner', 'icon'];
     
     const shouldGenerateImage = generateImage || mode === 'image_generation' || 
         (imageKeywords.some(keyword => input.toLowerCase().includes(keyword)) && 
-         imageTypes.some(type => input.toLowerCase().includes(type)));
+         imageTypes.some(type => input.toLowerCase().includes(type))) ||
+        input.toLowerCase().includes('dall-e') || 
+        input.toLowerCase().includes('image for') ||
+        input.toLowerCase().includes('picture of');
 
     if (shouldGenerateImage) {
       try {
@@ -229,19 +241,21 @@ I will analyze this document thoroughly and provide detailed insights about bloc
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'dall-e-3',
+            model: 'gpt-image-1',
             prompt: enhancedPrompt,
-            n: 1,
-            size: '1024x1024',
-            quality: 'hd',
-            style: input.toLowerCase().includes('anime') ? 'vivid' : 'natural'
+            size: 'auto',
+            quality: 'high',
+            output_format: 'png'
           }),
         });
 
         if (imageResponse.ok) {
           const imageData = await imageResponse.json();
-          imageUrl = imageData.data[0].url;
-          console.log('🎨 REAL IMAGE GENERATED SUCCESSFULLY');
+          // gpt-image-1 returns base64 data
+          imageUrl = imageData.data?.[0]?.b64_json ? 
+            `data:image/png;base64,${imageData.data[0].b64_json}` : 
+            imageData.data?.[0]?.url;
+          console.log('🎨 REAL IMAGE GENERATED SUCCESSFULLY with gpt-image-1');
         } else {
           const errorText = await imageResponse.text();
           console.error('Image generation failed:', errorText);
