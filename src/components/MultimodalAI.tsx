@@ -29,7 +29,7 @@ import {
   Shield,
   Sparkles,
   FileText,
-  File
+  File as FileIcon
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -1271,7 +1271,7 @@ const MultimodalAI = () => {
                         ) : file.type?.includes('pdf') ? (
                           <FileText className="w-4 h-4 text-red-500" />
                         ) : (
-                          <File className="w-4 h-4 text-gray-500" />
+                          <FileIcon className="w-4 h-4 text-gray-500" />
                         )}
                         <span className="text-sm text-gray-700 dark:text-gray-300 truncate max-w-32">
                           {file.name}
