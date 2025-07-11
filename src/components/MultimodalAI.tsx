@@ -994,9 +994,15 @@ const MultimodalAI = () => {
               </Badge>
             )}
             {isProcessing && (
-              <Badge variant="outline" className="border-blue-500/30 text-blue-400 bg-blue-500/10 animate-pulse rounded-full">
-                <Brain className="w-3 h-3 mr-1" />
-                {currentLanguage === 'sw' ? 'Ninachakua' : 'Processing'}
+              <Badge variant="outline" className="border-blue-500/30 text-blue-400 bg-blue-500/10 rounded-full">
+                <div className="flex items-center space-x-1">
+                  <div className="flex space-x-1">
+                    <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
+                    <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
+                    <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+                  </div>
+                  <span className="ml-2 text-xs">{currentLanguage === 'sw' ? 'Ninafikiria...' : 'Thinking...'}</span>
+                </div>
               </Badge>
             )}
             {isVideoOn && (
@@ -1265,8 +1271,12 @@ const MultimodalAI = () => {
                             </AvatarFallback>
                           </Avatar>
                         ) : (
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                            <Sparkles className="w-5 h-5 text-white" />
+                          <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-purple-500 to-indigo-600 border-2 border-white shadow-lg">
+                            <img
+                              src={aiAvatarImages.default}
+                              alt="Nurath AI"
+                              className="w-full h-full object-cover"
+                            />
                           </div>
                         )}
                       </div>
@@ -1536,16 +1546,37 @@ const MultimodalAI = () => {
               <div className="text-center">
                 <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl p-8">
                   <div className="flex flex-col items-center space-y-4">
-                    <div className={`w-24 h-24 rounded-full flex items-center justify-center ${
-                      isVideoOn ? 'bg-green-500' : 'bg-gray-500'
-                    }`}>
-                      <Video className="w-12 h-12 text-white" />
-                    </div>
+                    {/* Video Display */}
+                    {isVideoOn ? (
+                      <div className="relative w-full max-w-md">
+                        <video
+                          ref={videoRef}
+                          autoPlay
+                          muted
+                          playsInline
+                          className="w-full h-64 object-cover rounded-xl border-4 border-green-400 shadow-lg"
+                        />
+                        <div className="absolute top-2 left-2">
+                          <Badge variant="outline" className="border-green-500/30 text-green-400 bg-green-500/10">
+                            <Video className="w-3 h-3 mr-1" />
+                            {currentLanguage === 'sw' ? 'Mzunguko' : 'Live'}
+                          </Badge>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className={`w-24 h-24 rounded-full flex items-center justify-center ${
+                        isVideoOn ? 'bg-green-500' : 'bg-gray-500'
+                      }`}>
+                        <Video className="w-12 h-12 text-white" />
+                      </div>
+                    )}
+                    
                     <p className="text-lg font-medium text-gray-900 dark:text-white">
                       {isVideoOn 
                         ? (currentLanguage === 'sw' ? 'Simu ya video imewashwa - Ninaweza kukuona!' : 'Video call active - I can see you!') 
                         : (currentLanguage === 'sw' ? 'Anza simu ya video na AI' : 'Start video call with AI')}
                     </p>
+                    
                     <div className="flex space-x-4">
                       <Button
                         onClick={isVideoOn ? stopVideo : startVideo}
@@ -1557,6 +1588,17 @@ const MultimodalAI = () => {
                       >
                         {isVideoOn ? <VideoOff className="w-6 h-6" /> : <Video className="w-6 h-6" />}
                       </Button>
+                      
+                      {isVideoOn && (
+                        <Button
+                          onClick={takePhoto}
+                          size="lg"
+                          variant="outline"
+                          className="rounded-full"
+                        >
+                          <Camera className="w-6 h-6" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1575,6 +1617,7 @@ const MultimodalAI = () => {
         onChange={(e) => e.target.files && handleFileUpload(e.target.files)}
       />
       <audio ref={audioRef} preload="auto" />
+      <video ref={videoRef} style={{ display: 'none' }} />
     </div>
   );
 };

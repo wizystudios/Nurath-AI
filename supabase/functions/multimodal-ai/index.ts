@@ -251,11 +251,18 @@ I will analyze this document thoroughly and provide detailed insights about bloc
 
         if (imageResponse.ok) {
           const imageData = await imageResponse.json();
-          // gpt-image-1 returns base64 data
-          imageUrl = imageData.data?.[0]?.b64_json ? 
-            `data:image/png;base64,${imageData.data[0].b64_json}` : 
-            imageData.data?.[0]?.url;
-          console.log('🎨 REAL IMAGE GENERATED SUCCESSFULLY with gpt-image-1');
+          console.log('🎨 Image generation response:', imageData);
+          
+          // gpt-image-1 returns base64 data directly in the response
+          if (imageData.data?.[0]?.b64_json) {
+            imageUrl = `data:image/png;base64,${imageData.data[0].b64_json}`;
+            console.log('🎨 REAL IMAGE GENERATED SUCCESSFULLY with gpt-image-1 (base64)');
+          } else if (imageData.data?.[0]?.url) {
+            imageUrl = imageData.data[0].url;
+            console.log('🎨 REAL IMAGE GENERATED SUCCESSFULLY with gpt-image-1 (URL)');
+          } else {
+            console.error('🎨 No image data in response:', imageData);
+          }
         } else {
           const errorText = await imageResponse.text();
           console.error('Image generation failed:', errorText);
@@ -324,7 +331,7 @@ I will analyze this document thoroughly and provide detailed insights about bloc
 
     // Add image generation info to response
     if (imageUrl) {
-      aiResponse = `🎨 I've created a beautiful image for you! Here it is:\n\n${aiResponse}`;
+      aiResponse = `🎨 I've created a beautiful image for you!\n\n${aiResponse}\n\n[IMAGE_GENERATED]`;
     }
 
     // Generate audio response ONLY if shouldSpeak is explicitly true
