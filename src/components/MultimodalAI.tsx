@@ -993,15 +993,6 @@ const MultimodalAI = () => {
                 {currentLanguage === 'sw' ? 'Ninazungumza' : 'Speaking'}
               </Badge>
             )}
-            {isProcessing && (
-              <Badge variant="outline" className="border-blue-500/30 text-blue-400 bg-blue-500/10 rounded-full">
-                <div className="flex space-x-1">
-                  <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
-                  <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
-                  <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
-                </div>
-              </Badge>
-            )}
             {isVideoOn && (
               <Badge variant="outline" className="border-purple-500/30 text-purple-400 bg-purple-500/10 rounded-full">
                 <Video className="w-3 h-3 mr-1" />
@@ -1284,15 +1275,6 @@ const MultimodalAI = () => {
                           ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white'
                           : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-700'
                       }`}>
-                        {/* User/AI Name */}
-                        <div className={`text-xs font-medium mb-2 ${
-                          message.type === 'user' ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'
-                        }`}>
-                          {message.type === 'user' 
-                            ? (profile?.full_name || 'You')
-                            : 'Nurath.AI'
-                          }
-                        </div>
                         
                         {/* Enhanced Content Rendering */}
                         <div className="text-sm leading-relaxed">
@@ -1375,6 +1357,21 @@ const MultimodalAI = () => {
                     </div>
                   </div>
                 ))}
+                
+                {/* Processing indicator when AI is responding */}
+                {isProcessing && (
+                  <div className="flex justify-start mb-4">
+                    <div className="max-w-[80%] mr-auto">
+                      <div className="rounded-2xl px-5 py-4 bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-700">
+                        <div className="flex space-x-1">
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
