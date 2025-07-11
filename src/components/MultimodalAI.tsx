@@ -995,13 +995,10 @@ const MultimodalAI = () => {
             )}
             {isProcessing && (
               <Badge variant="outline" className="border-blue-500/30 text-blue-400 bg-blue-500/10 rounded-full">
-                <div className="flex items-center space-x-1">
-                  <div className="flex space-x-1">
-                    <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
-                    <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
-                    <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
-                  </div>
-                  <span className="ml-2 text-xs">{currentLanguage === 'sw' ? 'Ninafikiria...' : 'Thinking...'}</span>
+                <div className="flex space-x-1">
+                  <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
+                  <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
+                  <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
                 </div>
               </Badge>
             )}

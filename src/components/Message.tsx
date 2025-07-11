@@ -52,22 +52,12 @@ const Message: React.FC<MessageProps> = ({ message }) => {
       className={`flex ${isUser ? "justify-end" : "justify-start"}`}
     >
       <div
-        className={`flex gap-3 max-w-[80%] ${
-          isUser ? "flex-row-reverse" : "flex-row"
+        className={`max-w-[80%] ${
+          isUser ? "ml-auto" : "mr-auto"
         }`}
       >
-        <div
-          className={`flex h-8 w-8 shrink-0 select-none items-center justify-center rounded-full ${
-            isUser ? "bg-primary" : "bg-purple-600"
-          } text-white`}
-        >
-          {getIcon()}
-        </div>
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="font-semibold">
-              {isUser ? "You" : "Nurath.AI"}
-            </span>
+          <div className="flex items-center gap-2 mb-1 justify-end">
             <span className="text-xs text-muted-foreground">{time}</span>
           </div>
           <div
