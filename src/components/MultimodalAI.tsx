@@ -980,25 +980,6 @@ const MultimodalAI = () => {
               </Button>
             </div>
             
-            {/* Status Badges */}
-            {isListening && (
-              <Badge variant="outline" className="border-red-500/30 text-red-400 bg-red-500/10 animate-pulse rounded-full">
-                <Mic className="w-3 h-3 mr-1" />
-                {currentLanguage === 'sw' ? 'Sikiliza' : 'Listening'}
-              </Badge>
-            )}
-            {isSpeaking && (
-              <Badge variant="outline" className="border-green-500/30 text-green-400 bg-green-500/10 animate-pulse rounded-full">
-                <Volume2 className="w-3 h-3 mr-1" />
-                {currentLanguage === 'sw' ? 'Ninazungumza' : 'Speaking'}
-              </Badge>
-            )}
-            {isVideoOn && (
-              <Badge variant="outline" className="border-purple-500/30 text-purple-400 bg-purple-500/10 rounded-full">
-                <Video className="w-3 h-3 mr-1" />
-                {currentLanguage === 'sw' ? 'Video imewashwa' : 'Video Active'}
-              </Badge>
-            )}
           </div>
           <ThemeToggle />
         </header>
@@ -1611,7 +1592,19 @@ const MultimodalAI = () => {
         onChange={(e) => e.target.files && handleFileUpload(e.target.files)}
       />
       <audio ref={audioRef} preload="auto" />
-      <video ref={videoRef} style={{ display: 'none' }} />
+      
+      {/* Video element - show when video is active */}
+      {isVideoOn && (
+        <div className="fixed top-4 right-4 w-64 h-48 bg-black rounded-lg overflow-hidden shadow-lg border-2 border-white z-50">
+          <video 
+            ref={videoRef} 
+            className="w-full h-full object-cover"
+            autoPlay
+            muted
+            playsInline
+          />
+        </div>
+      )}
     </div>
   );
 };
