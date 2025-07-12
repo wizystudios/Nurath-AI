@@ -563,15 +563,24 @@ const MultimodalAI = () => {
             videoRef.current.play().then(() => {
               setIsVideoOn(true);
               console.log("📹 Camera started successfully");
-              toast.success("🎥 Camera activated! Video call is now active.");
+              toast.success("🎥 Camera activated! I can now see through your camera.");
               
-                if (currentMode === 'video') {
-                  speakText("Camera is now active. I can see your environment through the video feed.", 'normal');
-                  
-                  setTimeout(async () => {
-                    await takePhoto();
-                  }, 3000);
-                }
+              if (currentMode === 'video') {
+                speakText("Camera is now active. I can see your environment. Let me describe what I see.", 'normal');
+                
+                // Start continuous vision analysis for blind users
+                setTimeout(async () => {
+                  await takePhoto();
+                  // Set up interval for continuous analysis every 10 seconds
+                  const analysisInterval = setInterval(async () => {
+                    if (isVideoOn && currentMode === 'video') {
+                      await takePhoto();
+                    } else {
+                      clearInterval(analysisInterval);
+                    }
+                  }, 10000);
+                }, 2000);
+              }
             }).catch((playError) => {
               console.error("📹 Play error:", playError);
               throw new Error("Could not start video playback");
@@ -694,30 +703,31 @@ const MultimodalAI = () => {
       canvas.width = videoRef.current.videoWidth || 640;
       canvas.height = videoRef.current.videoHeight || 480;
       
-      ctx?.drawImage(videoRef.current, 0, 0);
+      if (!ctx) {
+        throw new Error('Could not get canvas context');
+      }
       
-      canvas.toBlob(async (blob) => {
-        if (blob) {
-          const file = new File([blob], 'photo.jpg', { type: 'image/jpeg' });
-          const reader = new FileReader();
-          reader.onload = async (e) => {
-            const base64Data = e.target?.result as string;
-            
-            await handleAIInteraction(
-              "I just took a photo. Please describe everything you see in great detail - people, objects, surroundings, colors, and help me understand my environment completely.",
-              'image',
-              [{ type: 'image', data: base64Data, name: 'photo.jpg' }],
-              true
-            );
-          };
-          reader.readAsDataURL(file);
-          await speakText("Photo captured. Analyzing what I can see.", 'normal');
-          toast.success("📸 Photo captured and analyzing...");
-        }
-      }, 'image/jpeg', 0.9);
+      // Capture the current frame from video
+      ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+      
+      // Convert to base64 and send to AI
+      const base64Data = canvas.toDataURL('image/jpeg', 0.8);
+      
+      console.log('📸 Photo captured, sending to AI for analysis...');
+      
+      // Send to AI with detailed vision prompt for blind users
+      await handleAIInteraction(
+        "Please analyze this live camera feed image in complete detail. Describe everything you see including: people and their positions, objects and their locations, colors, lighting, background details, any text or signs, potential hazards or obstacles, and the overall environment. Be very specific and thorough as this is to help a blind person understand their surroundings.",
+        'video',
+        [{ type: 'image', data: base64Data, name: 'camera_feed.jpg' }],
+        true // Always speak for video mode
+      );
+      
     } catch (error) {
       console.error('📸 Photo capture error:', error);
-      toast.error('Failed to capture photo');
+      const errorMsg = 'Failed to capture and analyze camera feed';
+      toast.error(errorMsg);
+      await speakText(errorMsg, 'high');
     }
   }, [isVideoOn, handleAIInteraction, speakText]);
 
