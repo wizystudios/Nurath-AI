@@ -194,6 +194,18 @@ I will analyze this document thoroughly and provide detailed insights about bloc
         role: 'user',
         content: voicePrompt
       });
+    } else if (mode === 'video' && attachments?.[0]) {
+      const videoPrompt = `[Video mode active] ${input} - Please provide detailed environmental analysis, scene description, object detection, and location awareness. Describe everything you see in complete detail for a blind person.`;
+      messages.push({
+        role: 'user',
+        content: [
+          { type: 'text', text: videoPrompt },
+          { 
+            type: 'image_url', 
+            image_url: { url: attachments[0].data }
+          }
+        ]
+      });
     } else if (mode === 'video') {
       const videoPrompt = `[Video mode active] ${input} - Please provide detailed environmental analysis, scene description, object detection, and location awareness.`;
       messages.push({
