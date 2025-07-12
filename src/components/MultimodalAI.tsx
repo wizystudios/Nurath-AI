@@ -565,18 +565,13 @@ const MultimodalAI = () => {
               console.log("📹 Camera started successfully");
               toast.success("🎥 Camera activated! Video call is now active.");
               
-              if (currentMode === 'video') {
-                speakText("Camera is now active. I can see your environment through the video feed.", 'normal');
-                
-                setTimeout(() => {
-                  handleAIInteraction(
-                    "Please describe everything you can see in my video feed in detail, including any people, objects, and surroundings.", 
-                    'video',
-                    undefined,
-                    true
-                  );
-                }, 3000);
-              }
+                if (currentMode === 'video') {
+                  speakText("Camera is now active. I can see your environment through the video feed.", 'normal');
+                  
+                  setTimeout(async () => {
+                    await takePhoto();
+                  }, 3000);
+                }
             }).catch((playError) => {
               console.error("📹 Play error:", playError);
               throw new Error("Could not start video playback");
