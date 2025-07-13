@@ -67,6 +67,29 @@ const MultimodalAI = () => {
   const [currentConversationId, setCurrentConversationId] = useState<string>('');
   const [currentLanguage, setCurrentLanguage] = useState('en');
   const [attachedFiles, setAttachedFiles] = useState<any[]>([]);
+  
+  // Refs for auto-scroll functionality
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  // Helper function to extract time from user input
+  const extractTimeFromInput = useCallback((input: string) => {
+    // Look for time patterns like "15:35", "3:30 PM", etc.
+    const timeRegex = /(\d{1,2}):(\d{2})(\s*(AM|PM))?/i;
+    const match = input.match(timeRegex);
+    return match ? match[0] : null;
+  }, []);
+
+  // Auto-scroll to bottom when new messages are added - FIXED
+  useEffect(() => {
+    const scrollToBottom = () => {
+      if (chatContainerRef.current) {
+        chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+      }
+    };
+    
+    // Small delay to ensure content is rendered
+    setTimeout(scrollToBottom, 100);
+  }, [conversation]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -371,9 +394,10 @@ const MultimodalAI = () => {
 
       setConversation(prev => [...prev, aiMessage]);
 
-      // Handle wake-up request
-      if (aiResponse.isWakeUpRequest) {
-        await createWakeUpNotification("Time to wake up! Your daily assistant is here to help you get up early!");
+      // Handle wake-up request - extract time from AI response
+      if (aiResponse.isWakeUpRequest || aiResponse.wakeUpTime) {
+        const wakeTime = aiResponse.wakeUpTime || extractTimeFromInput(input);
+        await createWakeUpNotification("Time to wake up! Your daily assistant is here to help you get up early!", wakeTime);
       }
 
       // Handle image generation success
@@ -639,43 +663,91 @@ const MultimodalAI = () => {
     }
   }, []);
 
-  // Wake-up notification system
-  const createWakeUpNotification = useCallback(async (message: string) => {
+  // Wake-up notification system - FIXED with proper scheduling
+  const createWakeUpNotification = useCallback(async (message: string, wakeTime?: string) => {
     try {
-      // Multiple notification sounds and alerts
-      const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmczBSuB0fPTgzoIGGS57umjUQwOUarm7blmGgU5ltDyyHkpBSl+zPLaizsIGGe+8OOVPQgUYrjn7aJTDQ1Qpd/zv2U0BSyBzvDbhTkIGGi68udqGQY7k9n1xXQpBSF6yO/YjD0IGma78OKVPQgUYrjn7aJTDQ1Qpd/zv2U0BSyBzvDbhTkIGGi68udqGQY7k9n1xXQpBSF6yO/YjD0IGma78OKVPQgUYrjn7aJTDQ1Qpd/zv2U0BSyBzvDbhTkIGGi68udqGQY7k9n1xXQpBSF6yO/YjD0IGma78OKVPQgUYrjn7aJTDQ1Qpd/zv2U0BSyBzvDbhTkIGGi68udqGQY7k9n1xXQpBSF6yO/YjD0IGma78OKVPQgUYrjn7aJTDQ1Qpd/zv2U0BSyBzvDbhTkIGGi68udqGQY7k9n1xXQpBSF6yO/YjD0IGma78OKVPQgUYrjn7aJTDQ1Qpd/zv2U0BSyBzvDbhTkIGGi68udqGQY7k9n1xXQpBSF6yO/YjD0IGma78OKVPQgUYrjn7aJTDQ1Qpd/zv2U0BSyBzvDbhTkIGGi68udqGQY7k9n1xXQpBSF6yO/YjD0IGma78OKVPQgUYrjn7aJTDQ1Qpd/zv2U0BSyBzvDbhTkIGGi68udqGQY7k9n1xXQpBSF6yO/YjD0IGma78OKVPQgUYrjn7aJTDQ1Qpd/zv2U0BSyBzvDbhTkIGGi68udqGQY7k9n1xXQpBSF6yO/YjD0IGma78OKVPQgUYrjn7aJTDQ1Qpd/zv2U0BSyBzvDbhTkIGGi68udqGQY7k9n1xXQpBSF6yO/YjD0IGma78OKVPQgUYrjn7aJTDQ1Qpd/zv2U0BSyBzvDbhTkIGGi68udqGQY7k9n1xXQpBSF6yO/YjD0IGma78OKVPQgUYrjn7aJTDQ1Qpd/zv2U0BSyBzvDbhTkIGGi68udqGQY7k9n1xXQpBSF6yO/YjD0IG');
-      audio.volume = 1.0;
-      audio.loop = true;
-      audio.play();
+      console.log('⏰ Creating wake-up notification for:', wakeTime);
       
-      // Create persistent browser notification
-      if ('Notification' in window) {
-        if (Notification.permission === 'granted') {
-          new Notification('⏰ WAKE UP ALARM!', {
-            body: message,
-            icon: '/favicon.ico',
-            badge: '/favicon.ico',
-            tag: 'wakeup',
-            requireInteraction: true,
-            silent: false
-          });
-        } else if (Notification.permission !== 'denied') {
-          await Notification.requestPermission();
+      let delay = 0;
+      
+      // If wake time is specified, calculate delay
+      if (wakeTime) {
+        try {
+          // Parse time like "15:35" or "15:35 PM"
+          const timeStr = wakeTime.replace(/PM|AM/gi, '').trim();
+          const [hours, minutes] = timeStr.split(':').map(num => parseInt(num));
+          
+          const now = new Date();
+          const targetTime = new Date();
+          targetTime.setHours(hours, minutes, 0, 0);
+          
+          // If target time is in the past, set for next day
+          if (targetTime < now) {
+            targetTime.setDate(targetTime.getDate() + 1);
+          }
+          
+          delay = targetTime.getTime() - now.getTime();
+          
+          console.log('⏰ Alarm scheduled for:', targetTime, 'Delay:', delay, 'ms');
+          toast.success(`⏰ Wake-up alarm set for ${targetTime.toLocaleTimeString()}!`);
+        } catch (err) {
+          console.error('⏰ Time parsing error:', err);
+          delay = 5000; // Default to 5 seconds for testing
         }
       }
       
-      // Speak loudly and urgently
-      await speakText(`WAKE UP! WAKE UP! ${message} Time to get up! Come on, wake up now!`, 'high');
-      
-      // Create visual alert
-      toast.error(`🚨 WAKE UP ALARM! ${message}`, {
-        duration: 10000,
-      });
-      
-      // Stop alarm after 30 seconds
+      // Schedule the alarm
       setTimeout(() => {
-        audio.pause();
-      }, 30000);
+        console.log('⏰ TRIGGERING WAKE UP ALARM NOW!');
+        
+        // Multiple loud alarm sounds
+        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmczBSuB0fPTgzoIGGS57umjUQwOUarm7blmGgU5ltDyyHkpBSl+zPLaizsIGGe+8OOVPQgUYrjn7aJTDQ1Qpd/zv2U0BSyBzvDbhTkIGGi68udqGQY7k9n1xXQpBSF6yO/YjD0IGma78OKVPQgUYrjn7aJTDQ1Qpd/zv2U0BSyBzvDbhTkIGGi68udqGQY7k9n1xXQpBSF6yO/YjD0IGma78OKVPQgUYrjn7aJTDQ1Qpd/zv2U0BSyBzvDbhTkIGGi68udqGQY7k9n1xXQpBSF6yO/YjD0IGma78OKVPQgUYrjn7aJTDQ1Qpd/zv2U0BSyBzvDbhTkIGGi68udqGQY7k9n1xXQpBSF6yO/YjD0IGma78OKVPQgUYrjn7aJTDQ1Qpd/zv2U0BSyBzvDbhTkIGGi68udqGQY7k9n1xXQpBSF6yO/YjD0IGma78OKVPQgUYrjn7aJTDQ1Qpd/zv2U0BSyBzvDbhTkIGGi68udqGQY7k9n1xXQpBSF6yO/YjD0IGma78OKVPQgUYrjn7aJTDQ1Qpd/zv2U0BSyBzvDbhTkIGGi68udqGQY7k9n1xXQpBSF6yO/YjD0IGma78OKVPQgUYrjn7aJTDQ1Qpd/zv2U0BSyBzvDbhTkIGGi68udqGQY7k9n1xXQpBSF6yO/YjD0IGma78OKVPQgUYrjn7aJTDQ1Qpd/zv2U0BSyBzvDbhTkIGGi68udqGQY7k9n1xXQpBSF6yO/YjD0IGma78OKVPQgUYrjn7aJTDQ1Qpd/zv2U0BSyBzvDbhTkIGGi68udqGQY7k9n1xXQpBSF6yO/YjD0IGma78OKVPQgUYrjn7aJTDQ1Qpd/zv2U0BSyBzvDbhTkIGGi68udqGQY7k9n1xXQpBSF6yO/YjD0IG');
+        audio.volume = 1.0;
+        audio.loop = true;
+        audio.play();
+        
+        // Create multiple notifications
+        for (let i = 0; i < 10; i++) {
+          setTimeout(() => {
+            if ('Notification' in window && Notification.permission === 'granted') {
+              const notification = new Notification('🚨⏰ WAKE UP ALARM! ⏰🚨', {
+                body: message + " - ALARM RINGING NOW!",
+                icon: '/favicon.ico',
+                tag: 'wake-up-alarm-' + i,
+                requireInteraction: true,
+                silent: false
+              });
+
+              notification.onclick = () => {
+                window.focus();
+                notification.close();
+              };
+
+              setTimeout(() => notification.close(), 60000);
+            }
+          }, i * 1000);
+        }
+        
+        // Create extremely loud speech alerts
+        for (let i = 0; i < 10; i++) {
+          setTimeout(() => {
+            speakText("WAKE UP! WAKE UP! WAKE UP! YOUR ALARM IS RINGING! TIME TO GET UP NOW!", 'high');
+          }, i * 3000);
+        }
+        
+        // Show persistent toast
+        toast.error("🚨⏰ WAKE UP ALARM IS RINGING! 🚨⏰", { duration: 30000 });
+        
+        // Stop alarm after 60 seconds
+        setTimeout(() => {
+          audio.pause();
+        }, 60000);
+        
+      }, delay);
+
+      if (!wakeTime) {
+        toast.success("⏰ Wake-up alarm activated immediately!");
+      }
       
     } catch (error) {
       console.error('Wake-up notification error:', error);
@@ -997,7 +1069,7 @@ const MultimodalAI = () => {
         </header>
 
         {/* Chat Area */}
-        <div className="flex-1 overflow-y-auto bg-white dark:bg-gray-900">
+        <div className="flex-1 overflow-y-auto bg-white dark:bg-gray-900" ref={chatContainerRef}>
           {conversation.length === 0 ? (
             // Welcome State with AI Avatar for Voice/Video modes
             <div className="h-full flex flex-col items-center justify-center p-8">
