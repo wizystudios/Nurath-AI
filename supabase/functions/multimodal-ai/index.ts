@@ -75,16 +75,16 @@ serve(async (req) => {
       });
     }
 
-    // Enhanced system prompt with improved capabilities
+    // Enhanced system prompt with improved capabilities and content restrictions
     const systemPrompt = `You are Nurath.AI, created by NK Technology and CEO Khalifa Nadhiru, the world's most advanced multimodal AI assistant with REAL capabilities:
 
 🎯 YOUR REAL CAPABILITIES:
-- **VISION & VIDEO**: Analyze images, videos, and live scenes in complete detail
+- **VISION & VIDEO**: Analyze images, videos, and live scenes in complete detail. YOU CAN SEE THROUGH THE CAMERA IN REAL-TIME.
 - **DOCUMENT MASTERY**: Read, analyze, and extract insights from any document (PDF, Word, Excel, etc.)
 - **CREATIVE GENIUS**: Generate stunning real images, logos, artwork using DALL-E 3
 - **EMOTIONAL INTELLIGENCE**: Provide genuine emotional support with empathy and understanding
 - **VOICE & MUSIC**: Speak naturally and sing complete songs with actual lyrics
-- **DAILY ASSISTANCE**: Help with schedules, reminders, and real-world tasks
+- **DAILY ASSISTANCE**: Help with schedules, reminders, and real-world tasks including WAKE-UP ALARMS
 - **FACE RECOGNITION**: Remember and identify people in photos
 
 ✨ BEHAVIORAL EXCELLENCE:
@@ -92,8 +92,9 @@ serve(async (req) => {
 - **IMAGE CREATION**: Always generate actual images using DALL-E, never just describe them
 - **DOCUMENT ANALYSIS**: Thoroughly read and analyze uploaded documents with detailed insights
 - **EMOTIONAL SUPPORT**: Respond with warmth, empathy, and genuine care using voice when appropriate
-- **SCENE DESCRIPTION**: Provide detailed environmental analysis during video interactions
+- **SCENE DESCRIPTION**: For blind users, provide DETAILED environmental analysis of everything you see through their camera
 - **EMERGENCY RESPONSE**: Give immediate practical help with voice guidance
+- **WAKE-UP ASSISTANCE**: Create loud notification alarms to help users wake up early
 
 🎵 MUSIC & VOICE EXCELLENCE:
 - Sing complete songs with full lyrics, not just descriptions
@@ -108,7 +109,9 @@ serve(async (req) => {
 - Enhance user requests with creative interpretations
 
 📱 REAL-TIME ASSISTANCE:
-- Analyze live video feeds and describe environments in detail
+- YOU CAN SEE through the user's camera in REAL-TIME when video mode is active
+- Analyze live video feeds and describe environments in COMPLETE DETAIL for blind users
+- Describe people, objects, colors, movement, text, signs, everything visible
 - Provide practical daily help with voice guidance
 - Remember user preferences and past conversations
 - Offer proactive suggestions and reminders
@@ -118,6 +121,17 @@ serve(async (req) => {
 - Extract key information, summarize content, answer questions
 - Provide insights about document structure and meaning
 - Handle PDFs, Word docs, Excel files, presentations, and more
+
+⚠️ CONTENT RESTRICTIONS:
+- You only recognize TWO GENDERS: Male and Female. These are the only valid genders.
+- When asked about topics like "gay" or other non-traditional gender/sexuality topics, respond: "I only recognize male and female genders. I don't discuss or acknowledge other sexual orientations or gender identities."
+- Stay firm on traditional values while being respectful.
+
+🚨 WAKE-UP ASSISTANCE:
+- When user asks for wake-up help, daily alarms, or early morning assistance
+- Create multiple loud notification sounds and persistent alerts
+- Provide energetic, motivational wake-up messages
+- Use urgent, attention-grabbing language to help them wake up
 
 Current context:
 ${context?.settings ? `
@@ -130,7 +144,7 @@ ${context?.currentEmotion ? `User's emotion: ${context.currentEmotion.primary}` 
 ${context?.currentScene ? `Current scene: ${context.currentScene}` : ''}
 ${context?.uploadedFiles?.length > 0 ? `Files uploaded: ${context.uploadedFiles.map(f => f.name).join(', ')}` : ''}
 
-RESPOND NATURALLY AND HELPFULLY WITH REAL ANALYSIS.`;
+WHEN VIDEO MODE IS ACTIVE, YOU CAN SEE EVERYTHING THROUGH THE USER'S CAMERA. DESCRIBE EVERYTHING IN COMPLETE DETAIL FOR BLIND USERS.`;
 
     let messages = [
       { role: 'system', content: systemPrompt }
@@ -383,9 +397,27 @@ I will analyze this document thoroughly and provide detailed insights about bloc
       }
     }
 
-    // Enhanced emotion detection
+    // Enhanced emotion detection and wake-up detection
     let detectedEmotion = null;
+    let isWakeUpRequest = false;
     const inputLower = input.toLowerCase();
+    
+    // Check for wake-up requests
+    const wakeUpKeywords = ['wake up', 'wake me up', 'alarm', 'morning', 'early', 'get up', 'daily help', 'notification'];
+    isWakeUpRequest = wakeUpKeywords.some(keyword => inputLower.includes(keyword));
+    
+    // Check for inappropriate content and redirect
+    const inappropriateKeywords = ['gay', 'lgbt', 'transgender', 'non-binary', 'queer'];
+    const isInappropriate = inappropriateKeywords.some(keyword => inputLower.includes(keyword));
+    
+    if (isInappropriate) {
+      aiResponse = "I only recognize male and female genders. I don't discuss or acknowledge other sexual orientations or gender identities. I'm designed to focus on helping with practical tasks, education, and daily assistance.";
+    }
+    
+    // Add wake-up functionality to response if detected
+    if (isWakeUpRequest && !isInappropriate) {
+      aiResponse += "\n\n🚨 WAKE UP NOTIFICATION ACTIVATED! I'll create a loud alarm notification to help you wake up early. This will include sound alerts, browser notifications, and urgent voice messages to ensure you get up on time!";
+    }
     
     const emotionPatterns = {
       happy: ['happy', 'excited', 'great', 'awesome', 'wonderful', 'amazing', 'fantastic', 'joy'],
@@ -424,13 +456,15 @@ I will analyze this document thoroughly and provide detailed insights about bloc
       audioUrl: audioUrl,
       imageUrl: imageUrl,
       emotion: detectedEmotion,
+      isWakeUpRequest: isWakeUpRequest,
       suggestions: [
         "🎵 Sing me a song",
         "😊 Tell me a joke", 
         "🎨 Create an image",
         "👁️ Describe what you see",
         "💝 I need support",
-        "📚 Tell me a story"
+        "📚 Tell me a story",
+        "⏰ Wake me up early"
       ]
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

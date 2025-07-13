@@ -371,6 +371,11 @@ const MultimodalAI = () => {
 
       setConversation(prev => [...prev, aiMessage]);
 
+      // Handle wake-up request
+      if (aiResponse.isWakeUpRequest) {
+        await createWakeUpNotification("Time to wake up! Your daily assistant is here to help you get up early!");
+      }
+
       // Handle image generation success
       if (aiResponse.imageUrl) {
         toast.success("🎨 Image generated successfully!");
@@ -497,141 +502,185 @@ const MultimodalAI = () => {
     }
   }, []);
 
-  // Enhanced camera functions with better error handling and constraints
+  // Enhanced camera functions with REAL video functionality for blind users
   const startVideo = useCallback(async () => {
     try {
-      console.log("📹 Starting camera...");
+      console.log("📹 Starting camera for real-time video analysis...");
       
-      // Check if getUserMedia is supported
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("Camera access not supported in this browser");
+        throw new Error('Camera not supported in this browser');
       }
 
-      // Try with different constraint sets for better compatibility
-      const constraintSets = [
-        // High quality constraints
-        { 
-          video: { 
-            width: { ideal: 1280, min: 640 },
-            height: { ideal: 720, min: 480 },
-            facingMode: 'user',
-            frameRate: { ideal: 30, min: 15 }
-          }, 
-          audio: false 
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: 'environment' // Use back camera by default for better scene analysis
         },
-        // Medium quality constraints
-        { 
-          video: { 
-            width: { ideal: 640 },
-            height: { ideal: 480 },
-            facingMode: 'user'
-          }, 
-          audio: false 
-        },
-        // Basic constraints
-        { 
-          video: true, 
-          audio: false 
-        }
-      ];
+        audio: false
+      });
 
-      let stream = null;
-      let lastError = null;
-
-      for (const constraints of constraintSets) {
-        try {
-          console.log("📹 Trying constraints:", constraints);
-          stream = await navigator.mediaDevices.getUserMedia(constraints);
-          break;
-        } catch (error) {
-          console.log("📹 Constraints failed:", error);
-          lastError = error;
-          continue;
-        }
-      }
-
-      if (!stream) {
-        throw lastError || new Error("Could not access camera with any configuration");
-      }
-      
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        
-        // Wait for video to be ready
         videoRef.current.onloadedmetadata = () => {
-          if (videoRef.current) {
-            videoRef.current.play().then(() => {
-              setIsVideoOn(true);
-              console.log("📹 Camera started successfully");
-              toast.success("🎥 Camera activated! I can now see through your camera.");
-              
-              if (currentMode === 'video') {
-                speakText("Camera is now active. I can see your environment. Let me describe what I see.", 'normal');
-                
-                // Start continuous vision analysis for blind users
-                setTimeout(async () => {
-                  await takePhoto();
-                  // Set up interval for continuous analysis every 10 seconds
-                  const analysisInterval = setInterval(async () => {
-                    if (isVideoOn && currentMode === 'video') {
-                      await takePhoto();
-                    } else {
-                      clearInterval(analysisInterval);
-                    }
-                  }, 10000);
-                }, 2000);
-              }
-            }).catch((playError) => {
-              console.error("📹 Play error:", playError);
-              throw new Error("Could not start video playback");
-            });
-          }
-        };
-
-        videoRef.current.onerror = (error) => {
-          console.error("📹 Video element error:", error);
-          stopVideo();
-          toast.error("Video playback error occurred");
+          videoRef.current?.play();
+          setIsVideoOn(true);
+          setCurrentMode('video');
+          
+          // Immediately announce video activation
+          const activationMessage = "🎥 Camera is now ACTIVE! I can see through your camera and will describe everything in detail. Perfect for helping blind users navigate their environment.";
+          toast.success("📹 Camera activated - Real-time vision enabled!");
+          speakText(activationMessage, 'high');
+          
+          // Add immediate video analysis message
+          const videoMessage: ConversationMessage = {
+            type: 'ai',
+            content: activationMessage,
+            timestamp: new Date(),
+            hasAudio: false,
+            id: Date.now().toString()
+          };
+          setConversation(prev => [...prev, videoMessage]);
+          
+          // Start continuous video analysis every 8 seconds for blind assistance
+          const analysisInterval = setInterval(async () => {
+            if (videoRef.current && isVideoOn) {
+              await takeRealTimePhoto(); // Auto-capture and analyze
+            } else {
+              clearInterval(analysisInterval);
+            }
+          }, 8000);
         };
       }
+    } catch (error) {
+      console.error("📹 Camera error:", error);
+      setIsVideoOn(false);
+      toast.error(`Camera failed: ${error.message}`);
+    }
+  }, [isVideoOn, speakText]);
+
+  // Enhanced takePhoto with immediate analysis
+  const takeRealTimePhoto = useCallback(async () => {
+    if (!videoRef.current || !isVideoOn) {
+      return;
+    }
+
+    try {
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      
+      context?.drawImage(videoRef.current, 0, 0);
+      const imageData = canvas.toDataURL('image/jpeg', 0.8);
+      
+      const prompt = "I'm continuously monitoring through the camera to help a blind person. Describe EVERYTHING you can see in complete detail - people, objects, colors, text, signs, movements, environment. Be very specific about locations and spatial relationships.";
+      
+      // Process immediately with AI
+      await handleAIInteraction(
+        prompt,
+        'video', 
+        [{ type: 'image/jpeg', data: imageData, name: 'camera-capture.jpg' }],
+        true // Always speak for video mode
+      );
+    } catch (error) {
+      console.error("📸 Photo capture error:", error);
+    }
+  }, [isVideoOn, handleAIInteraction]);
+
+  // Manual photo capture for button clicks
+  const takePhoto = useCallback(async () => {
+    if (!videoRef.current || !isVideoOn) {
+      toast.error("Please turn on camera first");
+      return;
+    }
+
+    try {
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      
+      context?.drawImage(videoRef.current, 0, 0);
+      const imageData = canvas.toDataURL('image/jpeg', 0.8);
+      
+      const prompt = "Analyze this camera view and describe everything you see in detail.";
+      
+      // Process immediately with AI
+      await handleAIInteraction(
+        prompt,
+        'video', 
+        [{ type: 'image/jpeg', data: imageData, name: 'camera-capture.jpg' }],
+        true // Always speak for video mode
+      );
+      
+      toast.success("📸 Scene captured and analyzed!");
+    } catch (error) {
+      console.error("📸 Photo capture error:", error);
+      toast.error("Failed to capture image");
+    }
+  }, [isVideoOn, handleAIInteraction]);
+
+  // Enhanced stop video
+  const stopVideo = useCallback(() => {
+    try {
+      if (videoRef.current?.srcObject) {
+        const stream = videoRef.current.srcObject as MediaStream;
+        stream.getTracks().forEach(track => track.stop());
+        videoRef.current.srcObject = null;
+      }
+      setIsVideoOn(false);
+      setCurrentMode('text');
+      toast.success("📹 Camera stopped");
+    } catch (error) {
+      console.error("📹 Stop video error:", error);
+    }
+  }, []);
+
+  // Wake-up notification system
+  const createWakeUpNotification = useCallback(async (message: string) => {
+    try {
+      // Multiple notification sounds and alerts
+      const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmczBSuB0fPTgzoIGGS57umjUQwOUarm7blmGgU5ltDyyHkpBSl+zPLaizsIGGe+8OOVPQgUYrjn7aJTDQ1Qpd/zv2U0BSyBzvDbhTkIGGi68udqGQY7k9n1xXQpBSF6yO/YjD0IGma78OKVPQgUYrjn7aJTDQ1Qpd/zv2U0BSyBzvDbhTkIGGi68udqGQY7k9n1xXQpBSF6yO/YjD0IGma78OKVPQgUYrjn7aJTDQ1Qpd/zv2U0BSyBzvDbhTkIGGi68udqGQY7k9n1xXQpBSF6yO/YjD0IGma78OKVPQgUYrjn7aJTDQ1Qpd/zv2U0BSyBzvDbhTkIGGi68udqGQY7k9n1xXQpBSF6yO/YjD0IGma78OKVPQgUYrjn7aJTDQ1Qpd/zv2U0BSyBzvDbhTkIGGi68udqGQY7k9n1xXQpBSF6yO/YjD0IGma78OKVPQgUYrjn7aJTDQ1Qpd/zv2U0BSyBzvDbhTkIGGi68udqGQY7k9n1xXQpBSF6yO/YjD0IGma78OKVPQgUYrjn7aJTDQ1Qpd/zv2U0BSyBzvDbhTkIGGi68udqGQY7k9n1xXQpBSF6yO/YjD0IGma78OKVPQgUYrjn7aJTDQ1Qpd/zv2U0BSyBzvDbhTkIGGi68udqGQY7k9n1xXQpBSF6yO/YjD0IGma78OKVPQgUYrjn7aJTDQ1Qpd/zv2U0BSyBzvDbhTkIGGi68udqGQY7k9n1xXQpBSF6yO/YjD0IGma78OKVPQgUYrjn7aJTDQ1Qpd/zv2U0BSyBzvDbhTkIGGi68udqGQY7k9n1xXQpBSF6yO/YjD0IGma78OKVPQgUYrjn7aJTDQ1Qpd/zv2U0BSyBzvDbhTkIGGi68udqGQY7k9n1xXQpBSF6yO/YjD0IGma78OKVPQgUYrjn7aJTDQ1Qpd/zv2U0BSyBzvDbhTkIGGi68udqGQY7k9n1xXQpBSF6yO/YjD0IG');
+      audio.volume = 1.0;
+      audio.loop = true;
+      audio.play();
+      
+      // Create persistent browser notification
+      if ('Notification' in window) {
+        if (Notification.permission === 'granted') {
+          new Notification('⏰ WAKE UP ALARM!', {
+            body: message,
+            icon: '/favicon.ico',
+            badge: '/favicon.ico',
+            tag: 'wakeup',
+            requireInteraction: true,
+            silent: false
+          });
+        } else if (Notification.permission !== 'denied') {
+          await Notification.requestPermission();
+        }
+      }
+      
+      // Speak loudly and urgently
+      await speakText(`WAKE UP! WAKE UP! ${message} Time to get up! Come on, wake up now!`, 'high');
+      
+      // Create visual alert
+      toast.error(`🚨 WAKE UP ALARM! ${message}`, {
+        duration: 10000,
+      });
+      
+      // Stop alarm after 30 seconds
+      setTimeout(() => {
+        audio.pause();
+      }, 30000);
       
     } catch (error) {
-      console.error("🚨 Camera error:", error);
-      let errorMessage = "Camera access failed. ";
-      
-      if (error.name === 'NotFoundError') {
-        errorMessage += "No camera found. Please connect a camera and try again.";
-      } else if (error.name === 'NotAllowedError') {
-        errorMessage += "Camera permission denied. Please allow camera access in your browser settings and refresh the page.";
-      } else if (error.name === 'NotReadableError') {
-        errorMessage += "Camera is being used by another application. Please close other applications using the camera.";
-      } else if (error.name === 'OverconstrainedError') {
-        errorMessage += "Camera constraints not supported. Trying with basic settings...";
-      } else {
-        errorMessage += error.message || "Unknown camera error occurred.";
-      }
-      
-      await speakText(errorMessage, 'high');
-      toast.error(errorMessage);
-      setIsVideoOn(false);
+      console.error('Wake-up notification error:', error);
     }
-  }, [handleAIInteraction, speakText, currentMode]);
-
-  const stopVideo = useCallback(() => {
-    if (videoRef.current?.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach(track => {
-        track.stop();
-        console.log("📹 Camera track stopped:", track.kind);
-      });
-      videoRef.current.srcObject = null;
-    }
-    setIsVideoOn(false);
-    if (currentMode === 'video') {
-      speakText("Camera stopped. Video call ended.", 'normal');
-    }
-    toast.info("📹 Camera stopped - Video call ended");
-  }, [speakText, currentMode]);
+  }, [speakText]);
 
   // FIXED: Proper file upload handling
   const handleFileUpload = useCallback(async (files: FileList) => {
@@ -688,48 +737,6 @@ const MultimodalAI = () => {
     setAttachedFiles(prev => prev.filter((_, i) => i !== index));
   }, []);
 
-  const takePhoto = useCallback(async () => {
-    if (!videoRef.current || !isVideoOn) {
-      const message = "Please turn on the camera first to take a photo.";
-      await speakText(message, 'high');
-      toast.error(message);
-      return;
-    }
-
-    try {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      
-      canvas.width = videoRef.current.videoWidth || 640;
-      canvas.height = videoRef.current.videoHeight || 480;
-      
-      if (!ctx) {
-        throw new Error('Could not get canvas context');
-      }
-      
-      // Capture the current frame from video
-      ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-      
-      // Convert to base64 and send to AI
-      const base64Data = canvas.toDataURL('image/jpeg', 0.8);
-      
-      console.log('📸 Photo captured, sending to AI for analysis...');
-      
-      // Send to AI with detailed vision prompt for blind users
-      await handleAIInteraction(
-        "Please analyze this live camera feed image in complete detail. Describe everything you see including: people and their positions, objects and their locations, colors, lighting, background details, any text or signs, potential hazards or obstacles, and the overall environment. Be very specific and thorough as this is to help a blind person understand their surroundings.",
-        'video',
-        [{ type: 'image', data: base64Data, name: 'camera_feed.jpg' }],
-        true // Always speak for video mode
-      );
-      
-    } catch (error) {
-      console.error('📸 Photo capture error:', error);
-      const errorMsg = 'Failed to capture and analyze camera feed';
-      toast.error(errorMsg);
-      await speakText(errorMsg, 'high');
-    }
-  }, [isVideoOn, handleAIInteraction, speakText]);
 
   // Authentication check
   useEffect(() => {
