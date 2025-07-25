@@ -10,7 +10,7 @@ import { MessageCircle, Mail, Key, User, LogIn } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
 import { Footer } from "@/components/Footer";
-import TanzaniaFlag from "@/components/TanzaniaFlag";
+import TanzaniaFlag from "@/components/TanzaniaFlag":
 import { ThemeToggle } from "@/components/theme-toggle";
 
 const AuthPage = () => {
