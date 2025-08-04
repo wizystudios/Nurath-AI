@@ -49,7 +49,7 @@ const Message: React.FC<MessageProps> = ({ message }) => {
 
   return (
     <div
-      className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+      className={`flex ${isUser ? "justify-end" : "justify-start"} mb-4`}
     >
       <div
         className={`max-w-[80%] ${
@@ -57,14 +57,14 @@ const Message: React.FC<MessageProps> = ({ message }) => {
         }`}
       >
         <div>
-          <div className="flex items-center gap-2 mb-1 justify-end">
-            <span className="text-xs text-muted-foreground">{time}</span>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs text-muted-foreground/60">{time}</span>
           </div>
           <div
-            className={`rounded-md p-4 text-sm ${
+            className={`p-3 text-sm font-medium ${
               isUser
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted"
+                ? "text-foreground"
+                : "text-foreground"
             }`}
           >
             {renderContent()}

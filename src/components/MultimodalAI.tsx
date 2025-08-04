@@ -583,33 +583,35 @@ const MultimodalAI = () => {
     }
   }, [isVideoOn, speakText]);
 
-  // Enhanced takePhoto with immediate analysis
+  // FIXED: Real-time video analysis for blind assistance
   const takeRealTimePhoto = useCallback(async () => {
-    if (!videoRef.current || !isVideoOn) {
-      return;
-    }
+    if (!videoRef.current || !isVideoOn) return;
 
     try {
       const canvas = document.createElement('canvas');
       const context = canvas.getContext('2d');
       
-      canvas.width = videoRef.current.videoWidth;
-      canvas.height = videoRef.current.videoHeight;
+      canvas.width = videoRef.current.videoWidth || 640;
+      canvas.height = videoRef.current.videoHeight || 480;
       
-      context?.drawImage(videoRef.current, 0, 0);
-      const imageData = canvas.toDataURL('image/jpeg', 0.8);
-      
-      const prompt = "I'm continuously monitoring through the camera to help a blind person. Describe EVERYTHING you can see in complete detail - people, objects, colors, text, signs, movements, environment. Be very specific about locations and spatial relationships.";
-      
-      // Process immediately with AI
-      await handleAIInteraction(
-        prompt,
-        'video', 
-        [{ type: 'image/jpeg', data: imageData, name: 'camera-capture.jpg' }],
-        true // Always speak for video mode
-      );
+      if (context) {
+        context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+        const imageData = canvas.toDataURL('image/jpeg', 0.8);
+        
+        await handleAIInteraction(
+          "Describe what you see in this live video feed. Tell me about people, objects, movements, and environment.",
+          'video',
+          [{
+            type: 'image/jpeg',
+            data: imageData,
+            name: 'live-feed.jpg',
+            size: imageData.length
+          }],
+          true
+        );
+      }
     } catch (error) {
-      console.error("📸 Photo capture error:", error);
+      console.error("📸 Video analysis error:", error);
     }
   }, [isVideoOn, handleAIInteraction]);
 
@@ -1650,12 +1652,12 @@ const MultimodalAI = () => {
                       
                       {isVideoOn && (
                         <Button
-                          onClick={takePhoto}
+                          onClick={takeRealTimePhoto}
                           size="lg"
-                          variant="outline"
-                          className="rounded-full"
+                          disabled={isProcessing}
+                          className="rounded-full bg-blue-500 hover:bg-blue-600"
                         >
-                          <Camera className="w-6 h-6" />
+                          <Eye className="w-6 h-6" />
                         </Button>
                       )}
                     </div>
