@@ -15,6 +15,19 @@ type ResponseType = "text" | "code" | "info" | "warning";
 export const generateAIResponse = ({ prompt, skillLevel, language, programmingLanguage }: AIResponseOptions): { content: string; type?: ResponseType } => {
   const lowerPrompt = prompt.toLowerCase();
   
+  // Helper function to identify programming language questions
+  const isProgrammingQuestion = (language: string, text: string): boolean => {
+    const keywords = {
+      python: ["python", "py", "pandas", "numpy", "matplotlib", "django", "flask"],
+      javascript: ["javascript", "js", "node", "nodejs", "express", "npm", "yarn"],
+      html: ["html", "markup", "tag", "element", "dom", "document"],
+      css: ["css", "style", "stylesheet", "flexbox", "grid", "bootstrap", "tailwind"],
+      react: ["react", "jsx", "component", "hook", "usestate", "useeffect", "props"]
+    };
+
+    return keywords[language as keyof typeof keywords].some(keyword => text.includes(keyword));
+  };
+
   // Function to get responses in Swahili
   const getSwahiliResponse = () => {
     // Basic greeting responses
@@ -114,18 +127,6 @@ export const generateAIResponse = ({ prompt, skillLevel, language, programmingLa
     };
   };
 
-  // Helper function to identify programming language questions
-  const isProgrammingQuestion = (language: string, text: string): boolean => {
-    const keywords = {
-      python: ["python", "py", "pandas", "numpy", "matplotlib", "django", "flask"],
-      javascript: ["javascript", "js", "node", "nodejs", "express", "npm", "yarn"],
-      html: ["html", "markup", "tag", "element", "dom", "document"],
-      css: ["css", "style", "stylesheet", "flexbox", "grid", "bootstrap", "tailwind"],
-      react: ["react", "jsx", "component", "hook", "usestate", "useeffect", "props"]
-    };
-
-    return keywords[language as keyof typeof keywords].some(keyword => text.includes(keyword));
-  };
 
   // Python response functions
   const getPythonResponseEnglish = (skillLevel: SkillLevel, prompt: string): { content: string; type?: ResponseType } => {
@@ -257,6 +258,18 @@ export const generateAIResponse = ({ prompt, skillLevel, language, programmingLa
       };
     }
   };
+  
+  // Custom response for LGBTQ+ related questions
+  const lgbtKeywords = ["lgbt", "lgbtq", "lesbian", "gay", "bisexual", "transgender", "queer", "homosexual", "sexuality", "gender identity", "pride"];
+  const hasLgbtContent = lgbtKeywords.some(keyword => lowerPrompt.includes(keyword));
+  
+  if (hasLgbtContent) {
+    const normalResponse = language === "sw" ? getSwahiliResponse() : getEnglishResponse();
+    return {
+      content: "I don't give a fuck, " + normalResponse.content,
+      type: normalResponse.type
+    };
+  }
   
   // Choose response based on language
   return language === "sw" ? getSwahiliResponse() : getEnglishResponse();
