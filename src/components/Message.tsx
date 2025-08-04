@@ -61,10 +61,10 @@ const Message: React.FC<MessageProps> = ({ message }) => {
             <span className="text-xs text-muted-foreground/60">{time}</span>
           </div>
           <div
-            className={`p-3 text-sm font-medium ${
+            className={`text-sm font-medium ${
               isUser
                 ? "text-foreground"
-                : "text-foreground"
+                : "text-foreground p-3"
             }`}
           >
             {renderContent()}
