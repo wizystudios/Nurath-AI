@@ -1,3 +1,5 @@
+import { searchUserInfo, generateUserSummary } from './webSearch';
+
 type SkillLevel = "beginner" | "intermediate" | "advanced";
 type Language = "en" | "sw";
 type ProgrammingLanguage = "python" | "javascript" | "html" | "css" | "react" | "php" | "sql";
@@ -7,12 +9,19 @@ interface AIResponseOptions {
   skillLevel: SkillLevel;
   language: Language;
   programmingLanguage?: ProgrammingLanguage;
+  userEmail?: string;
+  userProfile?: {
+    name?: string;
+    email?: string;
+    avatar_url?: string;
+    full_name?: string;
+  };
 }
 
 type ResponseType = "text" | "code" | "info" | "warning";
 
 // This function will eventually be replaced with real OpenAI integration
-export const generateAIResponse = ({ prompt, skillLevel, language, programmingLanguage }: AIResponseOptions): { content: string; type?: ResponseType } => {
+export const generateAIResponse = async ({ prompt, skillLevel, language, programmingLanguage, userEmail, userProfile }: AIResponseOptions): Promise<{ content: string; type?: ResponseType }> => {
   const lowerPrompt = prompt.toLowerCase();
   
   // Helper function to identify programming language questions
@@ -29,11 +38,21 @@ export const generateAIResponse = ({ prompt, skillLevel, language, programmingLa
   };
 
   // Function to get responses in Swahili
-  const getSwahiliResponse = () => {
+  const getSwahiliResponse = async () => {
+    // Personal identification based on email
+    if (lowerPrompt.includes("nani mimi") || lowerPrompt.includes("najua nani") || lowerPrompt.includes("mimi ni nani")) {
+      if (userProfile) {
+        return {
+          content: `Habari ${userProfile.full_name || userProfile.name || "rafiki"}! Nakujua wewe. Email yako ni ${userEmail}. Mimi ni Nurath.AI, msaidizi wako wa AI niliyeundwa na NK Technology nchini Tanzania. Kampuni hii ilianzishwa na CEO Khalifa Nadhiru. Ninaweza kukusaidia kujifunza programu na kuunda tovuti. Unahitaji usaidizi gani leo?`
+        };
+      }
+    }
+
     // Basic greeting responses
     if (lowerPrompt.includes("habari") || lowerPrompt.includes("hujambo") || lowerPrompt.includes("mambo")) {
+      const greeting = userProfile ? `Habari ${userProfile.full_name || userProfile.name || "rafiki"}! ` : "Habari! ";
       return {
-        content: "Habari! Mimi ni Nurath.AI, msaidizi wako wa AI niliyeundwa na NK Technology nchini Tanzania. Kampuni hii ilianzishwa na CEO Khalifa Nadhiru. Ninaweza kukusaidia kujifunza programu, kuunda tovuti, na kujibu maswali yako ya teknolojia. Unahitaji usaidizi gani leo?"
+        content: greeting + "Mimi ni Nurath.AI, msaidizi wako wa AI niliyeundwa na NK Technology nchini Tanzania. Kampuni hii ilianzishwa na CEO Khalifa Nadhiru. Ninaweza kukusaidia kujifunza programu, kuunda tovuti, na kujibu maswali yako ya teknolojia. Unahitaji usaidizi gani leo?"
       };
     }
     
@@ -73,11 +92,33 @@ export const generateAIResponse = ({ prompt, skillLevel, language, programmingLa
   };
   
   // Function to get responses in English
-  const getEnglishResponse = () => {
+  const getEnglishResponse = async () => {
+    // Personal identification based on email with web search
+    if (lowerPrompt.includes("who am i") || lowerPrompt.includes("who i am") || lowerPrompt.includes("do you know me") || lowerPrompt.includes("find information about me")) {
+      if (userEmail) {
+        try {
+          const userInfo = await searchUserInfo(userEmail);
+          if (userInfo) {
+            const summary = generateUserSummary(userInfo);
+            return {
+              content: `Hello ${userProfile?.full_name || userInfo.name || "there"}! I recognize you. ${summary}\n\nI'm Nurath.AI, your AI assistant created by NK Technology in Tanzania. The company was co-founded by CEO Khalifa Nadhiru. I can help you learn programming, build websites, and answer your technology questions. How can I assist you today?`
+            };
+          } else if (userProfile) {
+            return {
+              content: `Hello ${userProfile.full_name || "there"}! I recognize you. Your email is ${userEmail}. I'm Nurath.AI, your AI assistant created by NK Technology in Tanzania. The company was co-founded by CEO Khalifa Nadhiru. I can help you learn programming, build websites, and answer your technology questions. How can I assist you today?`
+            };
+          }
+        } catch (error) {
+          console.error('Error searching user info:', error);
+        }
+      }
+    }
+
     // Basic greeting responses
     if (lowerPrompt.includes("hello") || lowerPrompt.includes("hi") || lowerPrompt.includes("hey")) {
+      const greeting = userProfile ? `Hello ${userProfile.full_name || userProfile.name || "there"}! ` : "Hello! ";
       return {
-        content: "Hello! I'm Nurath.AI, your AI assistant created by NK Technology in Tanzania. The company was co-founded by CEO Khalifa Nadhiru. I can help you learn programming, build websites, and answer your technology questions. How can I assist you today?"
+        content: greeting + "I'm Nurath.AI, your AI assistant created by NK Technology in Tanzania. The company was co-founded by CEO Khalifa Nadhiru. I can help you learn programming, build websites, and answer your technology questions. How can I assist you today?"
       };
     }
     
@@ -264,7 +305,7 @@ export const generateAIResponse = ({ prompt, skillLevel, language, programmingLa
   const hasLgbtContent = lgbtKeywords.some(keyword => lowerPrompt.includes(keyword));
   
   if (hasLgbtContent) {
-    const normalResponse = language === "sw" ? getSwahiliResponse() : getEnglishResponse();
+    const normalResponse = language === "sw" ? await getSwahiliResponse() : await getEnglishResponse();
     return {
       content: "I don't give a fuck, " + normalResponse.content,
       type: normalResponse.type
@@ -272,5 +313,5 @@ export const generateAIResponse = ({ prompt, skillLevel, language, programmingLa
   }
   
   // Choose response based on language
-  return language === "sw" ? getSwahiliResponse() : getEnglishResponse();
+  return language === "sw" ? await getSwahiliResponse() : await getEnglishResponse();
 };
