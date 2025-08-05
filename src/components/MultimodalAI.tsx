@@ -45,11 +45,19 @@ interface ConversationMessage {
   hasAudio?: boolean;
   id: string;
   imageUrl?: string;
+  videoUrl?: string;
+  downloadUrl?: string;
+  fileData?: {
+    type: string;
+    content: string;
+    metadata?: any;
+  };
 }
 
 const MultimodalAI = () => {
   const [isListening, setIsListening] = useState(false);
   const [isVideoOn, setIsVideoOn] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [inputText, setInputText] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -67,9 +75,13 @@ const MultimodalAI = () => {
   const [currentConversationId, setCurrentConversationId] = useState<string>('');
   const [currentLanguage, setCurrentLanguage] = useState('en');
   const [attachedFiles, setAttachedFiles] = useState<any[]>([]);
+  const [recordedChunks, setRecordedChunks] = useState<Blob[]>([]);
+  const [isVideoCallActive, setIsVideoCallActive] = useState(false);
   
   // Refs for auto-scroll functionality
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedVideoRef = useRef<HTMLVideoElement>(null);
 
   // Helper function to extract time from user input
   const extractTimeFromInput = useCallback((input: string) => {
@@ -665,6 +677,228 @@ const MultimodalAI = () => {
     }
   }, []);
 
+  // Video recording functionality
+  const startVideoRecording = useCallback(async () => {
+    try {
+      if (!videoRef.current?.srcObject) {
+        toast.error("Please start camera first");
+        return;
+      }
+
+      const stream = videoRef.current.srcObject as MediaStream;
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: 'video/webm;codecs=vp9'
+      });
+
+      mediaRecorderRef.current = mediaRecorder;
+      setRecordedChunks([]);
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          setRecordedChunks(prev => [...prev, event.data]);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const blob = new Blob(recordedChunks, { type: 'video/webm' });
+        const videoUrl = URL.createObjectURL(blob);
+        
+        // Convert blob to base64 for AI analysis
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+          const base64Video = reader.result as string;
+          
+          await handleAIInteraction(
+            "Analyze this recorded video and describe everything you see. Tell me about movements, objects, people, and activities.",
+            'video',
+            [{
+              type: 'video/webm',
+              data: base64Video,
+              name: 'recorded-video.webm',
+              size: blob.size
+            }],
+            true
+          );
+        };
+        reader.readAsDataURL(blob);
+        
+        setIsRecording(false);
+        toast.success("📹 Video recorded and analyzed!");
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      toast.success("🔴 Recording started");
+    } catch (error) {
+      console.error("Video recording error:", error);
+      toast.error("Failed to start video recording");
+    }
+  }, [recordedChunks, handleAIInteraction]);
+
+  const stopVideoRecording = useCallback(() => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+    }
+  }, [isRecording]);
+
+  // Enhanced file analysis with better text extraction and metadata
+  const analyzeAdvancedFile = useCallback(async (file: File) => {
+    try {
+      console.log('📁 Advanced file analysis:', file.name, file.type, 'Size:', file.size);
+      setIsProcessing(true);
+      
+      let extractedContent = '';
+      let metadata = {
+        size: file.size,
+        type: file.type,
+        lastModified: file.lastModified,
+        name: file.name
+      };
+
+      // Handle different file types
+      if (file.type.startsWith('text/') || file.name.endsWith('.txt')) {
+        const text = await file.text();
+        extractedContent = text;
+      } else if (file.type.includes('pdf')) {
+        // For PDF files, we'll send the base64 data to AI for analysis
+        const reader = new FileReader();
+        const base64 = await new Promise<string>((resolve) => {
+          reader.onload = () => resolve(reader.result as string);
+          reader.readAsDataURL(file);
+        });
+        extractedContent = `PDF file: ${file.name}`;
+        return {
+          type: file.type,
+          data: base64,
+          name: file.name,
+          size: file.size,
+          extractedContent,
+          metadata
+        };
+      } else if (file.type.startsWith('image/')) {
+        extractedContent = `Image file: ${file.name}`;
+      }
+
+      const reader = new FileReader();
+      const fileData = await new Promise<any>((resolve, reject) => {
+        reader.onload = (e) => {
+          resolve({
+            type: file.type,
+            data: e.target?.result as string,
+            name: file.name,
+            size: file.size,
+            extractedContent,
+            metadata
+          });
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      
+      return fileData;
+    } catch (error) {
+      console.error('📁 Advanced file analysis error:', error);
+      throw error;
+    } finally {
+      setIsProcessing(false);
+    }
+  }, []);
+
+  // Image generation with download capability
+  const generateAndDownloadImage = useCallback(async (prompt: string) => {
+    try {
+      setIsProcessing(true);
+      toast.info("🎨 Generating image...");
+
+      const { data, error } = await supabase.functions.invoke('multimodal-ai', {
+        body: {
+          input: prompt,
+          mode: 'image_generation',
+          generateImage: true,
+          highQuality: true,
+          context: {
+            currentMode,
+            userId: user?.id,
+            language: currentLanguage
+          }
+        }
+      });
+
+      if (error) {
+        throw new Error(error.message || 'Image generation failed');
+      }
+
+      if (data?.imageUrl) {
+        // Create download link
+        const link = document.createElement('a');
+        link.href = data.imageUrl;
+        link.download = `generated-image-${Date.now()}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        // Add to conversation with download option
+        const imageMessage: ConversationMessage = {
+          type: 'ai',
+          content: "🎨 Image generated successfully! It has been automatically downloaded to your device.",
+          timestamp: new Date(),
+          hasAudio: false,
+          id: Date.now().toString(),
+          imageUrl: data.imageUrl,
+          downloadUrl: data.imageUrl
+        };
+
+        setConversation(prev => [...prev, imageMessage]);
+        toast.success("🎨 Image generated and downloaded!");
+      }
+    } catch (error) {
+      console.error('Image generation error:', error);
+      toast.error(`Failed to generate image: ${error.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [currentMode, user, currentLanguage]);
+
+  // Video call functionality
+  const startVideoCall = useCallback(async () => {
+    try {
+      await startVideo();
+      setIsVideoCallActive(true);
+      
+      // Start continuous real-time analysis for video calls
+      const callInterval = setInterval(async () => {
+        if (videoRef.current && isVideoCallActive) {
+          await takeRealTimePhoto();
+        } else {
+          clearInterval(callInterval);
+        }
+      }, 5000); // Analyze every 5 seconds during video call
+
+      toast.success("📹 Video call started - I can see you now!");
+      
+      // Welcome message for video call
+      const callMessage: ConversationMessage = {
+        type: 'ai',
+        content: "📹 Video call is now active! I can see you through the camera and will help you navigate your environment. Feel free to ask me to describe what I see or help you with anything visual.",
+        timestamp: new Date(),
+        hasAudio: true,
+        id: Date.now().toString()
+      };
+      
+      setConversation(prev => [...prev, callMessage]);
+      speakText(callMessage.content, 'high');
+    } catch (error) {
+      console.error('Video call error:', error);
+      toast.error('Failed to start video call');
+    }
+  }, [startVideo, isVideoCallActive, takeRealTimePhoto, speakText]);
+
+  const endVideoCall = useCallback(() => {
+    stopVideo();
+    setIsVideoCallActive(false);
+    toast.success("📹 Video call ended");
+  }, [stopVideo]);
+
   // Wake-up notification system - FIXED with proper scheduling
   const createWakeUpNotification = useCallback(async (message: string, wakeTime?: string) => {
     try {
@@ -756,7 +990,7 @@ const MultimodalAI = () => {
     }
   }, [speakText]);
 
-  // FIXED: Proper file upload handling
+  // Enhanced file upload handling with better analysis
   const handleFileUpload = useCallback(async (files: FileList) => {
     if (!files || files.length === 0) return;
     
@@ -766,22 +1000,41 @@ const MultimodalAI = () => {
     try {
       toast.info(`📁 Processing ${file.name}...`);
       
-      // Process the file
-      const fileData = await analyzeFile(file);
+      // Use advanced file analysis
+      const fileData = await analyzeAdvancedFile(file);
       
-      // Add to attached files
+      // Add to attached files with metadata
       setAttachedFiles(prev => [...prev, fileData]);
+      
+      // Create enhanced user message with file info
+      const fileMessage: ConversationMessage = {
+        type: 'user',
+        content: `📁 Uploaded: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`,
+        timestamp: new Date(),
+        attachments: [fileData],
+        id: Date.now().toString(),
+        fileData: {
+          type: file.type,
+          content: fileData.extractedContent || '',
+          metadata: fileData.metadata
+        }
+      };
+      
+      setConversation(prev => [...prev, fileMessage]);
       
       // Determine file type and mode
       let mode: 'image' | 'document' | 'text' = 'document';
-      let prompt = `I've uploaded a file named "${file.name}". Please analyze it thoroughly and tell me everything you can discover from it.`;
+      let prompt = `I've uploaded a file named "${file.name}". Here's the extracted content and metadata. Please analyze it thoroughly and tell me everything you can discover from it.`;
       
       if (file.type.startsWith('image/')) {
         mode = 'image';
-        prompt = `I've uploaded an image file named "${file.name}". Please analyze this image in detail and describe everything you can see.`;
+        prompt = `I've uploaded an image file named "${file.name}". Please analyze this image in detail, describe everything you can see, and extract any text if present.`;
       } else if (file.type.includes('pdf') || file.type.includes('doc') || file.type.includes('text')) {
         mode = 'document';
-        prompt = `I've uploaded a document file named "${file.name}". Please analyze it thoroughly and tell me everything you can discover from it.`;
+        prompt = `I've uploaded a document file named "${file.name}". Please analyze the content thoroughly, summarize it, and tell me the key information.`;
+      } else if (file.type.startsWith('video/')) {
+        mode = 'document'; // Use document mode for video analysis
+        prompt = `I've uploaded a video file named "${file.name}". Please analyze this video and describe what you see.`;
       }
       
       // Automatically process the file
@@ -797,7 +1050,7 @@ const MultimodalAI = () => {
       console.error('📁 File upload error:', error);
       toast.error(`Failed to process ${file.name}. Please try again.`);
     }
-  }, [analyzeFile, handleAIInteraction, currentMode]);
+  }, [analyzeAdvancedFile, handleAIInteraction, currentMode]);
 
   // FIXED: File input click handler
   const handleFileInputClick = useCallback(() => {
@@ -1132,8 +1385,8 @@ const MultimodalAI = () => {
                   {currentLanguage === 'sw' ? 'Nini ninaweza kukusaidia?' : 'What can I help you with?'}
                 </h1>
                 
-                {/* Quick Actions */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                {/* Enhanced Quick Actions */}
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-8">
                   <Button
                     onClick={() => handleAIInteraction(
                       currentLanguage === 'sw' 
@@ -1146,6 +1399,14 @@ const MultimodalAI = () => {
                   >
                     <Music className="w-6 h-6" />
                     <span className="text-sm">{currentLanguage === 'sw' ? 'Imba Wimbo' : 'Sing Song'}</span>
+                  </Button>
+                  <Button
+                    onClick={startVideoCall}
+                    variant="outline"
+                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl hover:scale-105 transition-transform"
+                  >
+                    <Video className="w-6 h-6" />
+                    <span className="text-sm">{currentLanguage === 'sw' ? 'Simu ya Video' : 'Video Call'}</span>
                   </Button>
                   <Button
                     onClick={() => {
@@ -1162,6 +1423,18 @@ const MultimodalAI = () => {
                   >
                     <Eye className="w-6 h-6" />
                     <span className="text-sm">{currentLanguage === 'sw' ? 'Eleza Eneo' : 'Describe Scene'}</span>
+                  </Button>
+                  <Button
+                    onClick={() => generateAndDownloadImage(
+                      currentLanguage === 'sw' 
+                        ? "Tengeneza picha nzuri ya mandhari ya asili" 
+                        : "Generate a beautiful landscape image"
+                    )}
+                    variant="outline"
+                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl hover:scale-105 transition-transform"
+                  >
+                    <Sparkles className="w-6 h-6" />
+                    <span className="text-sm">{currentLanguage === 'sw' ? 'Tengeneza Picha' : 'Generate Image'}</span>
                   </Button>
                   <Button
                     onClick={() => handleAIInteraction(
@@ -1280,6 +1553,24 @@ const MultimodalAI = () => {
                         {currentLanguage === 'sw' ? 'Piga Picha' : 'Take Photo'}
                       </Button>
                       <Button 
+                        onClick={isRecording ? stopVideoRecording : startVideoRecording}
+                        size="sm" 
+                        variant={isRecording ? "destructive" : "outline"}
+                        className="rounded-xl"
+                      >
+                        {isRecording ? (
+                          <>
+                            <StopCircle className="w-4 h-4 mr-2" />
+                            {currentLanguage === 'sw' ? 'Acha Kurekodi' : 'Stop Recording'}
+                          </>
+                        ) : (
+                          <>
+                            <Video className="w-4 h-4 mr-2" />
+                            {currentLanguage === 'sw' ? 'Rekodi Video' : 'Record Video'}
+                          </>
+                        )}
+                      </Button>
+                      <Button 
                         onClick={() => handleAIInteraction(
                           currentLanguage === 'sw' 
                             ? "Eleza mazingira yangu kwa undani" 
@@ -1390,7 +1681,7 @@ const MultimodalAI = () => {
                           </div>
                         )}
                         
-                        {/* Generated Image */}
+                        {/* Generated Image with Download */}
                         {message.imageUrl && (
                           <div className="mt-4">
                             <img 
@@ -1398,6 +1689,43 @@ const MultimodalAI = () => {
                               alt="Generated content" 
                               className="max-w-full h-auto rounded-lg border-2 border-purple-200 dark:border-purple-700 shadow-lg"
                             />
+                            {message.downloadUrl && (
+                              <div className="mt-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    const link = document.createElement('a');
+                                    link.href = message.downloadUrl!;
+                                    link.download = `generated-image-${message.id}.png`;
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
+                                    toast.success("Image downloaded!");
+                                  }}
+                                  className="rounded-xl text-purple-600 border-purple-300 hover:bg-purple-50"
+                                >
+                                  <FileIcon className="w-4 h-4 mr-2" />
+                                  {currentLanguage === 'sw' ? 'Pakua Picha' : 'Download Image'}
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* File Data Display */}
+                        {message.fileData && (
+                          <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                            <div className="flex items-center gap-2 mb-2">
+                              <FileText className="w-4 h-4 text-blue-500" />
+                              <span className="text-sm font-medium">File Content</span>
+                            </div>
+                            {message.fileData.content && (
+                              <div className="text-sm text-gray-600 dark:text-gray-400 max-h-32 overflow-y-auto">
+                                {message.fileData.content.substring(0, 200)}
+                                {message.fileData.content.length > 200 && '...'}
+                              </div>
+                            )}
                           </div>
                         )}
                         
@@ -1669,12 +1997,12 @@ const MultimodalAI = () => {
         </div>
       </div>
 
-      {/* Enhanced File Input */}
+      {/* Enhanced File Input with More Formats */}
       <input
         ref={fileInputRef}
         type="file"
         hidden
-        accept="image/*,video/*,.pdf,.doc,.docx,.txt,.csv,.xlsx,.ppt,.pptx"
+        accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.csv,.xlsx,.ppt,.pptx,.json,.xml,.html,.css,.js,.py,.java,.cpp,.c,.zip,.rar"
         onChange={(e) => e.target.files && handleFileUpload(e.target.files)}
       />
       <audio ref={audioRef} preload="auto" />
