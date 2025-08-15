@@ -26,24 +26,24 @@ const Index = () => {
   
   const features = [
     {
-      icon: <Code className="h-8 w-8 text-indigo-500" />,
-      title: "Interactive Coding",
-      description: "Learn to code with real-time feedback and interactive exercises"
+      icon: <MessageSquare className="h-8 w-8 text-indigo-500" />,
+      title: "Voice AI Assistant",
+      description: "Talk naturally with Nurath AI using advanced voice recognition"
     },
     {
-      icon: <BookOpen className="h-8 w-8 text-purple-500" />,
-      title: "Comprehensive Tutorials",
-      description: "Step-by-step tutorials for all skill levels from beginner to advanced"
+      icon: <Sparkles className="h-8 w-8 text-purple-500" />,
+      title: "Smart Recognition",
+      description: "Identify music, images, and get personalized daily assistance"
     },
     {
-      icon: <BarChart2 className="h-8 w-8 text-blue-500" />,
-      title: "Progress Tracking",
-      description: "Track your learning journey with detailed progress analytics"
+      icon: <Users className="h-8 w-8 text-blue-500" />,
+      title: "Video Calls",
+      description: "Real-time video conversations with your AI assistant"
     },
     {
-      icon: <Users className="h-8 w-8 text-pink-500" />,
-      title: "Community Support",
-      description: "Connect with fellow learners and get help when you need it"
+      icon: <BookOpen className="h-8 w-8 text-pink-500" />,
+      title: "Daily Helper",
+      description: "Set alarms, get reminders, and manage your daily tasks"
     }
   ];
   
@@ -97,10 +97,10 @@ const Index = () => {
                 <Sparkles className="h-4 w-4 mr-1" /> AI-Powered Learning
               </Badge>
               <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
-                Learn Coding with AI Assistance
+                Your Personal AI Assistant
               </h1>
               <p className="text-xl md:text-2xl mb-8 text-gray-200 max-w-lg">
-                Nurath.AI provides personalized learning experiences to help you master programming faster than ever before.
+                Nurath.AI is your intelligent companion for daily tasks, music discovery, video calls, and personalized assistance.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button 
@@ -115,9 +115,9 @@ const Index = () => {
                   size="lg" 
                   variant="outline" 
                   className="border-white text-white hover:bg-white/10"
-                  onClick={() => navigate("/tutorials")}
+                  onClick={() => navigate("/")}
                 >
-                  Explore Tutorials
+                  Try Nurath AI
                 </Button>
               </div>
             </div>
@@ -157,9 +157,9 @@ const Index = () => {
       <section className="py-20 bg-white dark:bg-gray-900">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Why Learn With Nurath.AI</h2>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">Why Choose Nurath.AI</h2>
             <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-              Our platform combines cutting-edge AI technology with proven learning methods to create the most effective coding education experience.
+              Our AI assistant combines advanced voice recognition, smart features, and personalized assistance to enhance your daily life.
             </p>
           </div>
           
@@ -185,9 +185,9 @@ const Index = () => {
       {/* CTA Section */}
       <section className="py-20 bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-6">Ready to Start Your Coding Journey?</h2>
+          <h2 className="text-3xl md:text-4xl font-bold mb-6">Ready to Experience AI Assistance?</h2>
           <p className="text-xl mb-8 max-w-2xl mx-auto">
-            Join our community of learners and start building your future in tech today.
+            Join thousands of users who trust Nurath.AI as their daily companion and smart assistant.
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4 max-w-md mx-auto">
             <Button 
