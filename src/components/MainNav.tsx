@@ -2,7 +2,7 @@
 import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, Book, Code, Users, User, BarChart3, LogOut } from "lucide-react";
+import { User, LogOut } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
@@ -27,38 +27,8 @@ export function MainNav() {
     }
   };
 
-  const navItems = [
-    {
-      title: "Chat with AI",
-      href: "/chat",
-      icon: MessageSquare,
-      description: "💬 Chat with Nurath.AI"
-    },
-    {
-      title: "Tutorials",
-      href: "/tutorials",
-      icon: Book,
-      description: "📚 Learn step by step"
-    },
-    {
-      title: "Code Editor",
-      href: "/code-editor",
-      icon: Code,
-      description: "💻 Practice coding"
-    },
-    {
-      title: "Community",
-      href: "/community",
-      icon: Users,
-      description: "🤝 Connect with others"
-    },
-    {
-      title: "Progress",
-      href: "/progress",
-      icon: BarChart3,
-      description: "📈 Track your journey"
-    },
-  ];
+  // Only AI Chat functionality - removed all tutorial/coding features
+  const navItems: any[] = [];
 
   return (
     <nav className="flex items-center space-x-2">
