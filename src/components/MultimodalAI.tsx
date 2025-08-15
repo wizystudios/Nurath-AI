@@ -333,7 +333,7 @@ const MultimodalAI = () => {
   // Enhanced AI interaction with better error handling and controlled speaking
   const handleAIInteraction = useCallback(async (
     input: string, 
-    mode: 'text' | 'voice' | 'image' | 'video' | 'image_generation' | 'document' = 'text', 
+    mode: 'text' | 'voice' | 'image' | 'video' | 'image_generation' | 'document' | 'song_generation' | 'song_identification' | 'alarm' = 'text', 
     attachments?: any[],
     forceSpeak: boolean = false
   ) => {
@@ -357,13 +357,25 @@ const MultimodalAI = () => {
 
       setConversation(prev => [...prev, newMessage]);
 
-      // Determine if this should generate an image
+      // Determine mode based on input keywords
+      const songKeywords = ['generate song', 'create song', 'make song', 'compose music', 'write song'];
+      const identifyKeywords = ['what song is this', 'identify song', 'song name', 'shazam', 'recognize music'];
+      const alarmKeywords = ['set alarm', 'wake me up', 'reminder', 'alert me'];
       const imageKeywords = ['generate', 'create', 'make', 'draw', 'design', 'show me'];
       const imageTypes = ['image', 'picture', 'photo', 'logo', 'artwork', 'art', 'anime', 'drawing', 'illustration'];
       
-      const shouldGenerateImage = mode === 'image_generation' || 
+      let detectedMode = mode;
+      if (songKeywords.some(keyword => input.toLowerCase().includes(keyword))) {
+        detectedMode = 'song_generation';
+      } else if (identifyKeywords.some(keyword => input.toLowerCase().includes(keyword))) {
+        detectedMode = 'song_identification';
+      } else if (alarmKeywords.some(keyword => input.toLowerCase().includes(keyword))) {
+        detectedMode = 'alarm';
+      } else if (mode === 'image_generation' || 
           (imageKeywords.some(keyword => input.toLowerCase().includes(keyword)) && 
-           imageTypes.some(type => input.toLowerCase().includes(type)));
+           imageTypes.some(type => input.toLowerCase().includes(type)))) {
+        detectedMode = 'image_generation';
+      }
 
       // FIXED: Only speak when explicitly requested or in voice/video modes
       const shouldSpeak = forceSpeak || mode === 'voice' || mode === 'video';
@@ -372,12 +384,14 @@ const MultimodalAI = () => {
       const { data, error } = await supabase.functions.invoke('multimodal-ai', {
         body: {
           input,
-          mode: shouldGenerateImage ? 'image_generation' : mode,
+          mode: detectedMode,
           attachments,
           videoEnabled: isVideoOn,
-          generateImage: shouldGenerateImage,
+          generateImage: detectedMode === 'image_generation',
           analyzeFile: attachments && attachments.length > 0,
           shouldSpeak: shouldSpeak, // Explicitly control when to speak
+          userEmail: user?.email,
+          userProfile: profile,
           context: {
             currentMode,
             userId: user?.id,
@@ -1385,82 +1399,54 @@ const MultimodalAI = () => {
                   {currentLanguage === 'sw' ? 'Nini ninaweza kukusaidia?' : 'What can I help you with?'}
                 </h1>
                 
-                {/* Enhanced Quick Actions */}
-                <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-8">
+                {/* Core AI Features */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                   <Button
                     onClick={() => handleAIInteraction(
                       currentLanguage === 'sw' 
-                        ? "Tafadhali nisimulie wimbo mzuri kwa sauti yako na uimbe maneno halisi" 
-                        : "Please sing me a beautiful song with your voice and sing the actual lyrics", 
-                      'text', undefined, true
+                        ? "Tengeneza wimbo wa mapenzi na uimbe maneno kamili" 
+                        : "Generate a song about love with complete lyrics", 
+                      'song_generation', undefined, true
                     )}
                     variant="outline"
                     className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl hover:scale-105 transition-transform"
                   >
                     <Music className="w-6 h-6" />
-                    <span className="text-sm">{currentLanguage === 'sw' ? 'Imba Wimbo' : 'Sing Song'}</span>
-                  </Button>
-                  <Button
-                    onClick={startVideoCall}
-                    variant="outline"
-                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl hover:scale-105 transition-transform"
-                  >
-                    <Video className="w-6 h-6" />
-                    <span className="text-sm">{currentLanguage === 'sw' ? 'Simu ya Video' : 'Video Call'}</span>
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setCurrentMode('video');
-                      setTimeout(() => handleAIInteraction(
-                        currentLanguage === 'sw' 
-                          ? "Niambie unachoweza kuona karibu nami na ueleze mazingira yangu" 
-                          : "Tell me what you can see around me and describe my environment", 
-                        'video', undefined, true
-                      ), 3000);
-                    }}
-                    variant="outline"
-                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl hover:scale-105 transition-transform"
-                  >
-                    <Eye className="w-6 h-6" />
-                    <span className="text-sm">{currentLanguage === 'sw' ? 'Eleza Eneo' : 'Describe Scene'}</span>
-                  </Button>
-                  <Button
-                    onClick={() => generateAndDownloadImage(
-                      currentLanguage === 'sw' 
-                        ? "Tengeneza picha nzuri ya mandhari ya asili" 
-                        : "Generate a beautiful landscape image"
-                    )}
-                    variant="outline"
-                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl hover:scale-105 transition-transform"
-                  >
-                    <Sparkles className="w-6 h-6" />
-                    <span className="text-sm">{currentLanguage === 'sw' ? 'Tengeneza Picha' : 'Generate Image'}</span>
+                    <span className="text-sm">{currentLanguage === 'sw' ? 'Tengeneza Wimbo' : 'Generate Song'}</span>
                   </Button>
                   <Button
                     onClick={() => handleAIInteraction(
                       currentLanguage === 'sw' 
-                        ? "Nahitaji msaada wa kihisia na faraja sasa hivi" 
-                        : "I need emotional support and comfort right now", 
-                      'text', undefined, true
+                        ? "Hii ni wimbo gani?" 
+                        : "What song is this?", 
+                      'song_identification', undefined, true
                     )}
                     variant="outline"
                     className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl hover:scale-105 transition-transform"
                   >
-                    <Heart className="w-6 h-6" />
-                    <span className="text-sm">{currentLanguage === 'sw' ? 'Msaada wa Kihisia' : 'Emotional Support'}</span>
+                    <Volume2 className="w-6 h-6" />
+                    <span className="text-sm">{currentLanguage === 'sw' ? 'Tambua Wimbo' : 'Identify Song'}</span>
                   </Button>
                   <Button
                     onClick={() => handleAIInteraction(
                       currentLanguage === 'sw' 
-                        ? "Nisaidie na ratiba yangu ya kila siku na unikumbushe mambo muhimu" 
-                        : "Help me with my daily routine and remind me of important things", 
-                      'text', undefined, true
+                        ? "Weka kengele saa 7:00 asubuhi" 
+                        : "Set alarm for 7:00 AM", 
+                      'alarm', undefined, true
                     )}
                     variant="outline"
                     className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl hover:scale-105 transition-transform"
                   >
                     <Clock className="w-6 h-6" />
-                    <span className="text-sm">{currentLanguage === 'sw' ? 'Msaada wa Kila Siku' : 'Daily Help'}</span>
+                    <span className="text-sm">{currentLanguage === 'sw' ? 'Weka Kengele' : 'Set Alarm'}</span>
+                  </Button>
+                  <Button
+                    onClick={() => setIsVideoCallActive(!isVideoCallActive)}
+                    variant="outline"
+                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl hover:scale-105 transition-transform"
+                  >
+                    <Video className="w-6 h-6" />
+                    <span className="text-sm">{currentLanguage === 'sw' ? 'Simu ya Video' : 'Video Call'}</span>
                   </Button>
                 </div>
               </div>

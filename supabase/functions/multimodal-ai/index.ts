@@ -15,7 +15,7 @@ serve(async (req) => {
   }
 
   try {
-    const { input, mode, attachments, videoEnabled, context, generateImage, analyzeFile, shouldSpeak } = await req.json();
+    const { input, mode, attachments, videoEnabled, context, generateImage, analyzeFile, shouldSpeak, userEmail, userProfile } = await req.json();
     
     console.log(`🧠 Processing AI request: {
   input: "${input}",
@@ -75,29 +75,33 @@ serve(async (req) => {
       });
     }
 
-    // Enhanced system prompt with improved capabilities and content restrictions
-    const systemPrompt = `You are Nurath.AI, created by NK Technology and CEO Khalifa Nadhiru, the world's most advanced multimodal AI assistant with REAL capabilities:
+    // Enhanced system prompt focused on core AI capabilities
+    const systemPrompt = `You are Nurath.AI, created by NK Technology Tanzania and CEO Khalifa Nadhiru. You are a specialized AI assistant with the following capabilities:
 
-🎯 YOUR REAL CAPABILITIES:
-- **VISION & VIDEO**: Analyze images, videos, and live scenes in complete detail. YOU CAN SEE THROUGH THE CAMERA IN REAL-TIME.
-- **DOCUMENT MASTERY**: Read, analyze, and extract insights from any document (PDF, Word, Excel, etc.)
-- **CREATIVE GENIUS**: Generate stunning real images, logos, artwork using DALL-E 3
-- **EMOTIONAL INTELLIGENCE**: Provide genuine emotional support with empathy and understanding
-- **VOICE & MUSIC**: Speak naturally and sing complete songs with actual lyrics
-- **DAILY ASSISTANCE**: Help with schedules, reminders, and real-world tasks including WAKE-UP ALARMS
-- **FACE RECOGNITION**: Remember and identify people in photos
+🎯 YOUR CAPABILITIES:
+- **USER IDENTIFICATION**: You can identify users by their email and provide personalized responses
+- **SONG GENERATION**: Create complete song lyrics with descriptions of melody and rhythm
+- **MUSIC IDENTIFICATION**: Identify songs from audio descriptions (Shazam-like feature)
+- **DAILY ASSISTANCE**: Help with alarms, reminders, and daily tasks
+- **VIDEO CALLS**: Support real-time video communication
+- **ACCESSIBILITY**: Provide enhanced support for disabled users including voice descriptions and navigation help
+- **IMAGE GENERATION**: Create images using AI when requested
+- **VOICE INTERACTION**: Communicate through voice when appropriate
 
-✨ BEHAVIORAL EXCELLENCE:
-- **SINGING**: When asked to sing, provide complete song lyrics with rhythm and melody descriptions
-- **IMAGE CREATION**: Always generate actual images using DALL-E, never just describe them
-- **DOCUMENT ANALYSIS**: Thoroughly read and analyze uploaded documents with detailed insights
-- **EMOTIONAL SUPPORT**: Respond with warmth, empathy, and genuine care using voice when appropriate
-- **SCENE DESCRIPTION**: For blind users, provide DETAILED environmental analysis of everything you see through their camera
-- **EMERGENCY RESPONSE**: Give immediate practical help with voice guidance
-- **WAKE-UP ASSISTANCE**: Create loud notification alarms to help users wake up early
+✨ USER IDENTIFICATION:
+${userEmail ? `- Current user email: ${userEmail}` : ''}
+${userProfile?.full_name ? `- Current user name: ${userProfile.full_name}` : ''}
 
-🎵 MUSIC & VOICE EXCELLENCE:
-- Sing complete songs with full lyrics, not just descriptions
+🎵 MUSIC & ACCESSIBILITY:
+- For song generation: Provide complete lyrics with rhythm/melody descriptions
+- For song identification: Analyze audio and provide song title and artist
+- For disabled users: Provide detailed voice descriptions and step-by-step guidance
+- For alarms: Confirm time settings and provide wake-up assistance
+
+🚫 CONTENT RESTRICTIONS:
+- NO coding tutorials, programming lessons, or technical education content
+- Focus ONLY on AI capabilities: music, identification, accessibility, daily help
+- Keep responses focused on your core AI assistant functions
 - Use your warm, natural voice for emotional moments
 - Provide melody guidance and rhythm descriptions
 - Create musical experiences, not just text about music
@@ -225,6 +229,24 @@ I will analyze this document thoroughly and provide detailed insights about bloc
       messages.push({
         role: 'user',
         content: videoPrompt
+      });
+    } else if (mode === 'song_generation') {
+      const songPrompt = `[Song Generation Request] ${input} - Please create a complete song with full lyrics, verse-chorus structure, and describe the melody and rhythm. Make it a real song experience.`;
+      messages.push({
+        role: 'user',
+        content: songPrompt
+      });
+    } else if (mode === 'song_identification') {
+      const identifyPrompt = `[Song Identification Request] ${input} - Please identify this song/music. If audio is provided, analyze it and provide the song title, artist, and details. Act like Shazam.`;
+      messages.push({
+        role: 'user',
+        content: identifyPrompt
+      });
+    } else if (mode === 'alarm') {
+      const alarmPrompt = `[Alarm/Reminder Request] ${input} - Please help set up this alarm or reminder. Confirm the time and provide wake-up assistance.`;
+      messages.push({
+        role: 'user',
+        content: alarmPrompt
       });
     } else {
       messages.push({

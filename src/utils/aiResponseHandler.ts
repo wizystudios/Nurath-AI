@@ -101,15 +101,21 @@ export const generateAIResponse = async ({ prompt, skillLevel, language, program
           if (userInfo) {
             const summary = generateUserSummary(userInfo);
             return {
-              content: `Hello ${userProfile?.full_name || userInfo.name || "there"}! I recognize you. ${summary}\n\nI'm Nurath.AI, your AI assistant created by NK Technology in Tanzania. The company was co-founded by CEO Khalifa Nadhiru. I can help you learn programming, build websites, and answer your technology questions. How can I assist you today?`
+              content: `Hello ${userProfile?.full_name || userInfo.name || "there"}! I recognize you. ${summary}\n\nI'm Nurath.AI, your AI assistant created by NK Technology in Tanzania. The company was co-founded by CEO Khalifa Nadhiru. I specialize in voice interactions, song generation, music identification, daily assistance with alarms, video calls, and accessibility support for disabled users. How can I assist you today?`
             };
           } else if (userProfile) {
             return {
-              content: `Hello ${userProfile.full_name || "there"}! I recognize you. Your email is ${userEmail}. I'm Nurath.AI, your AI assistant created by NK Technology in Tanzania. The company was co-founded by CEO Khalifa Nadhiru. I can help you learn programming, build websites, and answer your technology questions. How can I assist you today?`
+              content: `Hello ${userProfile.full_name || "there"}! I recognize you. Your email is ${userEmail}. I'm Nurath.AI, your AI assistant created by NK Technology in Tanzania. The company was co-founded by CEO Khalifa Nadhiru. I specialize in voice interactions, song generation, music identification, daily assistance with alarms, video calls, and accessibility support for disabled users. How can I assist you today?`
             };
           }
         } catch (error) {
           console.error('Error searching user info:', error);
+          // Return fallback response even if search fails
+          if (userProfile) {
+            return {
+              content: `Hello ${userProfile.full_name || "there"}! I recognize you. Your email is ${userEmail}. I'm Nurath.AI, your AI assistant created by NK Technology in Tanzania. I specialize in voice interactions, song generation, music identification, daily assistance with alarms, video calls, and accessibility support. How can I assist you today?`
+            };
+          }
         }
       }
     }
