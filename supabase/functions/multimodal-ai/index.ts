@@ -205,10 +205,7 @@ I can see you've uploaded a document. What would you like to know about it? You 
 - To answer questions about the material
 - To find specific information
 
-What would you like me to help you with regarding this document?`
-8. **Practical Applications**: How this knowledge can be applied
-
-I will analyze this document thoroughly and provide detailed insights about blockchain technologies and any other content present.`;
+What would you like me to help you with regarding this document?`;
 
       messages.push({
         role: 'user',
