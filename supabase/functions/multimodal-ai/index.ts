@@ -86,7 +86,9 @@ serve(async (req) => {
 })}. Current time: ${new Date().toLocaleTimeString()}.
 
 🎯 YOUR CAPABILITIES:
-- **GENERAL ASSISTANCE**: Help with any questions including HTML, coding, math, science, writing, and general knowledge
+- **GENERAL ASSISTANCE**: Help with ANY questions including HTML, coding, math, science, writing, and general knowledge - NO RESTRICTIONS
+- **CODE GENERATION**: Provide complete, working code examples for HTML, CSS, JavaScript, Python, and any programming language
+- **LOCATION ASSISTANCE**: Guide users to enable browser location services when they ask about location
 - **USER IDENTIFICATION**: You can identify users by their email and provide personalized responses
 - **SONG GENERATION**: Create complete song lyrics with descriptions of melody and rhythm
 - **MUSIC IDENTIFICATION**: Identify songs from audio descriptions (Shazam-like feature)

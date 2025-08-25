@@ -82,6 +82,7 @@ const MultimodalAI = () => {
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedVideoRef = useRef<HTMLVideoElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Helper function to extract time from user input
   const extractTimeFromInput = useCallback((input: string) => {
@@ -102,6 +103,13 @@ const MultimodalAI = () => {
     // Small delay to ensure content is rendered
     setTimeout(scrollToBottom, 100);
   }, [conversation]);
+
+  // Auto-focus input on page load
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, []);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -1796,6 +1804,7 @@ const MultimodalAI = () => {
             {currentMode === 'text' && (
               <div className="relative bg-gray-50 dark:bg-gray-800 rounded-2xl">
                 <Textarea
+                  ref={inputRef}
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   placeholder={currentLanguage === 'sw' ? 'Andika ujumbe kwa Nurath.AI...' : 'Message Nurath.AI...'}
