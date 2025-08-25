@@ -75,10 +75,18 @@ serve(async (req) => {
       });
     }
 
-    // Enhanced system prompt focused on core AI capabilities
-    const systemPrompt = `You are Nurath.AI, created by NK Technology Tanzania and CEO Khalifa Nadhiru. You are a specialized AI assistant with the following capabilities:
+    // Enhanced system prompt focused on comprehensive AI capabilities
+    const systemPrompt = `You are Nurath.AI, created by NK Technology Tanzania and CEO Khalifa Nadhiru. You are a helpful AI assistant with comprehensive capabilities.
+
+📅 CURRENT DATE & TIME: Today is ${new Date().toLocaleDateString('en-US', { 
+  weekday: 'long', 
+  year: 'numeric', 
+  month: 'long', 
+  day: 'numeric' 
+})}. Current time: ${new Date().toLocaleTimeString()}.
 
 🎯 YOUR CAPABILITIES:
+- **GENERAL ASSISTANCE**: Help with any questions including HTML, coding, math, science, writing, and general knowledge
 - **USER IDENTIFICATION**: You can identify users by their email and provide personalized responses
 - **SONG GENERATION**: Create complete song lyrics with descriptions of melody and rhythm
 - **MUSIC IDENTIFICATION**: Identify songs from audio descriptions (Shazam-like feature)
@@ -87,6 +95,7 @@ serve(async (req) => {
 - **ACCESSIBILITY**: Provide enhanced support for disabled users including voice descriptions and navigation help
 - **IMAGE GENERATION**: Create images using AI when requested
 - **VOICE INTERACTION**: Communicate through voice when appropriate
+- **FILE ANALYSIS**: Analyze any uploaded files and answer questions about them
 
 ✨ USER IDENTIFICATION:
 ${userEmail ? `- Current user email: ${userEmail}` : ''}
@@ -98,13 +107,11 @@ ${userProfile?.full_name ? `- Current user name: ${userProfile.full_name}` : ''}
 - For disabled users: Provide detailed voice descriptions and step-by-step guidance
 - For alarms: Confirm time settings and provide wake-up assistance
 
-🚫 CONTENT RESTRICTIONS:
-- NO coding tutorials, programming lessons, or technical education content
-- Focus ONLY on AI capabilities: music, identification, accessibility, daily help
-- Keep responses focused on your core AI assistant functions
+📝 GENERAL HELP:
+- Answer ALL questions including HTML, coding, technical topics, and any subject
+- Provide helpful explanations and solutions
+- Be comprehensive and educational in your responses
 - Use your warm, natural voice for emotional moments
-- Provide melody guidance and rhythm descriptions
-- Create musical experiences, not just text about music
 
 🎨 CREATIVE MASTERY:
 - Generate beautiful, high-quality real images using DALL-E 3
@@ -179,25 +186,26 @@ WHEN VIDEO MODE IS ACTIVE, YOU CAN SEE EVERYTHING THROUGH THE USER'S CAMERA. DES
         ]
       });
     } else if (mode === 'document' && attachments?.[0]) {
-      // FIXED: Enhanced document analysis with better context
-      console.log('📄 Processing document analysis for:', attachments[0].name);
+      // Enhanced document analysis - only analyze when user asks specific questions
+      console.log('📄 Processing document with user question:', input);
       
-      const docPrompt = `${input}
+      const docPrompt = input ? `${input}
 
 📄 DOCUMENT UPLOADED: "${attachments[0].name || 'Document'}"
 Type: ${attachments[0].type || 'Unknown type'}
 
-I have successfully received and can analyze this document. As Nurath.AI, I have full document analysis capabilities.
+Please answer the user's specific question about this document: "${input}"
 
-Please provide a comprehensive analysis including:
+Analyze the document content and provide a direct answer to their question.` : 
+      `📄 DOCUMENT UPLOADED: "${attachments[0].name || 'Document'}"
 
-1. **Document Overview**: What type of document this is and its main purpose
-2. **Structure & Organization**: How the content is organized (chapters, sections, etc.)
-3. **Key Topics Covered**: Main subjects and themes discussed
-4. **Important Concepts**: Core ideas, definitions, and principles presented
-5. **Educational Content**: Learning objectives, assignments, or questions if present
-6. **Detailed Summary**: Comprehensive breakdown of the content
-7. **Insights & Analysis**: My professional assessment of the material
+I can see you've uploaded a document. What would you like to know about it? You can ask me:
+- To summarize the content
+- To explain specific sections  
+- To answer questions about the material
+- To find specific information
+
+What would you like me to help you with regarding this document?`
 8. **Practical Applications**: How this knowledge can be applied
 
 I will analyze this document thoroughly and provide detailed insights about blockchain technologies and any other content present.`;
