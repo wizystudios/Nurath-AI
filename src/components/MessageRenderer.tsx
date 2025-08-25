@@ -96,6 +96,11 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({ content }) => {
               key={part.key}
               code={part.content}
               language={part.language}
+              editable={true}
+              onEdit={(newCode) => {
+                console.log('Code edited:', newCode);
+                // This could be extended to update the conversation
+              }}
             />
           );
         } else {

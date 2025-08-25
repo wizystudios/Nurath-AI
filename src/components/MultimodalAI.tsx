@@ -1,5 +1,6 @@
 
 import React, { useState, useRef, useCallback, useEffect } from "react";
+import MessageRenderer from "./MessageRenderer";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -1628,38 +1629,8 @@ const MultimodalAI = () => {
                           : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-700'
                       }`}>
                         
-                        {/* Enhanced Content Rendering */}
-                        <div className="text-sm leading-relaxed">
-                          {message.content.split('\n\n').map((paragraph, i) => (
-                            <div key={i} className={i > 0 ? 'mt-4' : ''}>
-                              {paragraph.split('\n').map((line, j) => {
-                                // Enhanced formatting
-                                let formattedLine = line
-                                  // Bold text
-                                  .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold">$1</strong>')
-                                  // Italic text  
-                                  .replace(/\*(.*?)\*/g, '<em class="italic">$1</em>')
-                                  // Headers
-                                  .replace(/^### (.*$)/g, '<h3 class="text-lg font-bold mt-3 mb-2">$1</h3>')
-                                  .replace(/^## (.*$)/g, '<h2 class="text-xl font-bold mt-4 mb-2">$1</h2>')
-                                  .replace(/^# (.*$)/g, '<h1 class="text-2xl font-bold mt-4 mb-3">$1</h1>')
-                                  // Lists
-                                  .replace(/^- (.*$)/g, '<li class="ml-4">• $1</li>')
-                                  .replace(/^\d+\. (.*$)/g, '<li class="ml-4">$1</li>')
-                                  // Code blocks
-                                  .replace(/`([^`]+)`/g, '<code class="bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded text-sm font-mono">$1</code>');
-                                
-                                return (
-                                  <p 
-                                    key={j} 
-                                    className={j > 0 ? 'mt-2' : ''}
-                                    dangerouslySetInnerHTML={{ __html: formattedLine }}
-                                  />
-                                );
-                              })}
-                            </div>
-                          ))}
-                        </div>
+                        {/* Enhanced Content Rendering with MessageRenderer */}
+                        <MessageRenderer content={message.content} />
                         
                         {/* Attachments */}
                         {message.attachments && message.attachments.length > 0 && (
