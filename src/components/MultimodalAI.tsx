@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useCallback, useEffect } from "react";
-import MessageRenderer from "./MessageRenderer";
+import Message from "./Message";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -1550,133 +1550,25 @@ const MultimodalAI = () => {
               )}
 
               {/* Enhanced Messages Display */}
-              <div className="space-y-6 p-6">
+              <div className="space-y-4 p-6">
                 {conversation.map((message) => (
-                  <div 
-                    key={message.id} 
-                    className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div 
-                      className={`flex items-start space-x-3 max-w-[85%] ${
-                        message.type === 'user' ? 'flex-row-reverse space-x-reverse' : ''
-                      }`}
-                    >
-                      {/* Enhanced Avatar */}
-                      <div className="flex-shrink-0">
-                        {message.type === 'user' ? (
-                          <Avatar className="w-10 h-10">
-                            <AvatarImage src={profile?.avatar_url} />
-                            <AvatarFallback className="bg-blue-100 text-blue-600">
-                              {profile?.full_name 
-                                ? profile.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase()
-                                : user?.email?.charAt(0).toUpperCase() || 'U'}
-                            </AvatarFallback>
-                          </Avatar>
-                        ) : (
-                          <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-purple-500 to-indigo-600 border-2 border-white shadow-lg">
-                            <img
-                              src={aiAvatarImages.default}
-                              alt="Nurath AI"
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Enhanced Message Content */}
-                      <div className={`rounded-2xl px-5 py-4 shadow-sm ${
-                        message.type === 'user'
-                          ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white'
-                          : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-700'
-                      }`}>
-                        
-                        {/* Enhanced Content Rendering with MessageRenderer */}
-                        <MessageRenderer content={message.content} />
-                        
-                        {/* Attachments */}
-                        {message.attachments && message.attachments.length > 0 && (
-                          <div className="mt-3 space-y-2">
-                            {message.attachments.map((attachment, i) => (
-                              <div key={i} className={`text-xs flex items-center ${
-                                message.type === 'user' ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'
-                              }`}>
-                                <FileText className="w-3 h-3 mr-1" />
-                                {attachment.name}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        
-                        {/* Generated Image with Download */}
-                        {message.imageUrl && (
-                          <div className="mt-4">
-                            <img 
-                              src={message.imageUrl} 
-                              alt="Generated content" 
-                              className="max-w-full h-auto rounded-lg border-2 border-purple-200 dark:border-purple-700 shadow-lg"
-                            />
-                            {message.downloadUrl && (
-                              <div className="mt-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => {
-                                    const link = document.createElement('a');
-                                    link.href = message.downloadUrl!;
-                                    link.download = `generated-image-${message.id}.png`;
-                                    document.body.appendChild(link);
-                                    link.click();
-                                    document.body.removeChild(link);
-                                    toast.success("Image downloaded!");
-                                  }}
-                                  className="rounded-xl text-purple-600 border-purple-300 hover:bg-purple-50"
-                                >
-                                  <FileIcon className="w-4 h-4 mr-2" />
-                                  {currentLanguage === 'sw' ? 'Pakua Picha' : 'Download Image'}
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {/* File Data Display */}
-                        {message.fileData && (
-                          <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                            <div className="flex items-center gap-2 mb-2">
-                              <FileText className="w-4 h-4 text-blue-500" />
-                              <span className="text-sm font-medium">File Content</span>
-                            </div>
-                            {message.fileData.content && (
-                              <div className="text-sm text-gray-600 dark:text-gray-400 max-h-32 overflow-y-auto">
-                                {message.fileData.content.substring(0, 200)}
-                                {message.fileData.content.length > 200 && '...'}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        
-                        {/* Audio Indicator */}
-                        {message.hasAudio && (
-                          <div className={`mt-3 flex items-center text-xs ${
-                            message.type === 'user' ? 'text-blue-100' : 'text-green-500 dark:text-green-400'
-                          }`}>
-                            <Volume2 className="w-3 h-3 mr-1" />
-                            {currentLanguage === 'sw' ? 'Sauti imesikika' : 'Audio played'}
-                          </div>
-                        )}
-                        
-                        {/* Timestamp */}
-                        <div className={`text-xs mt-2 ${
-                          message.type === 'user' ? 'text-blue-100' : 'text-gray-400 dark:text-gray-500'
-                        }`}>
-                          {new Date(message.timestamp).toLocaleTimeString([], { 
-                            hour: '2-digit', 
-                            minute: '2-digit' 
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <Message
+                    key={message.id}
+                    content={message.content}
+                    type={message.type}
+                    timestamp={message.timestamp}
+                    imageUrl={message.imageUrl}
+                    onEdit={(newContent) => {
+                      // Update message in conversation
+                      setConversation(prev => 
+                        prev.map(msg => 
+                          msg.id === message.id 
+                            ? { ...msg, content: newContent }
+                            : msg
+                        )
+                      );
+                    }}
+                  />
                 ))}
                 
                 {/* Processing indicator when AI is responding */}

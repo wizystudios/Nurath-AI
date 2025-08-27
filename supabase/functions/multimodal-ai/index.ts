@@ -175,7 +175,8 @@ WHEN VIDEO MODE IS ACTIVE, YOU CAN SEE EVERYTHING THROUGH THE USER'S CAMERA. DES
 
     // Handle different modes with REAL document analysis
     if (mode === 'image' && attachments?.[0]) {
-      const imagePrompt = `${input} - Please provide detailed analysis of this image. If it contains people, help me recognize and remember them. Describe everything you see in detail.`;
+      console.log('🖼️ Processing image with input:', input);
+      const imagePrompt = input || "Please analyze this image in detail. Describe everything you can see, including people, objects, text, colors, and any relevant information.";
         
       messages.push({
         role: 'user',
