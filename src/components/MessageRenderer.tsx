@@ -78,10 +78,10 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({ content }) => {
     
     // Convert line breaks to <br> tags and return JSX
     return formattedText.split('\n').map((line, index, array) => (
-      <React.Fragment key={`line-${index}`}>
+      <span key={`line-${index}`}>
         <span dangerouslySetInnerHTML={{ __html: line }} />
         {index < array.length - 1 && <br />}
-      </React.Fragment>
+      </span>
     ));
   };
 

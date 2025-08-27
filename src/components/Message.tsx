@@ -51,11 +51,7 @@ const Message: React.FC<MessageProps> = ({ content, type, timestamp, onEdit, ima
       onMouseLeave={() => setIsHovered(false)}
     >
       <div
-        className={`relative max-w-[85%] rounded-2xl px-4 py-3 ${
-          type === 'user'
-            ? 'bg-primary text-primary-foreground'
-            : 'bg-muted text-muted-foreground border border-border'
-        } ${isEditing ? 'ring-2 ring-primary' : ''}`}
+        className={`relative max-w-[85%] px-4 py-3 text-white ${isEditing ? 'ring-2 ring-primary' : ''}`}
       >
         {isEditing ? (
           <div className="space-y-3">
@@ -99,21 +95,21 @@ const Message: React.FC<MessageProps> = ({ content, type, timestamp, onEdit, ima
         {/* Hover Actions */}
         {(isHovered || isEditing) && !isEditing && (
           <div
-            className={`absolute top-2 ${
-              type === 'user' ? 'left-2' : 'right-2'
-            } flex gap-1 bg-background border border-border rounded-lg shadow-lg p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10`}
+            className={`absolute ${
+              type === 'user' ? 'bottom-2 left-2' : 'bottom-2 right-2'
+            } flex gap-1 bg-black border border-gray-600 rounded-lg shadow-lg p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10`}
           >
             <Button
               size="sm"
               variant="ghost"
               onClick={handleCopy}
-              className="h-8 w-8 p-0 hover:bg-accent"
+              className="h-8 w-8 p-0 hover:bg-gray-700 text-white"
               title="Copy message"
             >
               {copied ? (
                 <Check className="h-3 w-3 text-green-500" />
               ) : (
-                <Copy className="h-3 w-3" />
+                <Copy className="h-3 w-3 text-white" />
               )}
             </Button>
             {type === 'user' && (
@@ -121,10 +117,10 @@ const Message: React.FC<MessageProps> = ({ content, type, timestamp, onEdit, ima
                 size="sm"
                 variant="ghost"
                 onClick={handleEdit}
-                className="h-8 w-8 p-0 hover:bg-accent"
+                className="h-8 w-8 p-0 hover:bg-gray-700 text-white"
                 title="Edit message"
               >
-                <Edit className="h-3 w-3" />
+                <Edit className="h-3 w-3 text-white" />
               </Button>
             )}
           </div>

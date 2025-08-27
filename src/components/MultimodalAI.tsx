@@ -360,7 +360,7 @@ const MultimodalAI = () => {
         type: 'user',
         content: input,
         timestamp: new Date(),
-        attachments,
+        attachments: attachedFiles.length > 0 ? attachedFiles : attachments,
         id: Date.now().toString()
       };
 
@@ -394,10 +394,10 @@ const MultimodalAI = () => {
         body: {
           input,
           mode: detectedMode,
-          attachments,
+          attachments: attachedFiles.length > 0 ? attachedFiles : attachments,
           videoEnabled: isVideoOn,
           generateImage: detectedMode === 'image_generation',
-          analyzeFile: attachments && attachments.length > 0,
+          analyzeFile: (attachedFiles.length > 0 ? attachedFiles : attachments) && (attachedFiles.length > 0 ? attachedFiles : attachments).length > 0,
           shouldSpeak: shouldSpeak, // Explicitly control when to speak
           userEmail: user?.email,
           userProfile: profile,
