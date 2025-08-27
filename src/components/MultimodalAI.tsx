@@ -1029,51 +1029,12 @@ const MultimodalAI = () => {
       // Add to attached files with metadata
       setAttachedFiles(prev => [...prev, fileData]);
       
-      // Create enhanced user message with file info
-      const fileMessage: ConversationMessage = {
-        type: 'user',
-        content: `📁 Uploaded: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`,
-        timestamp: new Date(),
-        attachments: [fileData],
-        id: Date.now().toString(),
-        fileData: {
-          type: file.type,
-          content: fileData.extractedContent || '',
-          metadata: fileData.metadata
-        }
-      };
-      
-      setConversation(prev => [...prev, fileMessage]);
-      
-      // Determine file type and mode
-      let mode: 'image' | 'document' | 'text' = 'document';
-      let prompt = `I've uploaded a file named "${file.name}". Here's the extracted content and metadata. Please analyze it thoroughly and tell me everything you can discover from it.`;
-      
-      if (file.type.startsWith('image/')) {
-        mode = 'image';
-        prompt = `I've uploaded an image file named "${file.name}". Please analyze this image in detail, describe everything you can see, and extract any text if present.`;
-      } else if (file.type.includes('pdf') || file.type.includes('doc') || file.type.includes('text')) {
-        mode = 'document';
-        prompt = `I've uploaded a document file named "${file.name}". Please analyze the content thoroughly, summarize it, and tell me the key information.`;
-      } else if (file.type.startsWith('video/')) {
-        mode = 'document'; // Use document mode for video analysis
-        prompt = `I've uploaded a video file named "${file.name}". Please analyze this video and describe what you see.`;
-      }
-      
-      // Automatically process the file
-      await handleAIInteraction(
-        prompt,
-        mode,
-        [fileData],
-        currentMode === 'voice' // Only speak in voice mode
-      );
-      
-      toast.success(`📁 ${file.name} uploaded and analyzed successfully!`);
+      toast.success(`📁 ${file.name} uploaded! Add your instructions and click send.`);
     } catch (error) {
       console.error('📁 File upload error:', error);
       toast.error(`Failed to process ${file.name}. Please try again.`);
     }
-  }, [analyzeAdvancedFile, handleAIInteraction, currentMode]);
+  }, [analyzeAdvancedFile]);
 
   // FIXED: File input click handler
   const handleFileInputClick = useCallback(() => {
@@ -1778,7 +1739,11 @@ const MultimodalAI = () => {
                   ref={inputRef}
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
-                  placeholder={currentLanguage === 'sw' ? 'Andika ujumbe kwa Nurath.AI...' : 'Message Nurath.AI...'}
+                  placeholder={
+                    attachedFiles.length > 0 
+                      ? (currentLanguage === 'sw' ? 'Ongeza maelezo kwa faili uliyoambatisha...' : 'Add instructions for your attached file...')
+                      : (currentLanguage === 'sw' ? 'Andika ujumbe kwa Nurath.AI...' : 'Message Nurath.AI...')
+                  }
                   className="resize-none bg-transparent px-6 py-4 pr-20 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-0 rounded-2xl border-0 min-h-[80px]"
                   onKeyPress={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
