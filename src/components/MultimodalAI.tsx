@@ -1162,32 +1162,32 @@ const MultimodalAI = () => {
   }, [currentMode, startListening, stopListening, startVideo, isListening, isVideoOn, isProcessing]);
 
   return (
-    <div className="flex h-screen bg-white dark:bg-gray-900">
+    <div className="flex h-screen bg-black">
       {/* Sidebar */}
-      <div className={`${isSidebarOpen ? 'w-64' : 'w-0'} transition-all duration-300 bg-gray-50 dark:bg-gray-800 flex flex-col overflow-hidden md:relative fixed inset-y-0 left-0 z-50`}>
+      <div className={`${isSidebarOpen ? 'w-64' : 'w-0'} transition-all duration-300 bg-black flex flex-col overflow-hidden md:relative fixed inset-y-0 left-0 z-50 border-r border-white/5`}>
         {isSidebarOpen && (
           <>
-            <div className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-40" onClick={() => setIsSidebarOpen(false)} />
+            <div className="md:hidden fixed inset-0 bg-black/80 z-40" onClick={() => setIsSidebarOpen(false)} />
             
-            <div className="relative z-50 bg-gray-50 dark:bg-gray-800 h-full flex flex-col">
+            <div className="relative z-50 bg-black h-full flex flex-col">
               {/* Profile & New Chat */}
-              <div className="p-3">
+              <div className="p-4">
                 {/* User Profile Display */}
                 {user && (
-                  <div className="flex items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-xl mb-3">
+                  <div className="flex items-center p-3 mb-4">
                     <Avatar className="h-10 w-10 mr-3">
                       <AvatarImage src={profile?.avatar_url} />
-                      <AvatarFallback className="bg-purple-100 text-purple-600">
+                      <AvatarFallback className="bg-white/10 text-white">
                         {profile?.full_name 
                           ? profile.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase()
                           : user.email?.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                      <p className="text-sm font-medium text-white truncate">
                         {profile?.full_name || 'User'}
                       </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                      <p className="text-xs text-white/50 truncate">
                         {user.email}
                       </p>
                     </div>
@@ -1195,7 +1195,7 @@ const MultimodalAI = () => {
                       variant="ghost"
                       size="sm"
                       onClick={handleLogout}
-                      className="text-gray-500 hover:text-red-500"
+                      className="text-white/50 hover:text-red-400 hover:bg-transparent"
                     >
                       <X className="w-4 h-4" />
                     </Button>
@@ -1212,7 +1212,7 @@ const MultimodalAI = () => {
                 )}
                 
                 <Button
-                  className="w-full justify-start bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-xl mt-3"
+                  className="w-full justify-start bg-white/5 hover:bg-white/10 text-white border-0 mt-3"
                   onClick={() => {
                     const newConversationId = Date.now().toString();
                     setCurrentConversationId(newConversationId);
@@ -1227,9 +1227,9 @@ const MultimodalAI = () => {
                 {/* Language Toggle */}
                 <div className="mt-3">
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
-                    className="w-full justify-start rounded-xl"
+                    className="w-full justify-start text-white/70 hover:text-white hover:bg-white/5"
                     onClick={() => {
                       const newLang = currentLanguage === 'en' ? 'sw' : 'en';
                       setCurrentLanguage(newLang);
@@ -1242,10 +1242,10 @@ const MultimodalAI = () => {
               </div>
 
               {/* Settings */}
-              <div className="p-2 space-y-1 mt-auto">
+              <div className="p-4 mt-auto">
                 <Button 
                   variant="ghost" 
-                  className="w-full justify-start text-gray-700 dark:text-gray-300 rounded-xl"
+                  className="w-full justify-start text-white/70 hover:text-white hover:bg-white/5"
                   onClick={() => navigate('/profile')}
                 >
                   <Settings className="w-4 h-4 mr-2" />
@@ -1258,27 +1258,27 @@ const MultimodalAI = () => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col bg-black">
         {/* Header */}
-        <header className="flex items-center justify-between p-4 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800">
+        <header className="flex items-center justify-between p-4 bg-black border-b border-white/5">
           <div className="flex items-center space-x-4">
             <Button 
               variant="ghost" 
               size="sm"
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="text-gray-600 dark:text-gray-400 rounded-xl"
+              className="text-white/70 hover:text-white hover:bg-white/5"
             >
               <Menu className="w-5 h-5" />
             </Button>
-            <div className="font-semibold text-gray-900 dark:text-white">Nurath.AI</div>
+            <div className="font-semibold text-white">Nurath.AI</div>
             
             {/* Mode Selection - Icons Only */}
-            <div className="flex items-center bg-white dark:bg-gray-800 rounded-full p-1 border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center bg-white/5 rounded-full p-1">
               <Button
                 variant={currentMode === 'text' ? 'default' : 'ghost'}
                 size="sm"
                 onClick={() => setCurrentMode('text')}
-                className="h-8 w-8 p-0 rounded-full"
+                className={`h-8 w-8 p-0 rounded-full ${currentMode === 'text' ? 'bg-white text-black' : 'text-white hover:bg-white/10'}`}
                 title="Text Mode"
               >
                 <MessageCircle className="w-4 h-4" />
@@ -1287,7 +1287,7 @@ const MultimodalAI = () => {
                 variant={currentMode === 'voice' ? 'default' : 'ghost'}
                 size="sm"
                 onClick={() => setCurrentMode('voice')}
-                className="h-8 w-8 p-0 rounded-full"
+                className={`h-8 w-8 p-0 rounded-full ${currentMode === 'voice' ? 'bg-white text-black' : 'text-white hover:bg-white/10'}`}
                 title="Voice Mode"
               >
                 <Mic className="w-4 h-4" />
@@ -1296,7 +1296,7 @@ const MultimodalAI = () => {
                 variant={currentMode === 'video' ? 'default' : 'ghost'}
                 size="sm"
                 onClick={() => setCurrentMode('video')}
-                className="h-8 w-8 p-0 rounded-full"
+                className={`h-8 w-8 p-0 rounded-full ${currentMode === 'video' ? 'bg-white text-black' : 'text-white hover:bg-white/10'}`}
                 title="Video Mode"
               >
                 <Video className="w-4 h-4" />
@@ -1308,7 +1308,7 @@ const MultimodalAI = () => {
         </header>
 
         {/* Chat Area */}
-        <div className="flex-1 overflow-y-auto bg-white dark:bg-gray-900" ref={chatContainerRef}>
+        <div className="flex-1 overflow-y-auto bg-black" ref={chatContainerRef}>
           {conversation.length === 0 ? (
             // Welcome State with AI Avatar for Voice/Video modes
             <div className="h-full flex flex-col items-center justify-center p-8">
@@ -1319,7 +1319,7 @@ const MultimodalAI = () => {
                     <div className={`w-32 h-32 rounded-full overflow-hidden border-4 ${
                       isSpeaking ? 'border-green-400 shadow-lg shadow-green-400/50' : 
                       isListening ? 'border-blue-400 shadow-lg shadow-blue-400/50' : 
-                      'border-purple-400 shadow-lg shadow-purple-400/50'
+                      'border-white/20 shadow-lg shadow-white/10'
                     } transition-all duration-300`}>
                       <img
                         src={
@@ -1346,11 +1346,11 @@ const MultimodalAI = () => {
                       </div>
                     )}
                   </div>
-                  <div className="text-center">
-                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                  <div className="text-center mt-4">
+                    <h2 className="text-xl font-semibold text-white mb-2">
                       {currentLanguage === 'sw' ? 'Nurath AI - Msaidizi wako wa Kiteknolojia' : 'Nurath AI - Your AI Assistant'}
                     </h2>
-                    <p className="text-gray-600 dark:text-gray-400">
+                    <p className="text-white/60">
                       {isSpeaking ? (currentLanguage === 'sw' ? 'Ninazungumza...' : 'Speaking...') :
                        isListening ? (currentLanguage === 'sw' ? 'Ninasikiliza...' : 'Listening...') :
                        (currentLanguage === 'sw' ? 'Bonyeza kuzungumza na AI' : 'Ready to talk with you')}
@@ -1360,7 +1360,7 @@ const MultimodalAI = () => {
               )}
 
               <div className="text-center max-w-4xl">
-                <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-8 animate-pulse" style={{ 
+                <h1 className="text-4xl md:text-5xl font-bold text-white mb-8" style={{ 
                   background: 'linear-gradient(45deg, #667eea 0%, #764ba2 100%)',
                   WebkitBackgroundClip: 'text',
                   WebkitTextFillColor: 'transparent',
@@ -1378,8 +1378,8 @@ const MultimodalAI = () => {
                         : "Generate a song about love with complete lyrics", 
                       'song_generation', undefined, true
                     )}
-                    variant="outline"
-                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl hover:scale-105 transition-transform"
+                    variant="ghost"
+                    className="h-20 flex flex-col items-center justify-center space-y-2 text-white hover:bg-white/5 border border-white/10"
                   >
                     <Music className="w-6 h-6" />
                     <span className="text-sm">{currentLanguage === 'sw' ? 'Tengeneza Wimbo' : 'Generate Song'}</span>
@@ -1391,8 +1391,8 @@ const MultimodalAI = () => {
                         : "What song is this?", 
                       'song_identification', undefined, true
                     )}
-                    variant="outline"
-                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl hover:scale-105 transition-transform"
+                    variant="ghost"
+                    className="h-20 flex flex-col items-center justify-center space-y-2 text-white hover:bg-white/5 border border-white/10"
                   >
                     <Volume2 className="w-6 h-6" />
                     <span className="text-sm">{currentLanguage === 'sw' ? 'Tambua Wimbo' : 'Identify Song'}</span>
@@ -1404,16 +1404,19 @@ const MultimodalAI = () => {
                         : "Set alarm for 7:00 AM", 
                       'alarm', undefined, true
                     )}
-                    variant="outline"
-                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl hover:scale-105 transition-transform"
+                    variant="ghost"
+                    className="h-20 flex flex-col items-center justify-center space-y-2 text-white hover:bg-white/5 border border-white/10"
                   >
                     <Clock className="w-6 h-6" />
                     <span className="text-sm">{currentLanguage === 'sw' ? 'Weka Kengele' : 'Set Alarm'}</span>
                   </Button>
                   <Button
-                    onClick={() => setIsVideoCallActive(!isVideoCallActive)}
-                    variant="outline"
-                    className="h-20 flex flex-col items-center justify-center space-y-2 rounded-2xl hover:scale-105 transition-transform"
+                    onClick={() => {
+                      setCurrentMode('video');
+                      startVideo();
+                    }}
+                    variant="ghost"
+                    className="h-20 flex flex-col items-center justify-center space-y-2 text-white hover:bg-white/5 border border-white/10"
                   >
                     <Video className="w-6 h-6" />
                     <span className="text-sm">{currentLanguage === 'sw' ? 'Simu ya Video' : 'Video Call'}</span>
@@ -1426,7 +1429,7 @@ const MultimodalAI = () => {
               {/* Video Feed - Enhanced with AI Avatar Split Screen */}
               {isVideoOn && (
                 <div className="p-4">
-                  <div className="bg-gray-100 dark:bg-gray-800 rounded-2xl overflow-hidden">
+                  <div className="rounded-2xl overflow-hidden">
                     <div className="relative">
                       {/* Split screen layout */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 p-2">
@@ -1440,21 +1443,21 @@ const MultimodalAI = () => {
                             style={{ transform: 'scaleX(-1)' }}
                           />
                           <div className="absolute top-2 left-2">
-                            <Badge variant="outline" className="border-blue-500/30 text-blue-400 bg-blue-500/10">
-                              <Users className="w-3 h-3 text-white" />
+                            <Badge className="bg-blue-500/20 text-blue-400 border-0">
+                              <Users className="w-3 h-3 mr-1" />
                               {currentLanguage === 'sw' ? 'Wewe' : 'You'}
                             </Badge>
                           </div>
                         </div>
                         
                         {/* AI Avatar */}
-                        <div className="relative rounded-xl overflow-hidden bg-gradient-to-br from-purple-500/20 to-blue-500/20">
+                        <div className="relative rounded-xl overflow-hidden bg-gradient-to-br from-purple-500/10 to-blue-500/10">
                           <div className="w-full h-48 md:h-64 flex items-center justify-center">
                             <div className="relative">
                               <div className={`w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border-4 ${
                                 isSpeaking ? 'border-green-400 shadow-lg shadow-green-400/50' : 
                                 isListening ? 'border-purple-400 shadow-lg shadow-purple-400/50' : 
-                                'border-purple-400 shadow-lg shadow-purple-400/50'
+                                'border-white/20'
                               } transition-all duration-300`}>
                                 <img
                                   src={
@@ -1483,13 +1486,13 @@ const MultimodalAI = () => {
                             </div>
                           </div>
                           <div className="absolute top-2 left-2">
-                            <Badge variant="outline" className="border-purple-500/30 text-purple-400 bg-purple-500/10">
+                            <Badge className="bg-purple-500/20 text-purple-400 border-0">
                               <Brain className="w-3 h-3 mr-1" />
                               Nurath AI
                             </Badge>
                           </div>
                           <div className="absolute top-2 right-2">
-                            <Badge variant="outline" className="border-green-500/30 text-green-400 bg-green-500/10">
+                            <Badge className="bg-green-500/20 text-green-400 border-0">
                               <Video className="w-3 h-3 mr-1" />
                               {currentLanguage === 'sw' ? 'Mzunguko' : 'Live'}
                             </Badge>
@@ -1502,8 +1505,8 @@ const MultimodalAI = () => {
                       <Button 
                         onClick={takePhoto}
                         size="sm" 
-                        variant="outline" 
-                        className="rounded-xl"
+                        variant="ghost" 
+                        className="text-white hover:bg-white/10"
                       >
                         <Camera className="w-4 h-4 mr-2" />
                         {currentLanguage === 'sw' ? 'Piga Picha' : 'Take Photo'}
@@ -1511,8 +1514,8 @@ const MultimodalAI = () => {
                       <Button 
                         onClick={isRecording ? stopVideoRecording : startVideoRecording}
                         size="sm" 
-                        variant={isRecording ? "destructive" : "outline"}
-                        className="rounded-xl"
+                        variant={isRecording ? "destructive" : "ghost"}
+                        className={isRecording ? "" : "text-white hover:bg-white/10"}
                       >
                         {isRecording ? (
                           <>
@@ -1534,13 +1537,13 @@ const MultimodalAI = () => {
                           'video', undefined, true
                         )}
                         size="sm" 
-                        variant="outline"
-                        className="rounded-xl"
+                        variant="ghost"
+                        className="text-white hover:bg-white/10"
                       >
                         <Eye className="w-4 h-4 mr-2" />
                         {currentLanguage === 'sw' ? 'Changua Eneo' : 'Analyze Scene'}
                       </Button>
-                      <Button onClick={stopVideo} size="sm" variant="destructive" className="rounded-xl">
+                      <Button onClick={stopVideo} size="sm" variant="destructive">
                         <VideoOff className="w-4 h-4 mr-2" />
                         {currentLanguage === 'sw' ? 'Zima Kamera' : 'Stop Camera'}
                       </Button>
@@ -1575,11 +1578,11 @@ const MultimodalAI = () => {
                 {isProcessing && (
                   <div className="flex justify-start mb-4">
                     <div className="max-w-[80%] mr-auto">
-                      <div className="rounded-2xl px-5 py-4 bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-700">
+                      <div className="px-5 py-4 text-white">
                         <div className="flex space-x-1">
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+                          <div className="w-2 h-2 bg-white/50 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
+                          <div className="w-2 h-2 bg-white/50 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
+                          <div className="w-2 h-2 bg-white/50 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
                         </div>
                       </div>
                     </div>
@@ -1591,23 +1594,23 @@ const MultimodalAI = () => {
         </div>
 
         {/* Input Area - Enhanced with file attachment display */}
-        <div className="bg-white dark:bg-gray-900 p-6 border-t border-gray-100 dark:border-gray-800">
+        <div className="bg-black p-6 border-t border-white/5">
           <div className="max-w-3xl mx-auto">
             {/* Attached Files Display */}
             {attachedFiles.length > 0 && (
               <div className="mb-4">
                 <div className="flex flex-wrap gap-2">
                   {attachedFiles.map((file, index) => (
-                    <div key={index} className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-lg px-3 py-2">
+                    <div key={index} className="flex items-center gap-2 bg-white/5 rounded-lg px-3 py-2">
                       <div className="flex items-center gap-2">
                         {file.type?.startsWith('image/') ? (
-                          <ImageIcon className="w-4 h-4 text-blue-500" />
+                          <ImageIcon className="w-4 h-4 text-blue-400" />
                         ) : file.type?.includes('pdf') ? (
-                          <FileText className="w-4 h-4 text-red-500" />
+                          <FileText className="w-4 h-4 text-red-400" />
                         ) : (
-                          <FileIcon className="w-4 h-4 text-gray-500" />
+                          <FileIcon className="w-4 h-4 text-white/50" />
                         )}
-                        <span className="text-sm text-gray-700 dark:text-gray-300 truncate max-w-32">
+                        <span className="text-sm text-white truncate max-w-32">
                           {file.name}
                         </span>
                       </div>
@@ -1615,7 +1618,7 @@ const MultimodalAI = () => {
                         variant="ghost"
                         size="sm"
                         onClick={() => removeAttachedFile(index)}
-                        className="h-6 w-6 p-0 text-gray-500 hover:text-red-500"
+                        className="h-6 w-6 p-0 text-white/50 hover:text-red-400 hover:bg-transparent"
                       >
                         <X className="w-3 h-3" />
                       </Button>
@@ -1626,7 +1629,7 @@ const MultimodalAI = () => {
             )}
 
             {currentMode === 'text' && (
-              <div className="relative bg-gray-50 dark:bg-gray-800 rounded-2xl">
+              <div className="relative bg-white/5 rounded-2xl">
                 <Textarea
                   ref={inputRef}
                   value={inputText}
@@ -1636,7 +1639,7 @@ const MultimodalAI = () => {
                       ? (currentLanguage === 'sw' ? 'Ongeza maelezo kwa faili uliyoambatisha...' : 'Add instructions for your attached file...')
                       : (currentLanguage === 'sw' ? 'Andika ujumbe kwa Nurath.AI...' : 'Message Nurath.AI...')
                   }
-                  className="resize-none bg-transparent px-6 py-4 pr-20 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-0 rounded-2xl border-0 min-h-[80px]"
+                  className="resize-none bg-transparent px-6 py-4 pr-20 text-white placeholder-white/40 focus:outline-none focus:ring-0 rounded-2xl border-0 min-h-[80px]"
                   onKeyPress={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
@@ -1653,7 +1656,7 @@ const MultimodalAI = () => {
                     size="sm"
                     variant="ghost"
                     onClick={handleFileInputClick}
-                    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 rounded-xl"
+                    className="text-white/50 hover:text-white hover:bg-white/10"
                     title={currentLanguage === 'sw' ? 'Ambatisha faili' : 'Attach file'}
                   >
                     <Paperclip className="w-4 h-4" />
@@ -1668,7 +1671,7 @@ const MultimodalAI = () => {
                     }}
                     disabled={(!inputText.trim() && attachedFiles.length === 0) || isProcessing}
                     size="sm"
-                    className="bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-xl"
+                    className="bg-white text-black hover:bg-white/90 disabled:opacity-50 disabled:cursor-not-allowed"
                     title={currentLanguage === 'sw' ? 'Tuma ujumbe' : 'Send message'}
                   >
                     <Send className="w-4 h-4" />
@@ -1679,14 +1682,14 @@ const MultimodalAI = () => {
 
             {currentMode === 'voice' && (
               <div className="text-center">
-                <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl p-8">
+                <div className="p-8">
                   <div className="flex flex-col items-center space-y-4">
                     {/* AI Avatar for Voice Mode */}
                     <div className="relative">
                       <div className={`w-24 h-24 rounded-full overflow-hidden border-4 ${
                         isSpeaking ? 'border-green-400 shadow-lg shadow-green-400/50' : 
                         isListening ? 'border-red-400 shadow-lg shadow-red-400/50' : 
-                        'border-blue-500 shadow-lg shadow-blue-500/50'
+                        'border-white/20'
                       } transition-all duration-300`}>
                         <img
                           src={
@@ -1717,24 +1720,24 @@ const MultimodalAI = () => {
                       
                       {/* Microphone icon overlay */}
                       <div className={`absolute -bottom-2 -right-2 w-8 h-8 rounded-full flex items-center justify-center ${
-                        isListening ? 'bg-red-500' : 'bg-blue-500'
+                        isListening ? 'bg-red-500' : 'bg-white/20'
                       }`}>
                         <Mic className="w-4 h-4 text-white" />
                       </div>
                     </div>
                     
                     <div className="text-center">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                      <h3 className="text-lg font-semibold text-white mb-2">
                         Nurath AI
                       </h3>
-                      <p className="text-lg font-medium text-gray-900 dark:text-white">
+                      <p className="text-lg font-medium text-white">
                         {isListening 
                           ? (currentLanguage === 'sw' ? 'Sikiliza... Sema sasa!' : 'Listening... Speak now!') 
                           : isSpeaking
                           ? (currentLanguage === 'sw' ? 'Ninazungumza...' : 'Speaking...')
                           : (currentLanguage === 'sw' ? 'Bonyeza kuzungumza na AI' : 'Tap to speak with AI')}
                       </p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                      <p className="text-sm text-white/50">
                         {currentLanguage === 'sw' ? 'Lugha: Kiswahili' : 'Language: English'}
                       </p>
                     </div>
@@ -1744,7 +1747,7 @@ const MultimodalAI = () => {
                       size="lg"
                       disabled={isProcessing}
                       className={`rounded-full ${
-                        isListening ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-500 hover:bg-blue-600'
+                        isListening ? 'bg-red-500 hover:bg-red-600' : 'bg-white text-black hover:bg-white/90'
                       }`}
                     >
                       {isListening ? <StopCircle className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
@@ -1756,7 +1759,7 @@ const MultimodalAI = () => {
 
             {currentMode === 'video' && (
               <div className="text-center">
-                <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl p-8">
+                <div className="p-8">
                   <div className="flex flex-col items-center space-y-4">
                     {/* Video Display */}
                     {isVideoOn ? (
@@ -1766,24 +1769,22 @@ const MultimodalAI = () => {
                           autoPlay
                           muted
                           playsInline
-                          className="w-full h-64 object-cover rounded-xl border-4 border-green-400 shadow-lg"
+                          className="w-full h-64 object-cover rounded-xl border-2 border-green-400 shadow-lg"
                         />
                         <div className="absolute top-2 left-2">
-                          <Badge variant="outline" className="border-green-500/30 text-green-400 bg-green-500/10">
+                          <Badge className="bg-green-500/20 text-green-400 border-0">
                             <Video className="w-3 h-3 mr-1" />
                             {currentLanguage === 'sw' ? 'Mzunguko' : 'Live'}
                           </Badge>
                         </div>
                       </div>
                     ) : (
-                      <div className={`w-24 h-24 rounded-full flex items-center justify-center ${
-                        isVideoOn ? 'bg-green-500' : 'bg-gray-500'
-                      }`}>
+                      <div className="w-24 h-24 rounded-full flex items-center justify-center bg-white/10">
                         <Video className="w-12 h-12 text-white" />
                       </div>
                     )}
                     
-                    <p className="text-lg font-medium text-gray-900 dark:text-white">
+                    <p className="text-lg font-medium text-white">
                       {isVideoOn 
                         ? (currentLanguage === 'sw' ? 'Simu ya video imewashwa - Ninaweza kukuona!' : 'Video call active - I can see you!') 
                         : (currentLanguage === 'sw' ? 'Anza simu ya video na AI' : 'Start video call with AI')}
@@ -1806,7 +1807,7 @@ const MultimodalAI = () => {
                           onClick={takeRealTimePhoto}
                           size="lg"
                           disabled={isProcessing}
-                          className="rounded-full bg-blue-500 hover:bg-blue-600"
+                          className="rounded-full bg-white text-black hover:bg-white/90"
                         >
                           <Eye className="w-6 h-6" />
                         </Button>
@@ -1829,19 +1830,6 @@ const MultimodalAI = () => {
         onChange={(e) => e.target.files && handleFileUpload(e.target.files)}
       />
       <audio ref={audioRef} preload="auto" />
-      
-      {/* Video element - show when video is active */}
-      {isVideoOn && (
-        <div className="fixed top-4 right-4 w-64 h-48 bg-black rounded-lg overflow-hidden shadow-lg border-2 border-white z-50">
-          <video 
-            ref={videoRef} 
-            className="w-full h-full object-cover"
-            autoPlay
-            muted
-            playsInline
-          />
-        </div>
-      )}
     </div>
   );
 };
