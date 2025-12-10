@@ -96,8 +96,8 @@ const Message: React.FC<MessageProps> = ({ content, type, timestamp, onEdit, ima
         {(isHovered || isEditing) && !isEditing && (
           <div
             className={`absolute ${
-              type === 'user' ? 'bottom-2 left-2' : 'bottom-2 right-2'
-            } flex gap-1 bg-black border border-gray-600 rounded-lg shadow-lg p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10`}
+              type === 'user' ? '-bottom-8 left-0' : '-bottom-8 right-0'
+            } flex gap-1 bg-black/80 rounded-lg p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10`}
           >
             <Button
               size="sm"

@@ -147,29 +147,28 @@ export function AuthDropdown() {
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-white/70 text-sm hidden md:inline">Logged out</span>
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogTrigger asChild>
           <Button variant="ghost" size="sm" className="text-white hover:bg-white/10 flex items-center gap-2">
-            <span>Nurath AI</span>
-            <ChevronDown className="h-3 w-3" />
+            <User className="h-4 w-4" />
+            <span>Sign In</span>
           </Button>
         </DialogTrigger>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md bg-black border-white/10">
           <DialogHeader>
-            <DialogTitle>Welcome to Nurath.AI</DialogTitle>
+            <DialogTitle className="text-white">Welcome to Nurath.AI</DialogTitle>
           </DialogHeader>
           
           <Tabs defaultValue="login" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="login">Login</TabsTrigger>
-              <TabsTrigger value="register">Register</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 bg-white/5">
+              <TabsTrigger value="login" className="text-white data-[state=active]:bg-white/10">Login</TabsTrigger>
+              <TabsTrigger value="register" className="text-white data-[state=active]:bg-white/10">Register</TabsTrigger>
             </TabsList>
             
             <TabsContent value="login">
               <form onSubmit={handleSignIn} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="login-email">Email</Label>
+                  <Label htmlFor="login-email" className="text-white">Email</Label>
                   <Input
                     id="login-email"
                     type="email"
@@ -177,10 +176,11 @@ export function AuthDropdown() {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     disabled={authLoading}
+                    className="bg-white/5 border-white/10 text-white placeholder:text-white/40"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="login-password">Password</Label>
+                  <Label htmlFor="login-password" className="text-white">Password</Label>
                   <Input
                     id="login-password"
                     type="password"
@@ -188,9 +188,10 @@ export function AuthDropdown() {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     disabled={authLoading}
+                    className="bg-white/5 border-white/10 text-white placeholder:text-white/40"
                   />
                 </div>
-                <Button type="submit" className="w-full" disabled={authLoading}>
+                <Button type="submit" className="w-full bg-white text-black hover:bg-white/90" disabled={authLoading}>
                   {authLoading ? "Signing in..." : "Sign In"}
                 </Button>
               </form>
@@ -199,7 +200,7 @@ export function AuthDropdown() {
             <TabsContent value="register">
               <form onSubmit={handleSignUp} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="register-name">Full Name</Label>
+                  <Label htmlFor="register-name" className="text-white">Full Name</Label>
                   <Input
                     id="register-name"
                     type="text"
@@ -207,10 +208,11 @@ export function AuthDropdown() {
                     onChange={(e) => setName(e.target.value)}
                     required
                     disabled={authLoading}
+                    className="bg-white/5 border-white/10 text-white placeholder:text-white/40"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="register-email">Email</Label>
+                  <Label htmlFor="register-email" className="text-white">Email</Label>
                   <Input
                     id="register-email"
                     type="email"
@@ -218,10 +220,11 @@ export function AuthDropdown() {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     disabled={authLoading}
+                    className="bg-white/5 border-white/10 text-white placeholder:text-white/40"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="register-password">Password</Label>
+                  <Label htmlFor="register-password" className="text-white">Password</Label>
                   <Input
                     id="register-password"
                     type="password"
@@ -229,9 +232,10 @@ export function AuthDropdown() {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     disabled={authLoading}
+                    className="bg-white/5 border-white/10 text-white placeholder:text-white/40"
                   />
                 </div>
-                <Button type="submit" className="w-full" disabled={authLoading}>
+                <Button type="submit" className="w-full bg-white text-black hover:bg-white/90" disabled={authLoading}>
                   {authLoading ? "Creating account..." : "Sign Up"}
                 </Button>
               </form>
