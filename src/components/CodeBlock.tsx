@@ -41,7 +41,6 @@ const CodeBlock: React.FC<CodeBlockProps> = ({
   };
 
   const handleRunCode = () => {
-    // For demonstration - this could be extended to actually run code
     console.log('Running code:', code);
   };
 
@@ -84,87 +83,76 @@ const CodeBlock: React.FC<CodeBlockProps> = ({
     }
   };
 
-  // Custom theme with better colors
+  // Custom dark theme
   const customTheme = {
     ...oneDark,
     'code[class*="language-"]': {
       ...oneDark['code[class*="language-"]'],
-      fontFamily: '"JetBrains Mono", "Fira Code", "SF Mono", "Consolas", "Monaco", monospace',
-      fontSize: '14px',
+      fontFamily: '"JetBrains Mono", "Fira Code", "SF Mono", "Consolas", monospace',
+      fontSize: '13px',
       lineHeight: '1.6',
     },
     'pre[class*="language-"]': {
       ...oneDark['pre[class*="language-"]'],
-      background: '#0f0f0f',
+      background: 'transparent',
       margin: 0,
-      padding: '1.5rem',
+      padding: '1rem',
       borderRadius: 0,
     }
   };
 
   return (
     <div 
-      className="relative group my-4 rounded-xl overflow-hidden shadow-2xl border border-gray-800 bg-gray-900 transition-all duration-300 hover:shadow-3xl hover:border-gray-700"
+      className="relative group my-3 rounded-lg overflow-hidden bg-white/5"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Terminal Header with macOS style */}
-      <div className="flex items-center justify-between bg-gradient-to-r from-gray-800 to-gray-900 px-4 py-3 border-b border-gray-700">
-        <div className="flex items-center gap-3">
-          {/* macOS style dots */}
-          <div className="flex gap-2">
-            <div className="w-3 h-3 rounded-full bg-red-500 hover:bg-red-400 transition-colors cursor-pointer"></div>
-            <div className="w-3 h-3 rounded-full bg-yellow-500 hover:bg-yellow-400 transition-colors cursor-pointer"></div>
-            <div className="w-3 h-3 rounded-full bg-green-500 hover:bg-green-400 transition-colors cursor-pointer"></div>
-          </div>
-          <div className="flex items-center gap-2 ml-2">
-            <Terminal className="w-4 h-4 text-gray-400" />
-            <span className="text-gray-300 text-sm font-mono font-semibold">
-              {getLanguageIcon(language)} {language.toUpperCase()}
-            </span>
-          </div>
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-2 bg-white/5">
+        <div className="flex items-center gap-2">
+          <Terminal className="w-4 h-4 text-white/50" />
+          <span className="text-white/70 text-sm font-mono">
+            {getLanguageIcon(language)} {language.toUpperCase()}
+          </span>
         </div>
         
-        <div className="flex items-center gap-2">
-          {/* Edit button - shows on hover */}
+        <div className="flex items-center gap-1">
           {editable && (
             <button
               onClick={handleEdit}
-              className={`flex items-center gap-2 text-gray-400 hover:text-blue-400 transition-all text-sm px-3 py-1 rounded-md hover:bg-gray-800 ${
-                isHovered ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-2'
+              className={`flex items-center gap-1 text-white/50 hover:text-white transition-all text-xs px-2 py-1 rounded hover:bg-white/10 ${
+                isHovered ? 'opacity-100' : 'opacity-0'
               }`}
             >
-              <Edit3 className="w-4 h-4" />
+              <Edit3 className="w-3 h-3" />
               {isEditing ? 'Save' : 'Edit'}
             </button>
           )}
           
-          {/* Run button for JavaScript/Python */}
           {(language === 'javascript' || language === 'js' || language === 'python') && (
             <button
               onClick={handleRunCode}
-              className={`flex items-center gap-2 text-gray-400 hover:text-green-400 transition-all text-sm px-3 py-1 rounded-md hover:bg-gray-800 ${
-                isHovered ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-2'
+              className={`flex items-center gap-1 text-white/50 hover:text-green-400 transition-all text-xs px-2 py-1 rounded hover:bg-white/10 ${
+                isHovered ? 'opacity-100' : 'opacity-0'
               }`}
             >
-              <Play className="w-4 h-4" />
+              <Play className="w-3 h-3" />
               Run
             </button>
           )}
           
-          {/* Copy button */}
           <button
             onClick={handleCopy}
-            className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors text-sm px-3 py-1 rounded-md hover:bg-gray-800"
+            className="flex items-center gap-1 text-white/50 hover:text-white transition-colors text-xs px-2 py-1 rounded hover:bg-white/10"
           >
             {copied ? (
               <>
-                <Check className="w-4 h-4 text-green-400" />
-                <span className="text-green-400">Copied!</span>
+                <Check className="w-3 h-3 text-green-400" />
+                <span className="text-green-400">Copied</span>
               </>
             ) : (
               <>
-                <Copy className="w-4 h-4" />
+                <Copy className="w-3 h-3" />
                 Copy
               </>
             )}
@@ -173,15 +161,15 @@ const CodeBlock: React.FC<CodeBlockProps> = ({
       </div>
       
       {/* Code Content */}
-      <div className="relative bg-gray-950">
+      <div className="relative">
         {isEditing ? (
           <textarea
             value={editedCode}
             onChange={(e) => setEditedCode(e.target.value)}
-            className="w-full bg-gray-950 text-gray-100 p-6 resize-none border-none outline-none font-mono text-sm leading-relaxed"
+            className="w-full bg-transparent text-white p-4 resize-none border-none outline-none font-mono text-sm leading-relaxed"
             style={{
-              fontFamily: '"JetBrains Mono", "Fira Code", "SF Mono", "Consolas", "Monaco", monospace',
-              minHeight: '200px'
+              fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+              minHeight: '120px'
             }}
             autoFocus
           />
@@ -192,12 +180,12 @@ const CodeBlock: React.FC<CodeBlockProps> = ({
             customStyle={{
               margin: 0,
               background: 'transparent',
-              padding: '1.5rem',
+              padding: '1rem',
             }}
-            showLineNumbers={code.split('\n').length > 1}
+            showLineNumbers={code.split('\n').length > 3}
             lineNumberStyle={{
-              color: '#6b7280',
-              fontSize: '12px',
+              color: 'rgba(255,255,255,0.3)',
+              fontSize: '11px',
               marginRight: '1rem',
               userSelect: 'none'
             }}
@@ -207,17 +195,7 @@ const CodeBlock: React.FC<CodeBlockProps> = ({
             {code}
           </SyntaxHighlighter>
         )}
-        
-        {/* Line count indicator */}
-        <div className="absolute bottom-2 right-2 text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded">
-          {code.split('\n').length} lines
-        </div>
       </div>
-      
-      {/* Hover gradient effect */}
-      <div className={`absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5 transition-opacity duration-300 pointer-events-none ${
-        isHovered ? 'opacity-100' : 'opacity-0'
-      }`}></div>
     </div>
   );
 };

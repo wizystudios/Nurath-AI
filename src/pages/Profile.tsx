@@ -1,39 +1,39 @@
-
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import LanguageSelector from "@/components/LanguageSelector"; // Fixed import
-import { toast } from "@/components/ui/sonner";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { 
   Save, 
   User as UserIcon, 
   Bell, 
   Shield, 
-  Upload,
   Camera,
-  Trash2
+  Trash2,
+  ArrowLeft,
+  LogOut
 } from "lucide-react";
 
 const Profile = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [skillLevel, setSkillLevel] = useState("beginner");
+  const [languagePreference, setLanguagePreference] = useState("en");
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [activeTab, setActiveTab] = useState<'general' | 'notifications' | 'security'>('general');
   
   useEffect(() => {
     async function getUserProfile() {
@@ -41,14 +41,13 @@ const Profile = () => {
         const { data: { user } } = await supabase.auth.getUser();
         
         if (!user) {
-          navigate('/auth');
+          navigate('/');
           return;
         }
         
         setUser(user);
         setEmail(user.email || "");
         
-        // Fetch profile data from profiles table
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('*')
@@ -60,6 +59,7 @@ const Profile = () => {
         } else if (profileData) {
           setFullName(profileData.full_name || user.user_metadata?.full_name || "");
           setSkillLevel(profileData.skill_level || "beginner");
+          setLanguagePreference(profileData.language_preference || "en");
           setAvatarUrl(profileData.avatar_url || null);
         } else {
           setFullName(user.user_metadata?.full_name || "");
@@ -76,9 +76,8 @@ const Profile = () => {
   
   const handleUpdateProfile = async () => {
     try {
-      setLoading(true);
+      setSaving(true);
       
-      // Update auth metadata
       const { error: authError } = await supabase.auth.updateUser({
         data: {
           full_name: fullName,
@@ -87,11 +86,9 @@ const Profile = () => {
       
       if (authError) throw authError;
       
-      // Handle avatar upload if there's a new file
       let newAvatarUrl = avatarUrl;
       
       if (avatarFile) {
-        // Upload the file to storage
         const fileExt = avatarFile.name.split('.').pop();
         const filePath = `avatars/${user?.id}/${Date.now()}.${fileExt}`;
         
@@ -101,7 +98,6 @@ const Profile = () => {
           
         if (uploadError) throw uploadError;
         
-        // Get the public URL
         const { data: publicUrlData } = supabase.storage
           .from('profiles')
           .getPublicUrl(filePath);
@@ -109,12 +105,12 @@ const Profile = () => {
         newAvatarUrl = publicUrlData.publicUrl;
       }
       
-      // Update profile data in the profiles table
       const { error: profileError } = await supabase
         .from('profiles')
         .update({
           full_name: fullName,
           skill_level: skillLevel,
+          language_preference: languagePreference,
           avatar_url: newAvatarUrl,
           updated_at: new Date().toISOString()
         })
@@ -123,13 +119,11 @@ const Profile = () => {
       if (profileError) throw profileError;
       
       toast.success("Profile updated successfully!");
-      
-      // Clear avatar file after upload
       setAvatarFile(null);
     } catch (error: any) {
       toast.error(error.message || "Error updating profile");
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
@@ -137,13 +131,11 @@ const Profile = () => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       
-      // Check if file is an image
       if (!file.type.startsWith('image/')) {
         toast.error("Please select an image file");
         return;
       }
       
-      // Check file size (max 2MB)
       if (file.size > 2 * 1024 * 1024) {
         toast.error("Image is too large (max 2MB)");
         return;
@@ -160,6 +152,11 @@ const Profile = () => {
     setAvatarFile(null);
   };
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate('/');
+  };
+
   const getInitials = (name: string) => {
     return name
       .split(' ')
@@ -171,212 +168,244 @@ const Profile = () => {
 
   if (loading) {
     return (
-      <Layout>
-        <div className="container flex items-center justify-center min-h-screen">
-          <span>Loading profile...</span>
-        </div>
-      </Layout>
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <span className="text-white/60">Loading profile...</span>
+      </div>
     );
   }
 
   return (
-    <Layout>
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Profile Settings</h1>
-            <p className="text-muted-foreground mt-2">
-              Manage your account and preferences
-            </p>
+    <div className="min-h-screen bg-black text-white">
+      {/* Header */}
+      <header className="flex items-center justify-between p-4 border-b border-white/5">
+        <div className="flex items-center gap-4">
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => navigate('/')}
+            className="text-white/70 hover:text-white hover:bg-white/5"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <h1 className="text-xl font-semibold">Profile Settings</h1>
+        </div>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleLogout}
+            className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            Sign Out
+          </Button>
+        </div>
+      </header>
+
+      <div className="max-w-2xl mx-auto p-6">
+        {/* Avatar Section */}
+        <div className="flex items-center gap-6 mb-10">
+          <div className="relative">
+            <Avatar className="w-24 h-24">
+              <AvatarImage src={avatarUrl || undefined} alt={fullName} />
+              <AvatarFallback className="bg-white/10 text-white text-2xl">
+                {getInitials(fullName || 'U')}
+              </AvatarFallback>
+            </Avatar>
+            <label 
+              htmlFor="avatar-upload" 
+              className="absolute bottom-0 right-0 bg-white text-black p-2 rounded-full cursor-pointer hover:bg-white/90 transition-colors"
+            >
+              <Camera className="h-4 w-4" />
+            </label>
+            <input 
+              id="avatar-upload" 
+              type="file" 
+              accept="image/*"
+              className="hidden" 
+              onChange={handleAvatarChange}
+            />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-2xl font-semibold text-white">{fullName || 'User'}</h2>
+            <p className="text-white/50">{email}</p>
+            {avatarUrl && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleRemoveAvatar}
+                className="text-red-400 hover:text-red-300 hover:bg-transparent mt-2 px-0"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Remove photo
+              </Button>
+            )}
           </div>
         </div>
-        
-        <Tabs defaultValue="general" className="w-full">
-          <TabsList className="w-full max-w-md mb-4">
-            <TabsTrigger value="general" className="flex-1">
-              <UserIcon className="mr-2 h-4 w-4" />
-              General
-            </TabsTrigger>
-            <TabsTrigger value="notifications" className="flex-1">
-              <Bell className="mr-2 h-4 w-4" />
-              Notifications
-            </TabsTrigger>
-            <TabsTrigger value="security" className="flex-1">
-              <Shield className="mr-2 h-4 w-4" />
-              Security
-            </TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="general">
-            <Card>
-              <CardHeader>
-                <CardTitle>General Information</CardTitle>
-                <CardDescription>
-                  Update your personal information and preferences
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Avatar Upload */}
-                <div className="flex flex-col items-center sm:flex-row sm:items-start gap-6">
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="relative">
-                      <Avatar className="w-24 h-24 border-4 border-muted">
-                        <AvatarImage src={avatarUrl || undefined} alt={fullName} />
-                        <AvatarFallback className="text-2xl">{getInitials(fullName)}</AvatarFallback>
-                      </Avatar>
-                      <label 
-                        htmlFor="avatar-upload" 
-                        className="absolute bottom-0 right-0 bg-primary text-white p-1 rounded-full cursor-pointer"
-                      >
-                        <Camera className="h-4 w-4" />
-                      </label>
-                      <input 
-                        id="avatar-upload" 
-                        type="file" 
-                        accept="image/*"
-                        className="hidden" 
-                        onChange={handleAvatarChange}
-                      />
-                    </div>
-                    {avatarUrl && (
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={handleRemoveAvatar}
-                        className="text-xs text-destructive"
-                      >
-                        <Trash2 className="h-3 w-3 mr-1" />
-                        Remove
-                      </Button>
-                    )}
-                  </div>
-                  <div className="space-y-2 flex-1">
-                    <Label htmlFor="name">Full Name</Label>
-                    <Input 
-                      id="name" 
-                      placeholder="Your name" 
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                    />
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input 
-                    id="email" 
-                    type="email" 
-                    value={email}
-                    disabled
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Email address cannot be changed
-                  </p>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="skill">Skill Level</Label>
-                  <Select 
-                    value={skillLevel}
-                    onValueChange={setSkillLevel}
-                  >
-                    <SelectTrigger id="skill">
-                      <SelectValue placeholder="Select skill level" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="beginner">Beginner</SelectItem>
-                      <SelectItem value="intermediate">Intermediate</SelectItem>
-                      <SelectItem value="advanced">Advanced</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label>Language Preference</Label>
-                  <div className="pt-2">
-                    <LanguageSelector 
-                      currentLanguage="en"
-                      onLanguageChange={() => {}}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-              <CardFooter>
-                <Button onClick={handleUpdateProfile} disabled={loading}>
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Changes
-                </Button>
-              </CardFooter>
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="notifications">
-            <Card>
-              <CardHeader>
-                <CardTitle>Notification Preferences</CardTitle>
-                <CardDescription>
-                  Control how and when you receive notifications
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="email-notifications" className="block mb-1">Email Notifications</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Receive updates and learning materials via email
-                    </p>
-                  </div>
-                  <Switch 
-                    id="email-notifications"
-                    checked={emailNotifications}
-                    onCheckedChange={setEmailNotifications}
-                  />
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="weekly-digest" className="block mb-1">Weekly Digest</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Receive a summary of your learning progress weekly
-                    </p>
-                  </div>
-                  <Switch id="weekly-digest" />
-                </div>
-              </CardContent>
-              <CardFooter>
-                <Button>
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Notification Preferences
-                </Button>
-              </CardFooter>
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="security">
-            <Card>
-              <CardHeader>
-                <CardTitle>Security Settings</CardTitle>
-                <CardDescription>
-                  Manage your account security and password
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Button variant="outline">
-                  <Shield className="mr-2 h-4 w-4" />
-                  Change Password
-                </Button>
-                <div className="pt-4">
-                  <h3 className="font-medium mb-2">Account Activity</h3>
-                  <div className="rounded-md border p-4">
-                    <p className="text-sm">Last login: {new Date().toLocaleDateString()}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+
+        {/* Tab Navigation */}
+        <div className="flex gap-6 mb-8 border-b border-white/10">
+          <button
+            onClick={() => setActiveTab('general')}
+            className={`pb-3 px-1 flex items-center gap-2 transition-colors ${
+              activeTab === 'general' 
+                ? 'text-white border-b-2 border-white' 
+                : 'text-white/50 hover:text-white'
+            }`}
+          >
+            <UserIcon className="w-4 h-4" />
+            General
+          </button>
+          <button
+            onClick={() => setActiveTab('notifications')}
+            className={`pb-3 px-1 flex items-center gap-2 transition-colors ${
+              activeTab === 'notifications' 
+                ? 'text-white border-b-2 border-white' 
+                : 'text-white/50 hover:text-white'
+            }`}
+          >
+            <Bell className="w-4 h-4" />
+            Notifications
+          </button>
+          <button
+            onClick={() => setActiveTab('security')}
+            className={`pb-3 px-1 flex items-center gap-2 transition-colors ${
+              activeTab === 'security' 
+                ? 'text-white border-b-2 border-white' 
+                : 'text-white/50 hover:text-white'
+            }`}
+          >
+            <Shield className="w-4 h-4" />
+            Security
+          </button>
+        </div>
+
+        {/* General Tab */}
+        {activeTab === 'general' && (
+          <div className="space-y-8">
+            <div className="space-y-2">
+              <Label htmlFor="name" className="text-white/70">Full Name</Label>
+              <Input 
+                id="name" 
+                placeholder="Your name" 
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                className="bg-transparent border-white/10 text-white placeholder:text-white/30 focus:border-white/30"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-white/70">Email</Label>
+              <Input 
+                id="email" 
+                type="email" 
+                value={email}
+                disabled
+                className="bg-transparent border-white/10 text-white/50"
+              />
+              <p className="text-xs text-white/40">Email cannot be changed</p>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="skill" className="text-white/70">Skill Level</Label>
+              <Select value={skillLevel} onValueChange={setSkillLevel}>
+                <SelectTrigger className="bg-transparent border-white/10 text-white">
+                  <SelectValue placeholder="Select skill level" />
+                </SelectTrigger>
+                <SelectContent className="bg-black border-white/10">
+                  <SelectItem value="beginner" className="text-white hover:bg-white/10">Beginner</SelectItem>
+                  <SelectItem value="intermediate" className="text-white hover:bg-white/10">Intermediate</SelectItem>
+                  <SelectItem value="advanced" className="text-white hover:bg-white/10">Advanced</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="language" className="text-white/70">Language Preference</Label>
+              <Select value={languagePreference} onValueChange={setLanguagePreference}>
+                <SelectTrigger className="bg-transparent border-white/10 text-white">
+                  <SelectValue placeholder="Select language" />
+                </SelectTrigger>
+                <SelectContent className="bg-black border-white/10">
+                  <SelectItem value="en" className="text-white hover:bg-white/10">🇬🇧 English</SelectItem>
+                  <SelectItem value="sw" className="text-white hover:bg-white/10">🇹🇿 Kiswahili</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <Button 
+              onClick={handleUpdateProfile} 
+              disabled={saving}
+              className="bg-white text-black hover:bg-white/90"
+            >
+              <Save className="mr-2 h-4 w-4" />
+              {saving ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </div>
+        )}
+
+        {/* Notifications Tab */}
+        {activeTab === 'notifications' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between py-4">
+              <div>
+                <p className="text-white font-medium">Email Notifications</p>
+                <p className="text-sm text-white/50">Receive updates and learning materials via email</p>
+              </div>
+              <Switch 
+                checked={emailNotifications}
+                onCheckedChange={setEmailNotifications}
+              />
+            </div>
+            
+            <div className="flex items-center justify-between py-4">
+              <div>
+                <p className="text-white font-medium">Weekly Digest</p>
+                <p className="text-sm text-white/50">Receive a summary of your learning progress weekly</p>
+              </div>
+              <Switch />
+            </div>
+            
+            <div className="flex items-center justify-between py-4">
+              <div>
+                <p className="text-white font-medium">New Features</p>
+                <p className="text-sm text-white/50">Get notified about new AI features and updates</p>
+              </div>
+              <Switch defaultChecked />
+            </div>
+          </div>
+        )}
+
+        {/* Security Tab */}
+        {activeTab === 'security' && (
+          <div className="space-y-6">
+            <div className="py-4">
+              <p className="text-white font-medium mb-1">Change Password</p>
+              <p className="text-sm text-white/50 mb-4">Update your password to keep your account secure</p>
+              <Button variant="outline" className="border-white/10 text-white hover:bg-white/5">
+                <Shield className="mr-2 h-4 w-4" />
+                Change Password
+              </Button>
+            </div>
+            
+            <div className="py-4">
+              <p className="text-white font-medium mb-1">Account Activity</p>
+              <p className="text-sm text-white/50">Last login: {new Date().toLocaleDateString()}</p>
+            </div>
+            
+            <div className="py-4">
+              <p className="text-white font-medium mb-1">Delete Account</p>
+              <p className="text-sm text-white/50 mb-4">Permanently delete your account and all data</p>
+              <Button variant="ghost" className="text-red-400 hover:text-red-300 hover:bg-red-500/10">
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete Account
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
-    </Layout>
+    </div>
   );
 };
 
