@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useEffect, useState } from "react"
 
 type Theme = "dark" | "light" | "system"
@@ -18,13 +17,20 @@ const ThemeProviderContext = createContext<ThemeProviderState | undefined>(undef
 
 export function ThemeProvider({
   children,
-  defaultTheme = "dark", // Default to dark theme for magical background
-  storageKey = "vite-ui-theme",
+  defaultTheme = "dark",
+  storageKey = "nurath-theme",
   ...props
 }: ThemeProviderProps) {
   const [theme, setTheme] = useState<Theme>(() => {
-    const storedTheme = localStorage.getItem(storageKey)
-    return (storedTheme as Theme) || defaultTheme
+    try {
+      const storedTheme = localStorage.getItem(storageKey)
+      if (storedTheme && ["dark", "light", "system"].includes(storedTheme)) {
+        return storedTheme as Theme
+      }
+    } catch (e) {
+      console.error("Failed to read theme from localStorage:", e)
+    }
+    return defaultTheme
   })
 
   useEffect(() => {
