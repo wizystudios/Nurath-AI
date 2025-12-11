@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import Message from "./Message";
+import AudioWaveform from "./AudioWaveform";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -36,7 +37,8 @@ import {
   LogIn,
   LogOut,
   User,
-  Globe
+  Globe,
+  Trash2
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -91,20 +93,23 @@ const MultimodalAI = () => {
   const [currentConversationId, setCurrentConversationId] = useState<string>('');
   const [currentLanguage, setCurrentLanguage] = useState('en');
   const [attachedFiles, setAttachedFiles] = useState<any[]>([]);
-  const [recordedChunks, setRecordedChunks] = useState<Blob[]>([]);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [showHistoryDialog, setShowHistoryDialog] = useState(false);
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authName, setAuthName] = useState('');
+  const [analyserNode, setAnalyserNode] = useState<AnalyserNode | null>(null);
+  const [isPushToTalkActive, setIsPushToTalkActive] = useState(false);
   
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const transcriptRef = useRef<string>('');
   const navigate = useNavigate();
 
   const aiAvatarImages = {
@@ -153,25 +158,23 @@ const MultimodalAI = () => {
     saveChatHistory();
   }, [conversation]);
 
-  // Enhanced voice recognition
-  const setupVoiceRecognition = useCallback(() => {
-    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-      toast.error("Voice recognition not supported - please try Chrome or Edge browser");
-      return null;
-    }
+  // Delete individual chat from history
+  const deleteChat = useCallback((chatId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const updatedHistory = chatHistory.filter(h => h.id !== chatId);
+    setChatHistory(updatedHistory);
+    localStorage.setItem('nurath-chat-history', JSON.stringify(updatedHistory));
+    toast.success("Chat deleted");
+  }, [chatHistory]);
 
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
-    
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = currentLanguage === 'sw' ? 'sw-KE' : 'en-US';
-    recognition.maxAlternatives = 3;
-    
-    return recognition;
-  }, [currentLanguage]);
+  // Clear all chat history
+  const clearAllHistory = useCallback(() => {
+    setChatHistory([]);
+    localStorage.removeItem('nurath-chat-history');
+    toast.success("All history cleared");
+  }, []);
 
-  // Text-to-speech
+  // Text-to-speech with analyser for waveform
   const speakText = useCallback(async (text: string) => {
     try {
       setIsSpeaking(true);
@@ -235,7 +238,6 @@ const MultimodalAI = () => {
 
       setIsProcessing(true);
 
-      // Include attached files in the message
       const filesToSend = attachedFiles.length > 0 ? attachedFiles : attachments;
 
       const newMessage: ConversationMessage = {
@@ -276,11 +278,8 @@ const MultimodalAI = () => {
       };
 
       setConversation(prev => [...prev, aiMessage]);
-
-      // Clear attached files after sending
       setAttachedFiles([]);
 
-      // Speak response if needed
       if (forceSpeak || mode === 'voice' || mode === 'video') {
         await speakText(data?.text || '');
       }
@@ -300,22 +299,59 @@ const MultimodalAI = () => {
     }
   }, [currentMode, isVideoOn, conversation, user, attachedFiles, speakText, currentLanguage]);
 
-  // Voice recognition handlers
-  const startListening = useCallback(async () => {
+  // Push-to-talk: Start listening when button is pressed
+  const startPushToTalk = useCallback(async () => {
     try {
-      const recognition = setupVoiceRecognition();
-      if (!recognition) return;
+      console.log('🎤 Starting push-to-talk...');
+      
+      if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        toast.error("Voice recognition not supported - please try Chrome or Edge browser");
+        return;
+      }
 
-      recognitionRef.current = recognition;
-      let finalTranscript = '';
+      // Get microphone access and create analyser for waveform
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          sampleRate: 24000,
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      });
+      
+      streamRef.current = stream;
+      
+      // Create audio context and analyser for waveform visualization
+      const audioContext = new AudioContext({ sampleRate: 24000 });
+      audioContextRef.current = audioContext;
+      
+      const source = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      setAnalyserNode(analyser);
+
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+      
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = currentLanguage === 'sw' ? 'sw-KE' : 'en-US';
+      recognition.maxAlternatives = 1;
+      
+      transcriptRef.current = '';
       
       recognition.onstart = () => {
+        console.log('🎤 Recognition started');
         setIsListening(true);
-        toast.success(`🎤 Listening in ${currentLanguage === 'sw' ? 'Swahili' : 'English'}...`);
+        setIsPushToTalkActive(true);
+        toast.success(`🎤 Hold to speak in ${currentLanguage === 'sw' ? 'Swahili' : 'English'}...`);
       };
 
       recognition.onresult = (event: any) => {
         let interimTranscript = '';
+        let finalTranscript = '';
         
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const transcript = event.results[i][0].transcript;
@@ -326,40 +362,68 @@ const MultimodalAI = () => {
           }
         }
         
-        // Update input with both final and interim
-        setInputText(finalTranscript + interimTranscript);
+        transcriptRef.current = finalTranscript || interimTranscript;
+        setInputText(transcriptRef.current);
+        console.log('🎤 Transcript:', transcriptRef.current);
       };
 
       recognition.onerror = (error: any) => {
-        console.error("Speech error:", error);
-        setIsListening(false);
-        if (error.error !== 'no-speech') {
+        console.error("🎤 Speech error:", error);
+        if (error.error !== 'no-speech' && error.error !== 'aborted') {
           toast.error(`Voice error: ${error.error}`);
         }
       };
 
       recognition.onend = () => {
-        setIsListening(false);
-        if (finalTranscript.trim()) {
-          handleAIInteraction(finalTranscript.trim(), 'voice', undefined, true);
-          setInputText('');
-        }
+        console.log('🎤 Recognition ended');
       };
 
+      recognitionRef.current = recognition;
       recognition.start();
+      
     } catch (error) {
-      console.error("Voice start error:", error);
-      setIsListening(false);
-      toast.error("Could not start voice recognition");
+      console.error("🎤 Push-to-talk start error:", error);
+      toast.error("Could not start voice recognition. Check microphone permissions.");
     }
-  }, [handleAIInteraction, setupVoiceRecognition, currentLanguage]);
+  }, [currentLanguage]);
 
-  const stopListening = useCallback(() => {
+  // Push-to-talk: Stop listening when button is released
+  const stopPushToTalk = useCallback(async () => {
+    console.log('🎤 Stopping push-to-talk...');
+    
+    // Stop recognition
     if (recognitionRef.current) {
       recognitionRef.current.stop();
-      setIsListening(false);
+      recognitionRef.current = null;
     }
-  }, []);
+    
+    // Stop audio stream
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    
+    // Close audio context
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+    
+    setAnalyserNode(null);
+    setIsListening(false);
+    setIsPushToTalkActive(false);
+    
+    // Send the transcript if we have one
+    const transcript = transcriptRef.current.trim();
+    if (transcript) {
+      console.log('🎤 Sending transcript:', transcript);
+      await handleAIInteraction(transcript, 'voice', undefined, true);
+      setInputText('');
+      transcriptRef.current = '';
+    } else {
+      toast.info("No speech detected. Try again.");
+    }
+  }, [handleAIInteraction]);
 
   // Video functions
   const startVideo = useCallback(async () => {
@@ -552,7 +616,6 @@ const MultimodalAI = () => {
               
               <DropdownMenuSeparator className="bg-white/10" />
               
-              {/* Language Selection */}
               <DropdownMenuItem 
                 onClick={() => {
                   const newLang = currentLanguage === 'en' ? 'sw' : 'en';
@@ -628,12 +691,12 @@ const MultimodalAI = () => {
       <div className="flex-1 overflow-y-auto bg-black" ref={chatContainerRef}>
         {conversation.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center p-8">
-            {/* AI Avatar for voice/video modes */}
+            {/* AI Avatar and Waveform for voice/video modes */}
             {(currentMode === 'voice' || currentMode === 'video') && (
-              <div className="mb-8">
+              <div className="mb-8 flex flex-col items-center">
                 <div className={`w-32 h-32 rounded-full overflow-hidden border-4 ${
                   isSpeaking ? 'border-green-400 shadow-lg shadow-green-400/50' : 
-                  isListening ? 'border-blue-400 shadow-lg shadow-blue-400/50' : 
+                  isListening ? 'border-red-400 shadow-lg shadow-red-400/50' : 
                   'border-white/20'
                 } transition-all`}>
                   <img
@@ -642,8 +705,18 @@ const MultimodalAI = () => {
                     className="w-full h-full object-cover"
                   />
                 </div>
+                
+                {/* Audio Waveform */}
+                <div className="mt-4">
+                  <AudioWaveform 
+                    isActive={isListening || isSpeaking} 
+                    type={isSpeaking ? 'speaking' : 'listening'}
+                    analyserNode={analyserNode}
+                  />
+                </div>
+                
                 <p className="text-center mt-4 text-white">
-                  {isSpeaking ? 'Speaking...' : isListening ? 'Listening...' : 'Ready'}
+                  {isSpeaking ? 'Speaking...' : isListening ? 'Listening...' : 'Hold button to speak'}
                 </p>
               </div>
             )}
@@ -838,18 +911,43 @@ const MultimodalAI = () => {
                   />
                 </div>
                 
+                {/* Waveform Visualization */}
+                <AudioWaveform 
+                  isActive={isListening || isSpeaking} 
+                  type={isSpeaking ? 'speaking' : 'listening'}
+                  analyserNode={analyserNode}
+                />
+                
+                {/* Live transcript display */}
+                {inputText && isListening && (
+                  <p className="text-white/70 text-sm max-w-md">{inputText}</p>
+                )}
+                
                 <p className="text-lg font-medium text-white">
-                  {isListening ? 'Listening... Speak now!' : isSpeaking ? 'Speaking...' : 'Tap to speak'}
+                  {isListening ? 'Listening... Release to send' : isSpeaking ? 'Speaking...' : 'Hold to speak'}
                 </p>
                 
+                {/* Push-to-Talk Button */}
                 <Button
-                  onClick={isListening ? stopListening : startListening}
+                  onMouseDown={startPushToTalk}
+                  onMouseUp={stopPushToTalk}
+                  onMouseLeave={isPushToTalkActive ? stopPushToTalk : undefined}
+                  onTouchStart={startPushToTalk}
+                  onTouchEnd={stopPushToTalk}
                   size="lg"
-                  disabled={isProcessing}
-                  className={`rounded-full ${isListening ? 'bg-red-500 hover:bg-red-600' : 'bg-white text-black hover:bg-white/90'}`}
+                  disabled={isProcessing || isSpeaking}
+                  className={`rounded-full w-20 h-20 ${
+                    isListening 
+                      ? 'bg-red-500 hover:bg-red-600 scale-110' 
+                      : 'bg-white text-black hover:bg-white/90'
+                  } transition-all`}
                 >
-                  {isListening ? <StopCircle className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+                  {isListening ? <MicOff className="w-8 h-8" /> : <Mic className="w-8 h-8" />}
                 </Button>
+                
+                <p className="text-white/40 text-xs">
+                  Hold the button while speaking, release to send
+                </p>
               </div>
             </div>
           )}
@@ -977,7 +1075,20 @@ const MultimodalAI = () => {
       <Dialog open={showHistoryDialog} onOpenChange={setShowHistoryDialog}>
         <DialogContent className="bg-black border-white/10 text-white max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-white">Chat History</DialogTitle>
+            <DialogTitle className="text-white flex items-center justify-between">
+              <span>Chat History</span>
+              {chatHistory.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearAllHistory}
+                  className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Clear All
+                </Button>
+              )}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-2">
             {chatHistory.length === 0 ? (
@@ -987,10 +1098,20 @@ const MultimodalAI = () => {
                 <div
                   key={chat.id}
                   onClick={() => loadChat(chat)}
-                  className="p-4 bg-white/5 rounded-lg cursor-pointer hover:bg-white/10 transition-colors"
+                  className="p-4 bg-white/5 rounded-lg cursor-pointer hover:bg-white/10 transition-colors group flex items-center justify-between"
                 >
-                  <p className="text-white font-medium truncate">{chat.title}</p>
-                  <p className="text-white/50 text-sm">{new Date(chat.date).toLocaleDateString()}</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white font-medium truncate">{chat.title}</p>
+                    <p className="text-white/50 text-sm">{new Date(chat.date).toLocaleDateString()}</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => deleteChat(chat.id, e)}
+                    className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-opacity"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
                 </div>
               ))
             )}
