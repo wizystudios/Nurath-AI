@@ -1,1 +1,10 @@
 project_id = "tmxwwfkrmsjyursybspx"
+
+[functions.ai-chat]
+verify_jwt = false
+
+[functions.multimodal-ai]
+verify_jwt = false
+
+[functions.realtime-voice]
+verify_jwt = false

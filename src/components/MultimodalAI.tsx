@@ -11,6 +11,9 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
 import { 
   Mic, 
@@ -26,7 +29,6 @@ import {
   MessageCircle,
   Camera,
   Image as ImageIcon,
-  StopCircle,
   Plus,
   Settings,
   X,
@@ -38,7 +40,11 @@ import {
   LogOut,
   User,
   Globe,
-  Trash2
+  Trash2,
+  Download,
+  Users,
+  Phone,
+  PhoneOff
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -78,10 +84,128 @@ interface ChatHistory {
   messages: ConversationMessage[];
 }
 
+interface Persona {
+  id: string;
+  name: string;
+  voice: string;
+}
+
+// Audio utilities for OpenAI Realtime API
+const encodeAudioForAPI = (float32Array: Float32Array): string => {
+  const int16Array = new Int16Array(float32Array.length);
+  for (let i = 0; i < float32Array.length; i++) {
+    const s = Math.max(-1, Math.min(1, float32Array[i]));
+    int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+  }
+  const uint8Array = new Uint8Array(int16Array.buffer);
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let i = 0; i < uint8Array.length; i += chunkSize) {
+    const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
+    binary += String.fromCharCode.apply(null, Array.from(chunk));
+  }
+  return btoa(binary);
+};
+
+const createWavFromPCM = (pcmData: Uint8Array): Uint8Array => {
+  const int16Data = new Int16Array(pcmData.length / 2);
+  for (let i = 0; i < pcmData.length; i += 2) {
+    int16Data[i / 2] = (pcmData[i + 1] << 8) | pcmData[i];
+  }
+  
+  const wavHeader = new ArrayBuffer(44);
+  const view = new DataView(wavHeader);
+  
+  const writeString = (offset: number, string: string) => {
+    for (let i = 0; i < string.length; i++) {
+      view.setUint8(offset + i, string.charCodeAt(i));
+    }
+  };
+
+  const sampleRate = 24000;
+  const numChannels = 1;
+  const bitsPerSample = 16;
+  const blockAlign = (numChannels * bitsPerSample) / 8;
+  const byteRate = sampleRate * blockAlign;
+
+  writeString(0, 'RIFF');
+  view.setUint32(4, 36 + int16Data.byteLength, true);
+  writeString(8, 'WAVE');
+  writeString(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, byteRate, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, bitsPerSample, true);
+  writeString(36, 'data');
+  view.setUint32(40, int16Data.byteLength, true);
+
+  const wavArray = new Uint8Array(wavHeader.byteLength + int16Data.byteLength);
+  wavArray.set(new Uint8Array(wavHeader), 0);
+  wavArray.set(new Uint8Array(int16Data.buffer), wavHeader.byteLength);
+  
+  return wavArray;
+};
+
+// Audio Queue for sequential playback
+class AudioQueue {
+  private queue: Uint8Array[] = [];
+  private isPlaying = false;
+  private audioContext: AudioContext;
+  private onPlayingChange: (playing: boolean) => void;
+
+  constructor(audioContext: AudioContext, onPlayingChange: (playing: boolean) => void) {
+    this.audioContext = audioContext;
+    this.onPlayingChange = onPlayingChange;
+  }
+
+  async addToQueue(audioData: Uint8Array) {
+    this.queue.push(audioData);
+    if (!this.isPlaying) {
+      await this.playNext();
+    }
+  }
+
+  private async playNext() {
+    if (this.queue.length === 0) {
+      this.isPlaying = false;
+      this.onPlayingChange(false);
+      return;
+    }
+
+    this.isPlaying = true;
+    this.onPlayingChange(true);
+    const audioData = this.queue.shift()!;
+
+    try {
+      const wavData = createWavFromPCM(audioData);
+      const arrayBuffer = wavData.buffer.slice(0) as ArrayBuffer;
+      const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+      
+      const source = this.audioContext.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(this.audioContext.destination);
+      
+      source.onended = () => this.playNext();
+      source.start(0);
+    } catch (error) {
+      console.error('Error playing audio:', error);
+      this.playNext();
+    }
+  }
+
+  clear() {
+    this.queue = [];
+    this.isPlaying = false;
+    this.onPlayingChange(false);
+  }
+}
+
 const MultimodalAI = () => {
   const [isListening, setIsListening] = useState(false);
   const [isVideoOn, setIsVideoOn] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [inputText, setInputText] = useState("");
   const [conversation, setConversation] = useState<ConversationMessage[]>([]);
@@ -99,17 +223,28 @@ const MultimodalAI = () => {
   const [authPassword, setAuthPassword] = useState('');
   const [authName, setAuthName] = useState('');
   const [analyserNode, setAnalyserNode] = useState<AnalyserNode | null>(null);
-  const [isPushToTalkActive, setIsPushToTalkActive] = useState(false);
+  const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
+  const [currentPersona, setCurrentPersona] = useState<string>('default');
+  const [personas] = useState<Persona[]>([
+    { id: 'default', name: 'Default', voice: 'alloy' },
+    { id: 'professional', name: 'Professional', voice: 'onyx' },
+    { id: 'friendly', name: 'Friendly', voice: 'nova' },
+    { id: 'creative', name: 'Creative', voice: 'shimmer' },
+    { id: 'teacher', name: 'Teacher', voice: 'echo' }
+  ]);
   
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const audioQueueRef = useRef<AudioQueue | null>(null);
+  const processorRef = useRef<ScriptProcessorNode | null>(null);
   const transcriptRef = useRef<string>('');
+  const aiTranscriptRef = useRef<string>('');
   const navigate = useNavigate();
 
   const aiAvatarImages = {
@@ -139,7 +274,7 @@ const MultimodalAI = () => {
     }
   }, []);
 
-  // Save chat history to localStorage
+  // Save chat history
   const saveChatHistory = useCallback(() => {
     if (conversation.length > 0 && currentConversationId) {
       const existingIndex = chatHistory.findIndex(h => h.id === currentConversationId);
@@ -158,7 +293,7 @@ const MultimodalAI = () => {
     saveChatHistory();
   }, [conversation]);
 
-  // Delete individual chat from history
+  // Delete individual chat
   const deleteChat = useCallback((chatId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const updatedHistory = chatHistory.filter(h => h.id !== chatId);
@@ -167,14 +302,74 @@ const MultimodalAI = () => {
     toast.success("Chat deleted");
   }, [chatHistory]);
 
-  // Clear all chat history
+  // Clear all history
   const clearAllHistory = useCallback(() => {
     setChatHistory([]);
     localStorage.removeItem('nurath-chat-history');
     toast.success("All history cleared");
   }, []);
 
-  // Text-to-speech with analyser for waveform
+  // Export conversation
+  const exportConversation = useCallback((format: 'txt' | 'pdf') => {
+    if (conversation.length === 0) {
+      toast.error("No conversation to export");
+      return;
+    }
+
+    const content = conversation.map(msg => {
+      const time = new Date(msg.timestamp).toLocaleString();
+      const sender = msg.type === 'user' ? 'You' : 'Nurath AI';
+      return `[${time}] ${sender}:\n${msg.content}\n`;
+    }).join('\n---\n\n');
+
+    if (format === 'txt') {
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `nurath-chat-${new Date().toISOString().split('T')[0]}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Chat exported as TXT");
+    } else {
+      // Simple PDF generation using print
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(`
+          <html>
+            <head>
+              <title>Nurath AI Chat Export</title>
+              <style>
+                body { font-family: Arial, sans-serif; padding: 20px; }
+                .message { margin-bottom: 20px; padding: 15px; border-radius: 8px; }
+                .user { background: #e3f2fd; }
+                .ai { background: #f5f5f5; }
+                .time { color: #666; font-size: 12px; }
+                .sender { font-weight: bold; margin-bottom: 5px; }
+              </style>
+            </head>
+            <body>
+              <h1>Nurath AI Chat Export</h1>
+              <p>Exported on ${new Date().toLocaleString()}</p>
+              <hr>
+              ${conversation.map(msg => `
+                <div class="message ${msg.type}">
+                  <div class="time">${new Date(msg.timestamp).toLocaleString()}</div>
+                  <div class="sender">${msg.type === 'user' ? 'You' : 'Nurath AI'}</div>
+                  <div>${msg.content}</div>
+                </div>
+              `).join('')}
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
+        printWindow.print();
+      }
+      toast.success("Print dialog opened for PDF");
+    }
+  }, [conversation]);
+
+  // Text-to-speech fallback
   const speakText = useCallback(async (text: string) => {
     try {
       setIsSpeaking(true);
@@ -189,9 +384,8 @@ const MultimodalAI = () => {
         
         const voices = speechSynthesis.getVoices();
         const preferredVoice = voices.find(v => 
-          v.lang.startsWith(currentLanguage === 'sw' ? 'sw' : 'en') &&
-          (v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('samantha'))
-        ) || voices.find(v => v.lang.startsWith('en')) || voices[0];
+          v.lang.startsWith(currentLanguage === 'sw' ? 'sw' : 'en')
+        ) || voices[0];
         
         if (preferredVoice) utterance.voice = preferredVoice;
         
@@ -205,6 +399,192 @@ const MultimodalAI = () => {
       setIsSpeaking(false);
     }
   }, [currentLanguage]);
+
+  // Connect to OpenAI Realtime API via edge function
+  const connectRealtimeVoice = useCallback(async () => {
+    try {
+      console.log('🔌 Connecting to Realtime Voice...');
+      
+      // Get microphone access
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          sampleRate: 24000,
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      });
+      
+      streamRef.current = stream;
+      
+      // Create audio context
+      const audioContext = new AudioContext({ sampleRate: 24000 });
+      audioContextRef.current = audioContext;
+      
+      // Create analyser for waveform
+      const source = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      setAnalyserNode(analyser);
+      
+      // Create processor for sending audio
+      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+      processorRef.current = processor;
+      
+      // Audio queue for playback
+      audioQueueRef.current = new AudioQueue(audioContext, (playing) => {
+        setIsSpeaking(playing);
+      });
+      
+      // Connect to edge function WebSocket
+      const wsUrl = `wss://tmxwwfkrmsjyursybspx.functions.supabase.co/realtime-voice`;
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+      
+      ws.onopen = () => {
+        console.log('🔌 WebSocket connected to edge function');
+        // Set persona
+        ws.send(JSON.stringify({ type: 'set_persona', persona: currentPersona }));
+      };
+      
+      ws.onmessage = async (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log('📥 Received:', data.type);
+          
+          if (data.type === 'connected') {
+            setIsRealtimeConnected(true);
+            setIsListening(true);
+            toast.success("🎤 Real-time voice connected!");
+            
+            // Start sending audio
+            processor.onaudioprocess = (e) => {
+              if (ws.readyState === WebSocket.OPEN) {
+                const inputData = e.inputBuffer.getChannelData(0);
+                const audioBase64 = encodeAudioForAPI(new Float32Array(inputData));
+                ws.send(JSON.stringify({
+                  type: 'input_audio_buffer.append',
+                  audio: audioBase64
+                }));
+              }
+            };
+            
+            source.connect(processor);
+            processor.connect(audioContext.destination);
+          }
+          
+          if (data.type === 'session.updated') {
+            console.log('✅ Session updated with persona');
+          }
+          
+          if (data.type === 'response.audio.delta' && data.delta) {
+            // Decode and queue audio for playback
+            const binaryString = atob(data.delta);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+              bytes[i] = binaryString.charCodeAt(i);
+            }
+            audioQueueRef.current?.addToQueue(bytes);
+          }
+          
+          if (data.type === 'response.audio_transcript.delta' && data.delta) {
+            aiTranscriptRef.current += data.delta;
+          }
+          
+          if (data.type === 'response.audio_transcript.done' && data.transcript) {
+            // Add AI response to conversation
+            const aiMessage: ConversationMessage = {
+              type: 'ai',
+              content: data.transcript,
+              timestamp: new Date(),
+              id: Date.now().toString()
+            };
+            setConversation(prev => [...prev, aiMessage]);
+            aiTranscriptRef.current = '';
+          }
+          
+          if (data.type === 'conversation.item.input_audio_transcription.completed' && data.transcript) {
+            // Add user message to conversation
+            const userMessage: ConversationMessage = {
+              type: 'user',
+              content: data.transcript,
+              timestamp: new Date(),
+              id: Date.now().toString()
+            };
+            setConversation(prev => [...prev, userMessage]);
+          }
+          
+          if (data.type === 'error') {
+            console.error('❌ Realtime error:', data.error);
+            toast.error(data.error?.message || 'Voice connection error');
+          }
+          
+          if (data.type === 'disconnected') {
+            setIsRealtimeConnected(false);
+            setIsListening(false);
+          }
+          
+        } catch (error) {
+          console.error('Error processing message:', error);
+        }
+      };
+      
+      ws.onerror = (error) => {
+        console.error('❌ WebSocket error:', error);
+        toast.error("Voice connection failed");
+        disconnectRealtimeVoice();
+      };
+      
+      ws.onclose = () => {
+        console.log('🔌 WebSocket closed');
+        setIsRealtimeConnected(false);
+        setIsListening(false);
+      };
+      
+    } catch (error: any) {
+      console.error('Failed to connect:', error);
+      toast.error(error.message || "Failed to start voice call");
+    }
+  }, [currentPersona]);
+
+  // Disconnect realtime voice
+  const disconnectRealtimeVoice = useCallback(() => {
+    console.log('🔌 Disconnecting realtime voice...');
+    
+    if (processorRef.current) {
+      processorRef.current.disconnect();
+      processorRef.current = null;
+    }
+    
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+    
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+    
+    if (audioQueueRef.current) {
+      audioQueueRef.current.clear();
+      audioQueueRef.current = null;
+    }
+    
+    setAnalyserNode(null);
+    setIsRealtimeConnected(false);
+    setIsListening(false);
+    setIsSpeaking(false);
+    
+    toast.success("Voice call ended");
+  }, []);
 
   // File analysis
   const analyzeFile = useCallback(async (file: File) => {
@@ -223,7 +603,7 @@ const MultimodalAI = () => {
     });
   }, []);
 
-  // Main AI interaction
+  // Main AI interaction (text mode)
   const handleAIInteraction = useCallback(async (
     input: string, 
     mode: string = 'text', 
@@ -261,7 +641,8 @@ const MultimodalAI = () => {
             currentMode,
             userId: user?.id,
             language: currentLanguage,
-            conversationHistory: conversation.slice(-5)
+            conversationHistory: conversation.slice(-5),
+            persona: currentPersona
           }
         }
       });
@@ -297,133 +678,7 @@ const MultimodalAI = () => {
     } finally {
       setIsProcessing(false);
     }
-  }, [currentMode, isVideoOn, conversation, user, attachedFiles, speakText, currentLanguage]);
-
-  // Push-to-talk: Start listening when button is pressed
-  const startPushToTalk = useCallback(async () => {
-    try {
-      console.log('🎤 Starting push-to-talk...');
-      
-      if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-        toast.error("Voice recognition not supported - please try Chrome or Edge browser");
-        return;
-      }
-
-      // Get microphone access and create analyser for waveform
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          sampleRate: 24000,
-          channelCount: 1,
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        }
-      });
-      
-      streamRef.current = stream;
-      
-      // Create audio context and analyser for waveform visualization
-      const audioContext = new AudioContext({ sampleRate: 24000 });
-      audioContextRef.current = audioContext;
-      
-      const source = audioContext.createMediaStreamSource(stream);
-      const analyser = audioContext.createAnalyser();
-      analyser.fftSize = 256;
-      source.connect(analyser);
-      setAnalyserNode(analyser);
-
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      const recognition = new SpeechRecognition();
-      
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = currentLanguage === 'sw' ? 'sw-KE' : 'en-US';
-      recognition.maxAlternatives = 1;
-      
-      transcriptRef.current = '';
-      
-      recognition.onstart = () => {
-        console.log('🎤 Recognition started');
-        setIsListening(true);
-        setIsPushToTalkActive(true);
-        toast.success(`🎤 Hold to speak in ${currentLanguage === 'sw' ? 'Swahili' : 'English'}...`);
-      };
-
-      recognition.onresult = (event: any) => {
-        let interimTranscript = '';
-        let finalTranscript = '';
-        
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const transcript = event.results[i][0].transcript;
-          if (event.results[i].isFinal) {
-            finalTranscript += transcript + ' ';
-          } else {
-            interimTranscript += transcript;
-          }
-        }
-        
-        transcriptRef.current = finalTranscript || interimTranscript;
-        setInputText(transcriptRef.current);
-        console.log('🎤 Transcript:', transcriptRef.current);
-      };
-
-      recognition.onerror = (error: any) => {
-        console.error("🎤 Speech error:", error);
-        if (error.error !== 'no-speech' && error.error !== 'aborted') {
-          toast.error(`Voice error: ${error.error}`);
-        }
-      };
-
-      recognition.onend = () => {
-        console.log('🎤 Recognition ended');
-      };
-
-      recognitionRef.current = recognition;
-      recognition.start();
-      
-    } catch (error) {
-      console.error("🎤 Push-to-talk start error:", error);
-      toast.error("Could not start voice recognition. Check microphone permissions.");
-    }
-  }, [currentLanguage]);
-
-  // Push-to-talk: Stop listening when button is released
-  const stopPushToTalk = useCallback(async () => {
-    console.log('🎤 Stopping push-to-talk...');
-    
-    // Stop recognition
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-      recognitionRef.current = null;
-    }
-    
-    // Stop audio stream
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-    
-    // Close audio context
-    if (audioContextRef.current) {
-      audioContextRef.current.close();
-      audioContextRef.current = null;
-    }
-    
-    setAnalyserNode(null);
-    setIsListening(false);
-    setIsPushToTalkActive(false);
-    
-    // Send the transcript if we have one
-    const transcript = transcriptRef.current.trim();
-    if (transcript) {
-      console.log('🎤 Sending transcript:', transcript);
-      await handleAIInteraction(transcript, 'voice', undefined, true);
-      setInputText('');
-      transcriptRef.current = '';
-    } else {
-      toast.info("No speech detected. Try again.");
-    }
-  }, [handleAIInteraction]);
+  }, [currentMode, isVideoOn, conversation, user, attachedFiles, speakText, currentLanguage, currentPersona]);
 
   // Video functions
   const startVideo = useCallback(async () => {
@@ -498,7 +753,7 @@ const MultimodalAI = () => {
     try {
       const fileData = await analyzeFile(file);
       setAttachedFiles(prev => [...prev, fileData]);
-      toast.success(`📁 ${file.name} attached! Add your message and send.`);
+      toast.success(`📁 ${file.name} attached!`);
     } catch (error) {
       toast.error(`Failed to process ${file.name}`);
     }
@@ -575,6 +830,13 @@ const MultimodalAI = () => {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      disconnectRealtimeVoice();
+    };
+  }, [disconnectRealtimeVoice]);
+
   // New chat
   const startNewChat = useCallback(() => {
     setCurrentConversationId(Date.now().toString());
@@ -592,7 +854,7 @@ const MultimodalAI = () => {
 
   return (
     <div className="flex flex-col h-screen bg-black">
-      {/* Header with Dropdown */}
+      {/* Header */}
       <header className="flex items-center justify-between p-4 bg-black">
         <div className="flex items-center space-x-4">
           {/* Main Dropdown Menu */}
@@ -613,6 +875,52 @@ const MultimodalAI = () => {
                 <History className="w-4 h-4 mr-3" />
                 Chat History
               </DropdownMenuItem>
+              
+              <DropdownMenuSeparator className="bg-white/10" />
+              
+              {/* Persona Selection */}
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger className="hover:bg-white/5 cursor-pointer">
+                  <Users className="w-4 h-4 mr-3" />
+                  AI Persona: {personas.find(p => p.id === currentPersona)?.name}
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="bg-black border-white/10 text-white">
+                  {personas.map(persona => (
+                    <DropdownMenuItem 
+                      key={persona.id}
+                      onClick={() => {
+                        setCurrentPersona(persona.id);
+                        toast.success(`Switched to ${persona.name} persona`);
+                        // Update WebSocket if connected
+                        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                          wsRef.current.send(JSON.stringify({ type: 'set_persona', persona: persona.id }));
+                        }
+                      }}
+                      className={`hover:bg-white/5 cursor-pointer ${currentPersona === persona.id ? 'bg-white/10' : ''}`}
+                    >
+                      {persona.name}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+              
+              {/* Export Options */}
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger className="hover:bg-white/5 cursor-pointer">
+                  <Download className="w-4 h-4 mr-3" />
+                  Export Chat
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="bg-black border-white/10 text-white">
+                  <DropdownMenuItem onClick={() => exportConversation('txt')} className="hover:bg-white/5 cursor-pointer">
+                    <FileText className="w-4 h-4 mr-3" />
+                    Export as TXT
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => exportConversation('pdf')} className="hover:bg-white/5 cursor-pointer">
+                    <FileIcon className="w-4 h-4 mr-3" />
+                    Export as PDF
+                  </DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
               
               <DropdownMenuSeparator className="bg-white/10" />
               
@@ -682,6 +990,13 @@ const MultimodalAI = () => {
               <Video className="w-4 h-4" />
             </Button>
           </div>
+          
+          {/* Real-time Voice Call Status */}
+          {isRealtimeConnected && (
+            <Badge className="bg-green-500/20 text-green-400 border-0 animate-pulse">
+              <Phone className="w-3 h-3 mr-1" /> Live
+            </Badge>
+          )}
         </div>
         
         <ThemeToggle />
@@ -706,7 +1021,6 @@ const MultimodalAI = () => {
                   />
                 </div>
                 
-                {/* Audio Waveform */}
                 <div className="mt-4">
                   <AudioWaveform 
                     isActive={isListening || isSpeaking} 
@@ -716,7 +1030,7 @@ const MultimodalAI = () => {
                 </div>
                 
                 <p className="text-center mt-4 text-white">
-                  {isSpeaking ? 'Speaking...' : isListening ? 'Listening...' : 'Hold button to speak'}
+                  {isRealtimeConnected ? (isSpeaking ? 'Speaking...' : 'Listening...') : 'Click to start voice call'}
                 </p>
               </div>
             )}
@@ -755,12 +1069,12 @@ const MultimodalAI = () => {
                 <span className="text-sm">Set Alarm</span>
               </Button>
               <Button
-                onClick={() => { setCurrentMode('video'); startVideo(); }}
+                onClick={() => { setCurrentMode('voice'); connectRealtimeVoice(); }}
                 variant="ghost"
                 className="h-20 flex flex-col items-center justify-center space-y-2 text-white hover:bg-white/5 border border-white/10"
               >
-                <Eye className="w-6 h-6" />
-                <span className="text-sm">Video Call</span>
+                <Phone className="w-6 h-6" />
+                <span className="text-sm">Voice Call</span>
               </Button>
             </div>
           </div>
@@ -860,7 +1174,7 @@ const MultimodalAI = () => {
                 ref={inputRef}
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
-                placeholder={attachedFiles.length > 0 ? 'Add instructions for your file...' : 'Message Nurath.AI...'}
+                placeholder={attachedFiles.length > 0 ? 'Add instructions...' : 'Message Nurath.AI...'}
                 className="resize-none bg-transparent px-6 py-4 pr-20 text-white placeholder-white/40 focus:outline-none focus:ring-0 rounded-2xl border-0 min-h-[80px]"
                 onKeyPress={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
@@ -911,42 +1225,41 @@ const MultimodalAI = () => {
                   />
                 </div>
                 
-                {/* Waveform Visualization */}
                 <AudioWaveform 
                   isActive={isListening || isSpeaking} 
                   type={isSpeaking ? 'speaking' : 'listening'}
                   analyserNode={analyserNode}
                 />
                 
-                {/* Live transcript display */}
-                {inputText && isListening && (
-                  <p className="text-white/70 text-sm max-w-md">{inputText}</p>
-                )}
-                
                 <p className="text-lg font-medium text-white">
-                  {isListening ? 'Listening... Release to send' : isSpeaking ? 'Speaking...' : 'Hold to speak'}
+                  {isRealtimeConnected 
+                    ? (isSpeaking ? 'AI Speaking...' : 'Listening to you...') 
+                    : 'Start a voice call'}
                 </p>
                 
-                {/* Push-to-Talk Button */}
+                {/* Voice Call Button */}
                 <Button
-                  onMouseDown={startPushToTalk}
-                  onMouseUp={stopPushToTalk}
-                  onMouseLeave={isPushToTalkActive ? stopPushToTalk : undefined}
-                  onTouchStart={startPushToTalk}
-                  onTouchEnd={stopPushToTalk}
+                  onClick={isRealtimeConnected ? disconnectRealtimeVoice : connectRealtimeVoice}
                   size="lg"
-                  disabled={isProcessing || isSpeaking}
+                  disabled={isProcessing}
                   className={`rounded-full w-20 h-20 ${
-                    isListening 
-                      ? 'bg-red-500 hover:bg-red-600 scale-110' 
-                      : 'bg-white text-black hover:bg-white/90'
+                    isRealtimeConnected 
+                      ? 'bg-red-500 hover:bg-red-600' 
+                      : 'bg-green-500 hover:bg-green-600'
                   } transition-all`}
                 >
-                  {isListening ? <MicOff className="w-8 h-8" /> : <Mic className="w-8 h-8" />}
+                  {isRealtimeConnected ? <PhoneOff className="w-8 h-8" /> : <Phone className="w-8 h-8" />}
                 </Button>
                 
                 <p className="text-white/40 text-xs">
-                  Hold the button while speaking, release to send
+                  {isRealtimeConnected 
+                    ? 'Real-time voice active - just speak naturally' 
+                    : 'Click to start real-time voice conversation'}
+                </p>
+                
+                {/* Current Persona */}
+                <p className="text-white/60 text-sm">
+                  Persona: {personas.find(p => p.id === currentPersona)?.name}
                 </p>
               </div>
             </div>
