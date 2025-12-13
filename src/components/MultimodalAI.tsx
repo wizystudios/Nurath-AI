@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import Message from "./Message";
 import AudioWaveform from "./AudioWaveform";
+import VoiceActivityIndicator from "./VoiceActivityIndicator";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -44,7 +45,10 @@ import {
   Download,
   Users,
   Phone,
-  PhoneOff
+  PhoneOff,
+  Volume1,
+  Brain,
+  Loader2
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -59,6 +63,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useConversationMemory } from "@/hooks/useConversationMemory";
 
 interface ConversationMessage {
   type: 'user' | 'ai';
@@ -88,6 +94,15 @@ interface Persona {
   id: string;
   name: string;
   voice: string;
+  elevenLabsVoiceId?: string;
+}
+
+interface ElevenLabsVoice {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  previewUrl?: string;
 }
 
 // Audio utilities for OpenAI Realtime API
@@ -223,15 +238,25 @@ const MultimodalAI = () => {
   const [authPassword, setAuthPassword] = useState('');
   const [authName, setAuthName] = useState('');
   const [analyserNode, setAnalyserNode] = useState<AnalyserNode | null>(null);
+  const [outputAnalyserNode, setOutputAnalyserNode] = useState<AnalyserNode | null>(null);
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
   const [currentPersona, setCurrentPersona] = useState<string>('default');
+  const [elevenLabsVoices, setElevenLabsVoices] = useState<ElevenLabsVoice[]>([]);
+  const [selectedElevenLabsVoice, setSelectedElevenLabsVoice] = useState<string>('');
+  const [isLoadingVoices, setIsLoadingVoices] = useState(false);
+  const [showVoiceSelector, setShowVoiceSelector] = useState(false);
+  const [inputLevel, setInputLevel] = useState(0);
+  const [outputLevel, setOutputLevel] = useState(0);
   const [personas] = useState<Persona[]>([
-    { id: 'default', name: 'Default', voice: 'alloy' },
-    { id: 'professional', name: 'Professional', voice: 'onyx' },
-    { id: 'friendly', name: 'Friendly', voice: 'nova' },
-    { id: 'creative', name: 'Creative', voice: 'shimmer' },
-    { id: 'teacher', name: 'Teacher', voice: 'echo' }
+    { id: 'default', name: 'Default', voice: 'alloy', elevenLabsVoiceId: 'EXAVITQu4vr4xnSDxMaL' },
+    { id: 'professional', name: 'Professional', voice: 'onyx', elevenLabsVoiceId: 'JBFqnCBsd6RMkjVDRZzb' },
+    { id: 'friendly', name: 'Friendly', voice: 'nova', elevenLabsVoiceId: 'pFZP5JQG7iQjIQuC4Bku' },
+    { id: 'creative', name: 'Creative', voice: 'shimmer', elevenLabsVoiceId: 'XrExE9yKIg1WjnnlVkGX' },
+    { id: 'teacher', name: 'Teacher', voice: 'echo', elevenLabsVoiceId: 'onwK4e9ZLuTAKqWW03F9' }
   ]);
+  
+  // Conversation memory hook
+  const { memory, keyTopics, updateMemory, getContextForAI, clearMemory } = useConversationMemory(user?.id);
   
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -291,9 +316,53 @@ const MultimodalAI = () => {
 
   useEffect(() => {
     saveChatHistory();
-  }, [conversation]);
+    // Update conversation memory when conversation changes
+    if (conversation.length > 0) {
+      updateMemory(conversation);
+    }
+  }, [conversation, saveChatHistory, updateMemory]);
 
-  // Delete individual chat
+  // Load ElevenLabs voices
+  const loadElevenLabsVoices = useCallback(async () => {
+    setIsLoadingVoices(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('elevenlabs-voices');
+      if (error) throw error;
+      if (data?.voices) {
+        setElevenLabsVoices(data.voices);
+        console.log(`🔊 Loaded ${data.voices.length} ElevenLabs voices`);
+      }
+    } catch (error: any) {
+      console.error('Failed to load ElevenLabs voices:', error);
+    } finally {
+      setIsLoadingVoices(false);
+    }
+  }, []);
+
+  // Load voices on mount
+  useEffect(() => {
+    loadElevenLabsVoices();
+  }, [loadElevenLabsVoices]);
+
+  // Update input level for voice activity indicator
+  useEffect(() => {
+    if (!analyserNode || !isListening) {
+      setInputLevel(0);
+      return;
+    }
+
+    const updateLevel = () => {
+      const dataArray = new Uint8Array(analyserNode.frequencyBinCount);
+      analyserNode.getByteFrequencyData(dataArray);
+      const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+      setInputLevel(Math.min(average / 128, 1));
+    };
+
+    const interval = setInterval(updateLevel, 50);
+    return () => clearInterval(interval);
+  }, [analyserNode, isListening]);
+
+
   const deleteChat = useCallback((chatId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const updatedHistory = chatHistory.filter(h => h.id !== chatId);
@@ -369,11 +438,42 @@ const MultimodalAI = () => {
     }
   }, [conversation]);
 
-  // Text-to-speech fallback
+  // Text-to-speech with ElevenLabs or fallback
   const speakText = useCallback(async (text: string) => {
     try {
       setIsSpeaking(true);
       
+      // Try ElevenLabs first if voice is selected
+      const currentVoice = selectedElevenLabsVoice || personas.find(p => p.id === currentPersona)?.elevenLabsVoiceId;
+      
+      if (currentVoice) {
+        try {
+          console.log(`🔊 Using ElevenLabs voice: ${currentVoice}`);
+          const { data, error } = await supabase.functions.invoke('elevenlabs-tts', {
+            body: { text, voiceId: currentVoice }
+          });
+          
+          if (!error && data) {
+            const audioBlob = new Blob([data], { type: 'audio/mpeg' });
+            const audioUrl = URL.createObjectURL(audioBlob);
+            const audio = new Audio(audioUrl);
+            audio.onended = () => {
+              setIsSpeaking(false);
+              URL.revokeObjectURL(audioUrl);
+            };
+            audio.onerror = () => {
+              setIsSpeaking(false);
+              URL.revokeObjectURL(audioUrl);
+            };
+            await audio.play();
+            return;
+          }
+        } catch (e) {
+          console.warn('ElevenLabs TTS failed, falling back to browser TTS:', e);
+        }
+      }
+      
+      // Fallback to browser TTS
       if ('speechSynthesis' in window) {
         speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
@@ -398,7 +498,7 @@ const MultimodalAI = () => {
       console.error('TTS Error:', error);
       setIsSpeaking(false);
     }
-  }, [currentLanguage]);
+  }, [currentLanguage, currentPersona, selectedElevenLabsVoice, personas]);
 
   // Connect to OpenAI Realtime API via edge function
   const connectRealtimeVoice = useCallback(async () => {
@@ -630,6 +730,9 @@ const MultimodalAI = () => {
 
       setConversation(prev => [...prev, newMessage]);
 
+      // Get memory context for AI
+      const memoryContext = getContextForAI();
+
       const { data, error } = await supabase.functions.invoke('multimodal-ai', {
         body: {
           input,
@@ -642,7 +745,9 @@ const MultimodalAI = () => {
             userId: user?.id,
             language: currentLanguage,
             conversationHistory: conversation.slice(-5),
-            persona: currentPersona
+            persona: currentPersona,
+            memoryContext, // Include conversation memory
+            keyTopics // Include key topics from memory
           }
         }
       });
@@ -904,6 +1009,70 @@ const MultimodalAI = () => {
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
               
+              {/* Custom Voice Selection */}
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger className="hover:bg-white/5 cursor-pointer">
+                  <Volume1 className="w-4 h-4 mr-3" />
+                  Custom Voice
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="bg-black border-white/10 text-white max-h-64 overflow-y-auto">
+                  <DropdownMenuItem 
+                    onClick={() => {
+                      setSelectedElevenLabsVoice('');
+                      toast.success('Using default persona voice');
+                    }}
+                    className={`hover:bg-white/5 cursor-pointer ${!selectedElevenLabsVoice ? 'bg-white/10' : ''}`}
+                  >
+                    Default (Persona Voice)
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="bg-white/10" />
+                  {isLoadingVoices ? (
+                    <DropdownMenuItem className="hover:bg-white/5">
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Loading voices...
+                    </DropdownMenuItem>
+                  ) : elevenLabsVoices.slice(0, 15).map(voice => (
+                    <DropdownMenuItem 
+                      key={voice.id}
+                      onClick={() => {
+                        setSelectedElevenLabsVoice(voice.id);
+                        toast.success(`Voice: ${voice.name}`);
+                      }}
+                      className={`hover:bg-white/5 cursor-pointer ${selectedElevenLabsVoice === voice.id ? 'bg-white/10' : ''}`}
+                    >
+                      {voice.name}
+                      <span className="ml-2 text-xs text-muted-foreground">{voice.category}</span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+              
+              {/* Memory Settings */}
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger className="hover:bg-white/5 cursor-pointer">
+                  <Brain className="w-4 h-4 mr-3" />
+                  Memory
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="bg-black border-white/10 text-white">
+                  {keyTopics.length > 0 && (
+                    <DropdownMenuItem className="hover:bg-white/5 flex-col items-start">
+                      <span className="text-xs text-muted-foreground mb-1">Topics:</span>
+                      <span className="text-xs">{keyTopics.join(', ')}</span>
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem 
+                    onClick={() => {
+                      clearMemory();
+                      toast.success('Conversation memory cleared');
+                    }}
+                    className="hover:bg-white/5 cursor-pointer text-red-400"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Clear Memory
+                  </DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+              
               {/* Export Options */}
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger className="hover:bg-white/5 cursor-pointer">
@@ -991,10 +1160,40 @@ const MultimodalAI = () => {
             </Button>
           </div>
           
-          {/* Real-time Voice Call Status */}
+          {/* Real-time Voice Call Status with Activity Indicators */}
           {isRealtimeConnected && (
-            <Badge className="bg-green-500/20 text-green-400 border-0 animate-pulse">
-              <Phone className="w-3 h-3 mr-1" /> Live
+            <div className="flex items-center gap-3">
+              {/* Input Level (Microphone) */}
+              <div className="flex items-center gap-1">
+                <Mic className="w-3 h-3 text-red-400" />
+                <VoiceActivityIndicator 
+                  isActive={isListening} 
+                  type="input" 
+                  analyserNode={analyserNode}
+                />
+              </div>
+              
+              {/* Output Level (Speaker) */}
+              <div className="flex items-center gap-1">
+                <Volume2 className="w-3 h-3 text-green-400" />
+                <VoiceActivityIndicator 
+                  isActive={isSpeaking} 
+                  type="output" 
+                  analyserNode={outputAnalyserNode}
+                />
+              </div>
+              
+              <Badge className="bg-green-500/20 text-green-400 border-0 animate-pulse">
+                <Phone className="w-3 h-3 mr-1" /> Live
+              </Badge>
+            </div>
+          )}
+          
+          {/* Memory indicator */}
+          {keyTopics.length > 0 && !isRealtimeConnected && (
+            <Badge variant="outline" className="text-xs border-purple-400/50 text-purple-400">
+              <Brain className="w-3 h-3 mr-1" />
+              {keyTopics.length} topics
             </Badge>
           )}
         </div>
