@@ -38,6 +38,69 @@ export type Database = {
         }
         Relationships: []
       }
+      appointments: {
+        Row: {
+          appointment_date: string
+          appointment_time: string
+          created_at: string | null
+          doctor_id: string | null
+          id: string
+          notes: string | null
+          organization_id: string | null
+          patient_email: string | null
+          patient_id: string | null
+          patient_name: string | null
+          patient_phone: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          appointment_date: string
+          appointment_time: string
+          created_at?: string | null
+          doctor_id?: string | null
+          id?: string
+          notes?: string | null
+          organization_id?: string | null
+          patient_email?: string | null
+          patient_id?: string | null
+          patient_name?: string | null
+          patient_phone?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          appointment_date?: string
+          appointment_time?: string
+          created_at?: string | null
+          doctor_id?: string | null
+          id?: string
+          notes?: string | null
+          organization_id?: string | null
+          patient_email?: string | null
+          patient_id?: string | null
+          patient_name?: string | null
+          patient_phone?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointments_doctor_id_fkey"
+            columns: ["doctor_id"]
+            isOneToOne: false
+            referencedRelation: "doctors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_messages: {
         Row: {
           content: string
@@ -65,6 +128,36 @@ export type Database = {
           role?: string
           type?: string | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      chatbot_faqs: {
+        Row: {
+          answer: string
+          category: string | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          keywords: string[]
+          question: string
+        }
+        Insert: {
+          answer: string
+          category?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          keywords: string[]
+          question: string
+        }
+        Update: {
+          answer?: string
+          category?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          keywords?: string[]
+          question?: string
         }
         Relationships: []
       }
@@ -222,6 +315,237 @@ export type Database = {
         }
         Relationships: []
       }
+      doctors: {
+        Row: {
+          bio: string | null
+          consultation_fee: number | null
+          created_at: string | null
+          email: string | null
+          full_name: string
+          id: string
+          is_approved: boolean | null
+          is_online: boolean | null
+          is_private: boolean | null
+          location: string | null
+          organization_id: string | null
+          phone: string | null
+          profile_picture: string | null
+          schedule: Json | null
+          specialty: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          bio?: string | null
+          consultation_fee?: number | null
+          created_at?: string | null
+          email?: string | null
+          full_name: string
+          id?: string
+          is_approved?: boolean | null
+          is_online?: boolean | null
+          is_private?: boolean | null
+          location?: string | null
+          organization_id?: string | null
+          phone?: string | null
+          profile_picture?: string | null
+          schedule?: Json | null
+          specialty: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          bio?: string | null
+          consultation_fee?: number | null
+          created_at?: string | null
+          email?: string | null
+          full_name?: string
+          id?: string
+          is_approved?: boolean | null
+          is_online?: boolean | null
+          is_private?: boolean | null
+          location?: string | null
+          organization_id?: string | null
+          phone?: string | null
+          profile_picture?: string | null
+          schedule?: Json | null
+          specialty?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "doctors_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lab_tests: {
+        Row: {
+          cost: number | null
+          created_at: string | null
+          description: string | null
+          id: string
+          is_available: boolean | null
+          name: string
+          organization_id: string
+          preparation: string | null
+          result_time: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          cost?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_available?: boolean | null
+          name: string
+          organization_id: string
+          preparation?: string | null
+          result_time?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          cost?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_available?: boolean | null
+          name?: string
+          organization_id?: string
+          preparation?: string | null
+          result_time?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lab_tests_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      medicines: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          expiry_date: string | null
+          id: string
+          is_available: boolean | null
+          name: string
+          organization_id: string
+          price: number | null
+          stock: number | null
+          type: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          expiry_date?: string | null
+          id?: string
+          is_available?: boolean | null
+          name: string
+          organization_id: string
+          price?: number | null
+          stock?: number | null
+          type?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          expiry_date?: string | null
+          id?: string
+          is_available?: boolean | null
+          name?: string
+          organization_id?: string
+          price?: number | null
+          stock?: number | null
+          type?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medicines_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          address: string | null
+          cover_url: string | null
+          created_at: string | null
+          description: string | null
+          email: string | null
+          id: string
+          is_approved: boolean | null
+          is_featured: boolean | null
+          is_suspended: boolean | null
+          license_no: string | null
+          location: string | null
+          logo_url: string | null
+          name: string
+          opening_hours: Json | null
+          phone: string | null
+          services: Json | null
+          type: Database["public"]["Enums"]["organization_type"]
+          updated_at: string | null
+          website: string | null
+        }
+        Insert: {
+          address?: string | null
+          cover_url?: string | null
+          created_at?: string | null
+          description?: string | null
+          email?: string | null
+          id?: string
+          is_approved?: boolean | null
+          is_featured?: boolean | null
+          is_suspended?: boolean | null
+          license_no?: string | null
+          location?: string | null
+          logo_url?: string | null
+          name: string
+          opening_hours?: Json | null
+          phone?: string | null
+          services?: Json | null
+          type: Database["public"]["Enums"]["organization_type"]
+          updated_at?: string | null
+          website?: string | null
+        }
+        Update: {
+          address?: string | null
+          cover_url?: string | null
+          created_at?: string | null
+          description?: string | null
+          email?: string | null
+          id?: string
+          is_approved?: boolean | null
+          is_featured?: boolean | null
+          is_suspended?: boolean | null
+          license_no?: string | null
+          location?: string | null
+          logo_url?: string | null
+          name?: string
+          opening_hours?: Json | null
+          phone?: string | null
+          services?: Json | null
+          type?: Database["public"]["Enums"]["organization_type"]
+          updated_at?: string | null
+          website?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -330,6 +654,116 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      telemed_chats: {
+        Row: {
+          created_at: string | null
+          doctor_id: string | null
+          id: string
+          organization_id: string | null
+          patient_id: string | null
+          patient_name: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          doctor_id?: string | null
+          id?: string
+          organization_id?: string | null
+          patient_id?: string | null
+          patient_name?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          doctor_id?: string | null
+          id?: string
+          organization_id?: string | null
+          patient_id?: string | null
+          patient_name?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telemed_chats_doctor_id_fkey"
+            columns: ["doctor_id"]
+            isOneToOne: false
+            referencedRelation: "doctors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "telemed_chats_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telemed_messages: {
+        Row: {
+          chat_id: string
+          content: string
+          created_at: string | null
+          id: string
+          message_type: string | null
+          sender_id: string | null
+          sender_name: string | null
+          sender_role: string | null
+        }
+        Insert: {
+          chat_id: string
+          content: string
+          created_at?: string | null
+          id?: string
+          message_type?: string | null
+          sender_id?: string | null
+          sender_name?: string | null
+          sender_role?: string | null
+        }
+        Update: {
+          chat_id?: string
+          content?: string
+          created_at?: string | null
+          id?: string
+          message_type?: string | null
+          sender_id?: string | null
+          sender_name?: string | null
+          sender_role?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telemed_messages_chat_id_fkey"
+            columns: ["chat_id"]
+            isOneToOne: false
+            referencedRelation: "telemed_chats"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telemed_settings: {
+        Row: {
+          id: string
+          key: string
+          updated_at: string | null
+          value: Json
+        }
+        Insert: {
+          id?: string
+          key: string
+          updated_at?: string | null
+          value: Json
+        }
+        Update: {
+          id?: string
+          key?: string
+          updated_at?: string | null
+          value?: Json
+        }
+        Relationships: []
       }
       tutorials: {
         Row: {
@@ -469,15 +903,47 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          organization_id: string | null
+          role: Database["public"]["Enums"]["telemed_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          organization_id?: string | null
+          role: Database["public"]["Enums"]["telemed_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          organization_id?: string | null
+          role?: Database["public"]["Enums"]["telemed_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_organization: { Args: { _user_id: string }; Returns: string }
+      has_telemed_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["telemed_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      organization_type: "hospital" | "pharmacy" | "lab" | "polyclinic"
+      telemed_role: "super_admin" | "org_admin" | "doctor" | "patient"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -604,6 +1070,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      organization_type: ["hospital", "pharmacy", "lab", "polyclinic"],
+      telemed_role: ["super_admin", "org_admin", "doctor", "patient"],
+    },
   },
 } as const

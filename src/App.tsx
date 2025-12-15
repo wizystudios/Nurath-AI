@@ -17,6 +17,10 @@ import NotFound from './pages/NotFound';
 import { Layout } from './components/Layout';
 import NewDiscussion from './pages/NewDiscussion';
 import { supabase } from '@/integrations/supabase/client';
+import TelemedChatbot from './pages/TelemedChatbot';
+import TelemedAuth from './pages/TelemedAuth';
+import TelemedBooking from './pages/TelemedBooking';
+import SuperAdminDashboard from './pages/SuperAdminDashboard';
 
 const queryClient = new QueryClient();
 
@@ -57,6 +61,10 @@ const App: React.FC = () => {
               <Route path="/progress" element={<ProgressTracker />} />
               <Route path="/community" element={<Community />} />
               <Route path="/community/new" element={<NewDiscussion />} />
+              <Route path="/telemed" element={<TelemedChatbot />} />
+              <Route path="/telemed/auth" element={<TelemedAuth />} />
+              <Route path="/telemed/book/:doctorId" element={<TelemedBooking />} />
+              <Route path="/telemed/admin" element={<SuperAdminDashboard />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </TooltipProvider>
