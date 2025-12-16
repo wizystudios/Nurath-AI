@@ -19,23 +19,23 @@ const TelemedAuth = () => {
 
   useEffect(() => {
     if (!loading && user && userRole) {
-      redirectBasedOnRole(userRole.role);
+      redirectBasedOnRole(userRole.role, userRole.organization_id);
     }
   }, [user, userRole, loading]);
 
-  const redirectBasedOnRole = (role: string) => {
-    switch (role) {
-      case 'super_admin':
-        navigate('/telemed/admin');
-        break;
-      case 'org_admin':
-        navigate('/telemed/organization');
-        break;
-      case 'doctor':
-        navigate('/telemed/doctor');
-        break;
-      default:
-        navigate('/telemed');
+  const redirectBasedOnRole = async (role: string, orgId?: string | null) => {
+    if (role === 'super_admin') {
+      navigate('/telemed/admin');
+    } else if (role === 'org_admin' && orgId) {
+      // Check org type to redirect to correct dashboard
+      const { data } = await supabase.from('organizations').select('type').eq('id', orgId).single();
+      if (data?.type === 'pharmacy') navigate('/telemed/pharmacy');
+      else if (data?.type === 'lab') navigate('/telemed/lab');
+      else navigate('/telemed/organization');
+    } else if (role === 'doctor') {
+      navigate('/telemed/doctor');
+    } else {
+      navigate('/telemed');
     }
   };
 

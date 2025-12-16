@@ -21,6 +21,10 @@ import TelemedChatbot from './pages/TelemedChatbot';
 import TelemedAuth from './pages/TelemedAuth';
 import TelemedBooking from './pages/TelemedBooking';
 import SuperAdminDashboard from './pages/SuperAdminDashboard';
+import OrgAdminDashboard from './pages/OrgAdminDashboard';
+import DoctorDashboard from './pages/DoctorDashboard';
+import PharmacyDashboard from './pages/PharmacyDashboard';
+import LabDashboard from './pages/LabDashboard';
 
 const queryClient = new QueryClient();
 
@@ -65,6 +69,10 @@ const App: React.FC = () => {
               <Route path="/telemed/auth" element={<TelemedAuth />} />
               <Route path="/telemed/book/:doctorId" element={<TelemedBooking />} />
               <Route path="/telemed/admin" element={<SuperAdminDashboard />} />
+              <Route path="/telemed/organization" element={<OrgAdminDashboard />} />
+              <Route path="/telemed/doctor" element={<DoctorDashboard />} />
+              <Route path="/telemed/pharmacy" element={<PharmacyDashboard />} />
+              <Route path="/telemed/lab" element={<LabDashboard />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </TooltipProvider>

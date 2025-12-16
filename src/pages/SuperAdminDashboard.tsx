@@ -28,6 +28,8 @@ import DoctorForm from '@/components/telemed/DoctorForm';
 import OrganizationList from '@/components/telemed/OrganizationList';
 import DoctorList from '@/components/telemed/DoctorList';
 import AppointmentList from '@/components/telemed/AppointmentList';
+import FAQManager from '@/components/telemed/FAQManager';
+import SystemSettings from '@/components/telemed/SystemSettings';
 
 const SuperAdminDashboard = () => {
   const navigate = useNavigate();
@@ -138,11 +140,12 @@ const SuperAdminDashboard = () => {
 
       <main className="container mx-auto px-4 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 mb-6">
+          <TabsList className="grid w-full grid-cols-3 md:grid-cols-6 mb-6">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="organizations">Organizations</TabsTrigger>
             <TabsTrigger value="doctors">Doctors</TabsTrigger>
             <TabsTrigger value="appointments">Appointments</TabsTrigger>
+            <TabsTrigger value="chatbot">FAQs</TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
 
@@ -237,16 +240,14 @@ const SuperAdminDashboard = () => {
             <AppointmentList key={refreshKey} />
           </TabsContent>
 
+          <TabsContent value="chatbot">
+            <h2 className="text-xl font-semibold mb-4">Chatbot FAQs</h2>
+            <FAQManager />
+          </TabsContent>
+
           <TabsContent value="settings">
-            <Card>
-              <CardHeader>
-                <CardTitle>System Settings</CardTitle>
-                <CardDescription>Configure Telemed system settings</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">Settings panel coming soon...</p>
-              </CardContent>
-            </Card>
+            <h2 className="text-xl font-semibold mb-4">System Settings</h2>
+            <SystemSettings />
           </TabsContent>
         </Tabs>
       </main>
