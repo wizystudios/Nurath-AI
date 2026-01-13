@@ -1,10 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import Message from "./Message";
-import AudioWaveform from "./AudioWaveform";
-import VoiceActivityIndicator from "./VoiceActivityIndicator";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
   DropdownMenu,
@@ -12,30 +9,13 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
 import { 
-  Mic, 
-  MicOff, 
-  Video, 
-  VideoOff,
-  Volume2,
   Send,
   Paperclip,
-  Music,
-  Clock,
-  Eye,
-  MessageCircle,
-  Camera,
-  Image as ImageIcon,
   Plus,
-  Settings,
   X,
   ChevronDown,
-  FileText,
-  File as FileIcon,
   History,
   LogIn,
   LogOut,
@@ -43,12 +23,11 @@ import {
   Globe,
   Trash2,
   Download,
-  Users,
-  Phone,
-  PhoneOff,
-  Volume1,
-  Brain,
-  Loader2
+  FileText,
+  File as FileIcon,
+  Image as ImageIcon,
+  Loader2,
+  Heart
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -63,24 +42,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { useConversationMemory } from "@/hooks/useConversationMemory";
 
 interface ConversationMessage {
   type: 'user' | 'ai';
   content: string;
   timestamp: Date;
   attachments?: any[];
-  hasAudio?: boolean;
   id: string;
   imageUrl?: string;
-  videoUrl?: string;
-  downloadUrl?: string;
-  fileData?: {
-    type: string;
-    content: string;
-    metadata?: any;
-  };
 }
 
 interface ChatHistory {
@@ -90,146 +59,14 @@ interface ChatHistory {
   messages: ConversationMessage[];
 }
 
-interface Persona {
-  id: string;
-  name: string;
-  voice: string;
-  elevenLabsVoiceId?: string;
-}
-
-interface ElevenLabsVoice {
-  id: string;
-  name: string;
-  category: string;
-  description: string;
-  previewUrl?: string;
-}
-
-// Audio utilities for OpenAI Realtime API
-const encodeAudioForAPI = (float32Array: Float32Array): string => {
-  const int16Array = new Int16Array(float32Array.length);
-  for (let i = 0; i < float32Array.length; i++) {
-    const s = Math.max(-1, Math.min(1, float32Array[i]));
-    int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-  }
-  const uint8Array = new Uint8Array(int16Array.buffer);
-  let binary = '';
-  const chunkSize = 0x8000;
-  for (let i = 0; i < uint8Array.length; i += chunkSize) {
-    const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
-    binary += String.fromCharCode.apply(null, Array.from(chunk));
-  }
-  return btoa(binary);
-};
-
-const createWavFromPCM = (pcmData: Uint8Array): Uint8Array => {
-  const int16Data = new Int16Array(pcmData.length / 2);
-  for (let i = 0; i < pcmData.length; i += 2) {
-    int16Data[i / 2] = (pcmData[i + 1] << 8) | pcmData[i];
-  }
-  
-  const wavHeader = new ArrayBuffer(44);
-  const view = new DataView(wavHeader);
-  
-  const writeString = (offset: number, string: string) => {
-    for (let i = 0; i < string.length; i++) {
-      view.setUint8(offset + i, string.charCodeAt(i));
-    }
-  };
-
-  const sampleRate = 24000;
-  const numChannels = 1;
-  const bitsPerSample = 16;
-  const blockAlign = (numChannels * bitsPerSample) / 8;
-  const byteRate = sampleRate * blockAlign;
-
-  writeString(0, 'RIFF');
-  view.setUint32(4, 36 + int16Data.byteLength, true);
-  writeString(8, 'WAVE');
-  writeString(12, 'fmt ');
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, numChannels, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, byteRate, true);
-  view.setUint16(32, blockAlign, true);
-  view.setUint16(34, bitsPerSample, true);
-  writeString(36, 'data');
-  view.setUint32(40, int16Data.byteLength, true);
-
-  const wavArray = new Uint8Array(wavHeader.byteLength + int16Data.byteLength);
-  wavArray.set(new Uint8Array(wavHeader), 0);
-  wavArray.set(new Uint8Array(int16Data.buffer), wavHeader.byteLength);
-  
-  return wavArray;
-};
-
-// Audio Queue for sequential playback
-class AudioQueue {
-  private queue: Uint8Array[] = [];
-  private isPlaying = false;
-  private audioContext: AudioContext;
-  private onPlayingChange: (playing: boolean) => void;
-
-  constructor(audioContext: AudioContext, onPlayingChange: (playing: boolean) => void) {
-    this.audioContext = audioContext;
-    this.onPlayingChange = onPlayingChange;
-  }
-
-  async addToQueue(audioData: Uint8Array) {
-    this.queue.push(audioData);
-    if (!this.isPlaying) {
-      await this.playNext();
-    }
-  }
-
-  private async playNext() {
-    if (this.queue.length === 0) {
-      this.isPlaying = false;
-      this.onPlayingChange(false);
-      return;
-    }
-
-    this.isPlaying = true;
-    this.onPlayingChange(true);
-    const audioData = this.queue.shift()!;
-
-    try {
-      const wavData = createWavFromPCM(audioData);
-      const arrayBuffer = wavData.buffer.slice(0) as ArrayBuffer;
-      const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
-      
-      const source = this.audioContext.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(this.audioContext.destination);
-      
-      source.onended = () => this.playNext();
-      source.start(0);
-    } catch (error) {
-      console.error('Error playing audio:', error);
-      this.playNext();
-    }
-  }
-
-  clear() {
-    this.queue = [];
-    this.isPlaying = false;
-    this.onPlayingChange(false);
-  }
-}
-
 const MultimodalAI = () => {
-  const [isListening, setIsListening] = useState(false);
-  const [isVideoOn, setIsVideoOn] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
   const [inputText, setInputText] = useState("");
   const [conversation, setConversation] = useState<ConversationMessage[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [currentMode, setCurrentMode] = useState<'text' | 'voice' | 'video'>('text');
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [chatHistory, setChatHistory] = useState<ChatHistory[]>([]);
-  const [currentConversationId, setCurrentConversationId] = useState<string>('');
+  const [currentConversationId, setCurrentConversationId] = useState<string>(Date.now().toString());
   const [currentLanguage, setCurrentLanguage] = useState('en');
   const [attachedFiles, setAttachedFiles] = useState<any[]>([]);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
@@ -237,46 +74,11 @@ const MultimodalAI = () => {
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authName, setAuthName] = useState('');
-  const [analyserNode, setAnalyserNode] = useState<AnalyserNode | null>(null);
-  const [outputAnalyserNode, setOutputAnalyserNode] = useState<AnalyserNode | null>(null);
-  const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
-  const [currentPersona, setCurrentPersona] = useState<string>('default');
-  const [elevenLabsVoices, setElevenLabsVoices] = useState<ElevenLabsVoice[]>([]);
-  const [selectedElevenLabsVoice, setSelectedElevenLabsVoice] = useState<string>('');
-  const [isLoadingVoices, setIsLoadingVoices] = useState(false);
-  const [showVoiceSelector, setShowVoiceSelector] = useState(false);
-  const [inputLevel, setInputLevel] = useState(0);
-  const [outputLevel, setOutputLevel] = useState(0);
-  const [personas] = useState<Persona[]>([
-    { id: 'default', name: 'Default', voice: 'alloy', elevenLabsVoiceId: 'EXAVITQu4vr4xnSDxMaL' },
-    { id: 'professional', name: 'Professional', voice: 'onyx', elevenLabsVoiceId: 'JBFqnCBsd6RMkjVDRZzb' },
-    { id: 'friendly', name: 'Friendly', voice: 'nova', elevenLabsVoiceId: 'pFZP5JQG7iQjIQuC4Bku' },
-    { id: 'creative', name: 'Creative', voice: 'shimmer', elevenLabsVoiceId: 'XrExE9yKIg1WjnnlVkGX' },
-    { id: 'teacher', name: 'Teacher', voice: 'echo', elevenLabsVoiceId: 'onwK4e9ZLuTAKqWW03F9' }
-  ]);
-  
-  // Conversation memory hook
-  const { memory, keyTopics, updateMemory, getContextForAI, clearMemory } = useConversationMemory(user?.id);
   
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const audioRef = useRef<HTMLAudioElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const wsRef = useRef<WebSocket | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const audioQueueRef = useRef<AudioQueue | null>(null);
-  const processorRef = useRef<ScriptProcessorNode | null>(null);
-  const transcriptRef = useRef<string>('');
-  const aiTranscriptRef = useRef<string>('');
   const navigate = useNavigate();
-
-  const aiAvatarImages = {
-    default: "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&w=400&h=400",
-    speaking: "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=400&h=400",
-    listening: "https://images.unsplash.com/photo-1649972904349-6e44c42644a7?auto=format&fit=crop&w=400&h=400"
-  };
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -316,593 +118,7 @@ const MultimodalAI = () => {
 
   useEffect(() => {
     saveChatHistory();
-    // Update conversation memory when conversation changes
-    if (conversation.length > 0) {
-      updateMemory(conversation);
-    }
-  }, [conversation, saveChatHistory, updateMemory]);
-
-  // Load ElevenLabs voices
-  const loadElevenLabsVoices = useCallback(async () => {
-    setIsLoadingVoices(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('elevenlabs-voices');
-      if (error) throw error;
-      if (data?.voices) {
-        setElevenLabsVoices(data.voices);
-        console.log(`🔊 Loaded ${data.voices.length} ElevenLabs voices`);
-      }
-    } catch (error: any) {
-      console.error('Failed to load ElevenLabs voices:', error);
-    } finally {
-      setIsLoadingVoices(false);
-    }
-  }, []);
-
-  // Load voices on mount
-  useEffect(() => {
-    loadElevenLabsVoices();
-  }, [loadElevenLabsVoices]);
-
-  // Update input level for voice activity indicator
-  useEffect(() => {
-    if (!analyserNode || !isListening) {
-      setInputLevel(0);
-      return;
-    }
-
-    const updateLevel = () => {
-      const dataArray = new Uint8Array(analyserNode.frequencyBinCount);
-      analyserNode.getByteFrequencyData(dataArray);
-      const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
-      setInputLevel(Math.min(average / 128, 1));
-    };
-
-    const interval = setInterval(updateLevel, 50);
-    return () => clearInterval(interval);
-  }, [analyserNode, isListening]);
-
-
-  const deleteChat = useCallback((chatId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const updatedHistory = chatHistory.filter(h => h.id !== chatId);
-    setChatHistory(updatedHistory);
-    localStorage.setItem('nurath-chat-history', JSON.stringify(updatedHistory));
-    toast.success("Chat deleted");
-  }, [chatHistory]);
-
-  // Clear all history
-  const clearAllHistory = useCallback(() => {
-    setChatHistory([]);
-    localStorage.removeItem('nurath-chat-history');
-    toast.success("All history cleared");
-  }, []);
-
-  // Export conversation
-  const exportConversation = useCallback((format: 'txt' | 'pdf') => {
-    if (conversation.length === 0) {
-      toast.error("No conversation to export");
-      return;
-    }
-
-    const content = conversation.map(msg => {
-      const time = new Date(msg.timestamp).toLocaleString();
-      const sender = msg.type === 'user' ? 'You' : 'Nurath AI';
-      return `[${time}] ${sender}:\n${msg.content}\n`;
-    }).join('\n---\n\n');
-
-    if (format === 'txt') {
-      const blob = new Blob([content], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `nurath-chat-${new Date().toISOString().split('T')[0]}.txt`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success("Chat exported as TXT");
-    } else {
-      // Simple PDF generation using print
-      const printWindow = window.open('', '_blank');
-      if (printWindow) {
-        printWindow.document.write(`
-          <html>
-            <head>
-              <title>Nurath AI Chat Export</title>
-              <style>
-                body { font-family: Arial, sans-serif; padding: 20px; }
-                .message { margin-bottom: 20px; padding: 15px; border-radius: 8px; }
-                .user { background: #e3f2fd; }
-                .ai { background: #f5f5f5; }
-                .time { color: #666; font-size: 12px; }
-                .sender { font-weight: bold; margin-bottom: 5px; }
-              </style>
-            </head>
-            <body>
-              <h1>Nurath AI Chat Export</h1>
-              <p>Exported on ${new Date().toLocaleString()}</p>
-              <hr>
-              ${conversation.map(msg => `
-                <div class="message ${msg.type}">
-                  <div class="time">${new Date(msg.timestamp).toLocaleString()}</div>
-                  <div class="sender">${msg.type === 'user' ? 'You' : 'Nurath AI'}</div>
-                  <div>${msg.content}</div>
-                </div>
-              `).join('')}
-            </body>
-          </html>
-        `);
-        printWindow.document.close();
-        printWindow.print();
-      }
-      toast.success("Print dialog opened for PDF");
-    }
-  }, [conversation]);
-
-  // Text-to-speech with ElevenLabs or fallback
-  const speakText = useCallback(async (text: string) => {
-    try {
-      setIsSpeaking(true);
-      
-      // Try ElevenLabs first if voice is selected
-      const currentVoice = selectedElevenLabsVoice || personas.find(p => p.id === currentPersona)?.elevenLabsVoiceId;
-      
-      if (currentVoice) {
-        try {
-          console.log(`🔊 Using ElevenLabs voice: ${currentVoice}`);
-          const { data, error } = await supabase.functions.invoke('elevenlabs-tts', {
-            body: { text, voiceId: currentVoice }
-          });
-          
-          if (!error && data) {
-            const audioBlob = new Blob([data], { type: 'audio/mpeg' });
-            const audioUrl = URL.createObjectURL(audioBlob);
-            const audio = new Audio(audioUrl);
-            audio.onended = () => {
-              setIsSpeaking(false);
-              URL.revokeObjectURL(audioUrl);
-            };
-            audio.onerror = () => {
-              setIsSpeaking(false);
-              URL.revokeObjectURL(audioUrl);
-            };
-            await audio.play();
-            return;
-          }
-        } catch (e) {
-          console.warn('ElevenLabs TTS failed, falling back to browser TTS:', e);
-        }
-      }
-      
-      // Fallback to browser TTS
-      if ('speechSynthesis' in window) {
-        speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.rate = 0.9;
-        utterance.pitch = 1.0;
-        utterance.volume = 1.0;
-        utterance.lang = currentLanguage === 'sw' ? 'sw-KE' : 'en-US';
-        
-        const voices = speechSynthesis.getVoices();
-        const preferredVoice = voices.find(v => 
-          v.lang.startsWith(currentLanguage === 'sw' ? 'sw' : 'en')
-        ) || voices[0];
-        
-        if (preferredVoice) utterance.voice = preferredVoice;
-        
-        utterance.onend = () => setIsSpeaking(false);
-        utterance.onerror = () => setIsSpeaking(false);
-        
-        speechSynthesis.speak(utterance);
-      }
-    } catch (error) {
-      console.error('TTS Error:', error);
-      setIsSpeaking(false);
-    }
-  }, [currentLanguage, currentPersona, selectedElevenLabsVoice, personas]);
-
-  // Connect to OpenAI Realtime API via edge function
-  const connectRealtimeVoice = useCallback(async () => {
-    try {
-      console.log('🔌 Connecting to Realtime Voice...');
-      
-      // Get microphone access
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          sampleRate: 24000,
-          channelCount: 1,
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        }
-      });
-      
-      streamRef.current = stream;
-      
-      // Create audio context
-      const audioContext = new AudioContext({ sampleRate: 24000 });
-      audioContextRef.current = audioContext;
-      
-      // Create analyser for waveform
-      const source = audioContext.createMediaStreamSource(stream);
-      const analyser = audioContext.createAnalyser();
-      analyser.fftSize = 256;
-      source.connect(analyser);
-      setAnalyserNode(analyser);
-      
-      // Create processor for sending audio
-      const processor = audioContext.createScriptProcessor(4096, 1, 1);
-      processorRef.current = processor;
-      
-      // Audio queue for playback
-      audioQueueRef.current = new AudioQueue(audioContext, (playing) => {
-        setIsSpeaking(playing);
-      });
-      
-      // Connect to edge function WebSocket
-      const wsUrl = `wss://tmxwwfkrmsjyursybspx.functions.supabase.co/realtime-voice`;
-      const ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
-      
-      ws.onopen = () => {
-        console.log('🔌 WebSocket connected to edge function');
-        // Set persona
-        ws.send(JSON.stringify({ type: 'set_persona', persona: currentPersona }));
-      };
-      
-      ws.onmessage = async (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          console.log('📥 Received:', data.type);
-          
-          if (data.type === 'connected') {
-            setIsRealtimeConnected(true);
-            setIsListening(true);
-            toast.success("🎤 Real-time voice connected!");
-            
-            // Start sending audio
-            processor.onaudioprocess = (e) => {
-              if (ws.readyState === WebSocket.OPEN) {
-                const inputData = e.inputBuffer.getChannelData(0);
-                const audioBase64 = encodeAudioForAPI(new Float32Array(inputData));
-                ws.send(JSON.stringify({
-                  type: 'input_audio_buffer.append',
-                  audio: audioBase64
-                }));
-              }
-            };
-            
-            source.connect(processor);
-            processor.connect(audioContext.destination);
-          }
-          
-          if (data.type === 'session.updated') {
-            console.log('✅ Session updated with persona');
-          }
-          
-          if (data.type === 'response.audio.delta' && data.delta) {
-            // Decode and queue audio for playback
-            const binaryString = atob(data.delta);
-            const bytes = new Uint8Array(binaryString.length);
-            for (let i = 0; i < binaryString.length; i++) {
-              bytes[i] = binaryString.charCodeAt(i);
-            }
-            audioQueueRef.current?.addToQueue(bytes);
-          }
-          
-          if (data.type === 'response.audio_transcript.delta' && data.delta) {
-            aiTranscriptRef.current += data.delta;
-          }
-          
-          if (data.type === 'response.audio_transcript.done' && data.transcript) {
-            // Add AI response to conversation
-            const aiMessage: ConversationMessage = {
-              type: 'ai',
-              content: data.transcript,
-              timestamp: new Date(),
-              id: Date.now().toString()
-            };
-            setConversation(prev => [...prev, aiMessage]);
-            aiTranscriptRef.current = '';
-          }
-          
-          if (data.type === 'conversation.item.input_audio_transcription.completed' && data.transcript) {
-            // Add user message to conversation
-            const userMessage: ConversationMessage = {
-              type: 'user',
-              content: data.transcript,
-              timestamp: new Date(),
-              id: Date.now().toString()
-            };
-            setConversation(prev => [...prev, userMessage]);
-          }
-          
-          if (data.type === 'error') {
-            console.error('❌ Realtime error:', data.error);
-            toast.error(data.error?.message || 'Voice connection error');
-          }
-          
-          if (data.type === 'disconnected') {
-            setIsRealtimeConnected(false);
-            setIsListening(false);
-          }
-          
-        } catch (error) {
-          console.error('Error processing message:', error);
-        }
-      };
-      
-      ws.onerror = (error) => {
-        console.error('❌ WebSocket error:', error);
-        toast.error("Voice connection failed");
-        disconnectRealtimeVoice();
-      };
-      
-      ws.onclose = () => {
-        console.log('🔌 WebSocket closed');
-        setIsRealtimeConnected(false);
-        setIsListening(false);
-      };
-      
-    } catch (error: any) {
-      console.error('Failed to connect:', error);
-      toast.error(error.message || "Failed to start voice call");
-    }
-  }, [currentPersona]);
-
-  // Disconnect realtime voice
-  const disconnectRealtimeVoice = useCallback(() => {
-    console.log('🔌 Disconnecting realtime voice...');
-    
-    if (processorRef.current) {
-      processorRef.current.disconnect();
-      processorRef.current = null;
-    }
-    
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-    
-    if (audioContextRef.current) {
-      audioContextRef.current.close();
-      audioContextRef.current = null;
-    }
-    
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
-    }
-    
-    if (audioQueueRef.current) {
-      audioQueueRef.current.clear();
-      audioQueueRef.current = null;
-    }
-    
-    setAnalyserNode(null);
-    setIsRealtimeConnected(false);
-    setIsListening(false);
-    setIsSpeaking(false);
-    
-    toast.success("Voice call ended");
-  }, []);
-
-  // File analysis
-  const analyzeFile = useCallback(async (file: File) => {
-    return new Promise<any>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        resolve({
-          type: file.type,
-          data: e.target?.result as string,
-          name: file.name,
-          size: file.size
-        });
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  }, []);
-
-  // Main AI interaction (text mode)
-  const handleAIInteraction = useCallback(async (
-    input: string, 
-    mode: string = 'text', 
-    attachments?: any[],
-    forceSpeak: boolean = false
-  ) => {
-    try {
-      if (!input.trim() && !attachments?.length) {
-        toast.error("Please provide some input");
-        return;
-      }
-
-      setIsProcessing(true);
-
-      const filesToSend = attachedFiles.length > 0 ? attachedFiles : attachments;
-
-      const newMessage: ConversationMessage = {
-        type: 'user',
-        content: input,
-        timestamp: new Date(),
-        attachments: filesToSend,
-        id: Date.now().toString()
-      };
-
-      setConversation(prev => [...prev, newMessage]);
-
-      // Get memory context for AI
-      const memoryContext = getContextForAI();
-
-      const { data, error } = await supabase.functions.invoke('multimodal-ai', {
-        body: {
-          input,
-          mode,
-          attachments: filesToSend,
-          videoEnabled: isVideoOn,
-          shouldSpeak: forceSpeak || mode === 'voice' || mode === 'video',
-          context: {
-            currentMode,
-            userId: user?.id,
-            language: currentLanguage,
-            conversationHistory: conversation.slice(-5),
-            persona: currentPersona,
-            memoryContext, // Include conversation memory
-            keyTopics // Include key topics from memory
-          }
-        }
-      });
-
-      if (error) throw new Error(error.message);
-
-      const aiMessage: ConversationMessage = {
-        type: 'ai',
-        content: data?.text || 'I had trouble processing your request.',
-        timestamp: new Date(),
-        hasAudio: !!data?.audioUrl,
-        id: (Date.now() + 1).toString(),
-        imageUrl: data?.imageUrl
-      };
-
-      setConversation(prev => [...prev, aiMessage]);
-      setAttachedFiles([]);
-
-      if (forceSpeak || mode === 'voice' || mode === 'video') {
-        await speakText(data?.text || '');
-      }
-
-    } catch (error: any) {
-      console.error('AI Error:', error);
-      const errorMessage: ConversationMessage = {
-        type: 'ai',
-        content: error.message || "I'm having technical difficulties.",
-        timestamp: new Date(),
-        id: (Date.now() + 2).toString()
-      };
-      setConversation(prev => [...prev, errorMessage]);
-      toast.error(error.message);
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [currentMode, isVideoOn, conversation, user, attachedFiles, speakText, currentLanguage, currentPersona]);
-
-  // Video functions
-  const startVideo = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'environment' },
-        audio: false
-      });
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-        setIsVideoOn(true);
-        setCurrentMode('video');
-        toast.success("📹 Camera activated!");
-        
-        const msg: ConversationMessage = {
-          type: 'ai',
-          content: "🎥 Camera is active! I can see through your camera. Ask me to describe what I see.",
-          timestamp: new Date(),
-          id: Date.now().toString()
-        };
-        setConversation(prev => [...prev, msg]);
-        speakText("Camera is now active. I can see through your camera. Ask me to describe what I see.");
-      }
-    } catch (error: any) {
-      console.error("Camera error:", error);
-      toast.error(`Camera failed: ${error.message}`);
-    }
-  }, [speakText]);
-
-  const stopVideo = useCallback(() => {
-    if (videoRef.current?.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach(track => track.stop());
-      videoRef.current.srcObject = null;
-    }
-    setIsVideoOn(false);
-    setCurrentMode('text');
-    toast.success("📹 Camera stopped");
-  }, []);
-
-  const takePhoto = useCallback(async () => {
-    if (!videoRef.current || !isVideoOn) {
-      toast.error("Please turn on camera first");
-      return;
-    }
-
-    const canvas = document.createElement('canvas');
-    canvas.width = videoRef.current.videoWidth;
-    canvas.height = videoRef.current.videoHeight;
-    canvas.getContext('2d')?.drawImage(videoRef.current, 0, 0);
-    const imageData = canvas.toDataURL('image/jpeg', 0.8);
-    
-    await handleAIInteraction(
-      "Describe everything you see in this image in detail.",
-      'video', 
-      [{ type: 'image/jpeg', data: imageData, name: 'camera-capture.jpg' }],
-      true
-    );
-    
-    toast.success("📸 Photo captured!");
-  }, [isVideoOn, handleAIInteraction]);
-
-  // File upload handler
-  const handleFileUpload = useCallback(async (files: FileList) => {
-    if (!files || files.length === 0) return;
-    
-    const file = files[0];
-    toast.info(`📁 Processing ${file.name}...`);
-    
-    try {
-      const fileData = await analyzeFile(file);
-      setAttachedFiles(prev => [...prev, fileData]);
-      toast.success(`📁 ${file.name} attached!`);
-    } catch (error) {
-      toast.error(`Failed to process ${file.name}`);
-    }
-  }, [analyzeFile]);
-
-  // Auth handlers
-  const handleLogin = useCallback(async () => {
-    const { error } = await supabase.auth.signInWithPassword({ 
-      email: authEmail, 
-      password: authPassword 
-    });
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-    toast.success("Logged in!");
-    setShowAuthDialog(false);
-    setAuthEmail('');
-    setAuthPassword('');
-  }, [authEmail, authPassword]);
-
-  const handleSignup = useCallback(async () => {
-    const { error } = await supabase.auth.signUp({
-      email: authEmail,
-      password: authPassword,
-      options: { 
-        data: { full_name: authName },
-        emailRedirectTo: window.location.origin
-      }
-    });
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-    toast.success("Account created! Check your email.");
-    setShowAuthDialog(false);
-  }, [authEmail, authPassword, authName]);
-
-  const handleLogout = useCallback(async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setProfile(null);
-    toast.success("Logged out");
-  }, []);
+  }, [conversation, saveChatHistory]);
 
   // Auth state check
   useEffect(() => {
@@ -935,21 +151,201 @@ const MultimodalAI = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      disconnectRealtimeVoice();
-    };
-  }, [disconnectRealtimeVoice]);
+  const deleteChat = useCallback((chatId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const updatedHistory = chatHistory.filter(h => h.id !== chatId);
+    setChatHistory(updatedHistory);
+    localStorage.setItem('nurath-chat-history', JSON.stringify(updatedHistory));
+    toast.success("Chat deleted");
+  }, [chatHistory]);
 
-  // New chat
+  const clearAllHistory = useCallback(() => {
+    setChatHistory([]);
+    localStorage.removeItem('nurath-chat-history');
+    toast.success("All history cleared");
+  }, []);
+
+  // Export conversation
+  const exportConversation = useCallback((format: 'txt' | 'pdf') => {
+    if (conversation.length === 0) {
+      toast.error("No conversation to export");
+      return;
+    }
+
+    const content = conversation.map(msg => {
+      const time = new Date(msg.timestamp).toLocaleString();
+      const sender = msg.type === 'user' ? 'You' : 'Nurath AI';
+      return `[${time}] ${sender}:\n${msg.content}\n`;
+    }).join('\n---\n\n');
+
+    if (format === 'txt') {
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `nurath-chat-${new Date().toISOString().split('T')[0]}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Chat exported as TXT");
+    } else {
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(`
+          <html>
+            <head><title>Nurath AI Chat Export</title>
+            <style>body{font-family:Arial,sans-serif;padding:20px}.message{margin-bottom:20px;padding:15px;border-radius:8px}.user{background:#e3f2fd}.ai{background:#f5f5f5}.time{color:#666;font-size:12px}.sender{font-weight:bold;margin-bottom:5px}</style>
+            </head>
+            <body><h1>Nurath AI Chat Export</h1><p>Exported on ${new Date().toLocaleString()}</p><hr>
+              ${conversation.map(msg => `<div class="message ${msg.type}"><div class="time">${new Date(msg.timestamp).toLocaleString()}</div><div class="sender">${msg.type === 'user' ? 'You' : 'Nurath AI'}</div><div>${msg.content}</div></div>`).join('')}
+            </body></html>
+        `);
+        printWindow.document.close();
+        printWindow.print();
+      }
+      toast.success("Print dialog opened for PDF");
+    }
+  }, [conversation]);
+
+  // File upload
+  const handleFileUpload = useCallback(async (files: FileList) => {
+    const newFiles: any[] = [];
+    
+    for (const file of Array.from(files)) {
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error(`${file.name} is too large (max 10MB)`);
+        continue;
+      }
+      
+      const reader = new FileReader();
+      const fileData = await new Promise<any>((resolve) => {
+        reader.onload = (e) => {
+          resolve({
+            name: file.name,
+            type: file.type,
+            data: e.target?.result,
+            size: file.size
+          });
+        };
+        reader.readAsDataURL(file);
+      });
+      
+      newFiles.push(fileData);
+    }
+    
+    setAttachedFiles(prev => [...prev, ...newFiles]);
+    toast.success(`${newFiles.length} file(s) attached`);
+  }, []);
+
+  // Main AI interaction
+  const handleAIInteraction = useCallback(async (input: string, attachments?: any[]) => {
+    try {
+      if (!input.trim() && !attachments?.length) {
+        toast.error("Please enter a message");
+        return;
+      }
+
+      setIsProcessing(true);
+
+      const filesToSend = attachedFiles.length > 0 ? attachedFiles : attachments;
+
+      const newMessage: ConversationMessage = {
+        type: 'user',
+        content: input,
+        timestamp: new Date(),
+        attachments: filesToSend,
+        id: Date.now().toString()
+      };
+
+      setConversation(prev => [...prev, newMessage]);
+
+      const { data, error } = await supabase.functions.invoke('multimodal-ai', {
+        body: {
+          input,
+          mode: 'text',
+          attachments: filesToSend,
+          context: {
+            userId: user?.id,
+            language: currentLanguage,
+            conversationHistory: conversation.slice(-5)
+          }
+        }
+      });
+
+      if (error) throw new Error(error.message);
+
+      const aiMessage: ConversationMessage = {
+        type: 'ai',
+        content: data?.text || 'I had trouble processing your request.',
+        timestamp: new Date(),
+        id: (Date.now() + 1).toString(),
+        imageUrl: data?.imageUrl
+      };
+
+      setConversation(prev => [...prev, aiMessage]);
+      setAttachedFiles([]);
+
+    } catch (error: any) {
+      console.error('AI Error:', error);
+      const errorMessage: ConversationMessage = {
+        type: 'ai',
+        content: error.message || "I'm having technical difficulties. Please try again.",
+        timestamp: new Date(),
+        id: (Date.now() + 2).toString()
+      };
+      setConversation(prev => [...prev, errorMessage]);
+      toast.error(error.message);
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [conversation, user, attachedFiles, currentLanguage]);
+
+  // Auth handlers
+  const handleLogin = async () => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: authEmail,
+        password: authPassword
+      });
+      if (error) throw error;
+      setUser(data.user);
+      setShowAuthDialog(false);
+      toast.success("Welcome back!");
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+  };
+
+  const handleSignup = async () => {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: authEmail,
+        password: authPassword,
+        options: {
+          emailRedirectTo: window.location.origin,
+          data: { full_name: authName }
+        }
+      });
+      if (error) throw error;
+      toast.success("Check your email to verify your account!");
+      setShowAuthDialog(false);
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+  };
+
+  const handleLogout = useCallback(async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setProfile(null);
+    toast.success("Logged out");
+  }, []);
+
   const startNewChat = useCallback(() => {
     setCurrentConversationId(Date.now().toString());
     setConversation([]);
     toast.success("New chat started");
   }, []);
 
-  // Load chat from history
   const loadChat = useCallback((chat: ChatHistory) => {
     setCurrentConversationId(chat.id);
     setConversation(chat.messages);
@@ -958,140 +354,40 @@ const MultimodalAI = () => {
   }, []);
 
   return (
-    <div className="flex flex-col h-screen bg-black">
+    <div className="flex flex-col h-screen bg-background">
       {/* Header */}
-      <header className="flex items-center justify-between p-4 bg-black">
+      <header className="flex items-center justify-between p-4 border-b border-border bg-card">
         <div className="flex items-center space-x-4">
-          {/* Main Dropdown Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="text-white hover:bg-white/5 text-xl font-semibold">
+              <Button variant="ghost" className="text-xl font-semibold">
                 Nurath.AI
                 <ChevronDown className="w-5 h-5 ml-2" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56 bg-black border-white/10 text-white">
-              <DropdownMenuItem onClick={startNewChat} className="hover:bg-white/5 cursor-pointer">
+            <DropdownMenuContent className="w-56">
+              <DropdownMenuItem onClick={startNewChat} className="cursor-pointer">
                 <Plus className="w-4 h-4 mr-3" />
                 New Chat
               </DropdownMenuItem>
               
-              <DropdownMenuItem onClick={() => setShowHistoryDialog(true)} className="hover:bg-white/5 cursor-pointer">
+              <DropdownMenuItem onClick={() => setShowHistoryDialog(true)} className="cursor-pointer">
                 <History className="w-4 h-4 mr-3" />
                 Chat History
               </DropdownMenuItem>
               
-              <DropdownMenuSeparator className="bg-white/10" />
+              <DropdownMenuSeparator />
               
-              {/* Persona Selection */}
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger className="hover:bg-white/5 cursor-pointer">
-                  <Users className="w-4 h-4 mr-3" />
-                  AI Persona: {personas.find(p => p.id === currentPersona)?.name}
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent className="bg-black border-white/10 text-white">
-                  {personas.map(persona => (
-                    <DropdownMenuItem 
-                      key={persona.id}
-                      onClick={() => {
-                        setCurrentPersona(persona.id);
-                        toast.success(`Switched to ${persona.name} persona`);
-                        // Update WebSocket if connected
-                        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                          wsRef.current.send(JSON.stringify({ type: 'set_persona', persona: persona.id }));
-                        }
-                      }}
-                      className={`hover:bg-white/5 cursor-pointer ${currentPersona === persona.id ? 'bg-white/10' : ''}`}
-                    >
-                      {persona.name}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
+              <DropdownMenuItem onClick={() => exportConversation('txt')} className="cursor-pointer">
+                <FileText className="w-4 h-4 mr-3" />
+                Export as TXT
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportConversation('pdf')} className="cursor-pointer">
+                <FileIcon className="w-4 h-4 mr-3" />
+                Export as PDF
+              </DropdownMenuItem>
               
-              {/* Custom Voice Selection */}
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger className="hover:bg-white/5 cursor-pointer">
-                  <Volume1 className="w-4 h-4 mr-3" />
-                  Custom Voice
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent className="bg-black border-white/10 text-white max-h-64 overflow-y-auto">
-                  <DropdownMenuItem 
-                    onClick={() => {
-                      setSelectedElevenLabsVoice('');
-                      toast.success('Using default persona voice');
-                    }}
-                    className={`hover:bg-white/5 cursor-pointer ${!selectedElevenLabsVoice ? 'bg-white/10' : ''}`}
-                  >
-                    Default (Persona Voice)
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator className="bg-white/10" />
-                  {isLoadingVoices ? (
-                    <DropdownMenuItem className="hover:bg-white/5">
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Loading voices...
-                    </DropdownMenuItem>
-                  ) : elevenLabsVoices.slice(0, 15).map(voice => (
-                    <DropdownMenuItem 
-                      key={voice.id}
-                      onClick={() => {
-                        setSelectedElevenLabsVoice(voice.id);
-                        toast.success(`Voice: ${voice.name}`);
-                      }}
-                      className={`hover:bg-white/5 cursor-pointer ${selectedElevenLabsVoice === voice.id ? 'bg-white/10' : ''}`}
-                    >
-                      {voice.name}
-                      <span className="ml-2 text-xs text-muted-foreground">{voice.category}</span>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-              
-              {/* Memory Settings */}
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger className="hover:bg-white/5 cursor-pointer">
-                  <Brain className="w-4 h-4 mr-3" />
-                  Memory
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent className="bg-black border-white/10 text-white">
-                  {keyTopics.length > 0 && (
-                    <DropdownMenuItem className="hover:bg-white/5 flex-col items-start">
-                      <span className="text-xs text-muted-foreground mb-1">Topics:</span>
-                      <span className="text-xs">{keyTopics.join(', ')}</span>
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuItem 
-                    onClick={() => {
-                      clearMemory();
-                      toast.success('Conversation memory cleared');
-                    }}
-                    className="hover:bg-white/5 cursor-pointer text-red-400"
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Clear Memory
-                  </DropdownMenuItem>
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-              
-              {/* Export Options */}
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger className="hover:bg-white/5 cursor-pointer">
-                  <Download className="w-4 h-4 mr-3" />
-                  Export Chat
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent className="bg-black border-white/10 text-white">
-                  <DropdownMenuItem onClick={() => exportConversation('txt')} className="hover:bg-white/5 cursor-pointer">
-                    <FileText className="w-4 h-4 mr-3" />
-                    Export as TXT
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => exportConversation('pdf')} className="hover:bg-white/5 cursor-pointer">
-                    <FileIcon className="w-4 h-4 mr-3" />
-                    Export as PDF
-                  </DropdownMenuItem>
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-              
-              <DropdownMenuSeparator className="bg-white/10" />
+              <DropdownMenuSeparator />
               
               <DropdownMenuItem 
                 onClick={() => {
@@ -1099,408 +395,192 @@ const MultimodalAI = () => {
                   setCurrentLanguage(newLang);
                   toast.success(`Language: ${newLang === 'sw' ? 'Swahili' : 'English'}`);
                 }}
-                className="hover:bg-white/5 cursor-pointer"
+                className="cursor-pointer"
               >
                 <Globe className="w-4 h-4 mr-3" />
                 {currentLanguage === 'sw' ? 'Kiswahili' : 'English'}
               </DropdownMenuItem>
               
-              <DropdownMenuItem onClick={() => navigate('/profile')} className="hover:bg-white/5 cursor-pointer">
-                <Settings className="w-4 h-4 mr-3" />
-                Settings
+              <DropdownMenuSeparator />
+              
+              <DropdownMenuItem onClick={() => navigate('/telemed')} className="cursor-pointer text-sky-600">
+                <Heart className="w-4 h-4 mr-3" />
+                Telemed Health
               </DropdownMenuItem>
               
-              <DropdownMenuSeparator className="bg-white/10" />
+              <DropdownMenuSeparator />
               
               {user ? (
                 <>
-                  <DropdownMenuItem className="hover:bg-white/5">
+                  <DropdownMenuItem className="cursor-default">
                     <User className="w-4 h-4 mr-3" />
                     {profile?.full_name || user.email}
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleLogout} className="hover:bg-white/5 cursor-pointer text-red-400">
+                  <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive">
                     <LogOut className="w-4 h-4 mr-3" />
                     Logout
                   </DropdownMenuItem>
                 </>
               ) : (
-                <DropdownMenuItem onClick={() => setShowAuthDialog(true)} className="hover:bg-white/5 cursor-pointer">
+                <DropdownMenuItem onClick={() => setShowAuthDialog(true)} className="cursor-pointer">
                   <LogIn className="w-4 h-4 mr-3" />
                   Login / Sign Up
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
           </DropdownMenu>
-          
-          {/* Mode Selection */}
-          <div className="flex items-center bg-white/5 rounded-full p-1">
-            <Button
-              variant={currentMode === 'text' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setCurrentMode('text')}
-              className={`h-8 w-8 p-0 rounded-full ${currentMode === 'text' ? 'bg-white text-black' : 'text-white hover:bg-white/10'}`}
-            >
-              <MessageCircle className="w-4 h-4" />
-            </Button>
-            <Button
-              variant={currentMode === 'voice' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setCurrentMode('voice')}
-              className={`h-8 w-8 p-0 rounded-full ${currentMode === 'voice' ? 'bg-white text-black' : 'text-white hover:bg-white/10'}`}
-            >
-              <Mic className="w-4 h-4" />
-            </Button>
-            <Button
-              variant={currentMode === 'video' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setCurrentMode('video')}
-              className={`h-8 w-8 p-0 rounded-full ${currentMode === 'video' ? 'bg-white text-black' : 'text-white hover:bg-white/10'}`}
-            >
-              <Video className="w-4 h-4" />
-            </Button>
-          </div>
-          
-          {/* Real-time Voice Call Status with Activity Indicators */}
-          {isRealtimeConnected && (
-            <div className="flex items-center gap-3">
-              {/* Input Level (Microphone) */}
-              <div className="flex items-center gap-1">
-                <Mic className="w-3 h-3 text-red-400" />
-                <VoiceActivityIndicator 
-                  isActive={isListening} 
-                  type="input" 
-                  analyserNode={analyserNode}
-                />
-              </div>
-              
-              {/* Output Level (Speaker) */}
-              <div className="flex items-center gap-1">
-                <Volume2 className="w-3 h-3 text-green-400" />
-                <VoiceActivityIndicator 
-                  isActive={isSpeaking} 
-                  type="output" 
-                  analyserNode={outputAnalyserNode}
-                />
-              </div>
-              
-              <Badge className="bg-green-500/20 text-green-400 border-0 animate-pulse">
-                <Phone className="w-3 h-3 mr-1" /> Live
-              </Badge>
-            </div>
-          )}
-          
-          {/* Memory indicator */}
-          {keyTopics.length > 0 && !isRealtimeConnected && (
-            <Badge variant="outline" className="text-xs border-purple-400/50 text-purple-400">
-              <Brain className="w-3 h-3 mr-1" />
-              {keyTopics.length} topics
-            </Badge>
-          )}
         </div>
         
         <ThemeToggle />
       </header>
 
       {/* Chat Area */}
-      <div className="flex-1 overflow-y-auto bg-black" ref={chatContainerRef}>
+      <div className="flex-1 overflow-y-auto" ref={chatContainerRef}>
         {conversation.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center p-8">
-            {/* AI Avatar and Waveform for voice/video modes */}
-            {(currentMode === 'voice' || currentMode === 'video') && (
-              <div className="mb-8 flex flex-col items-center">
-                <div className={`w-32 h-32 rounded-full overflow-hidden border-4 ${
-                  isSpeaking ? 'border-green-400 shadow-lg shadow-green-400/50' : 
-                  isListening ? 'border-red-400 shadow-lg shadow-red-400/50' : 
-                  'border-white/20'
-                } transition-all`}>
-                  <img
-                    src={isSpeaking ? aiAvatarImages.speaking : isListening ? aiAvatarImages.listening : aiAvatarImages.default}
-                    alt="Nurath AI"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                
-                <div className="mt-4">
-                  <AudioWaveform 
-                    isActive={isListening || isSpeaking} 
-                    type={isSpeaking ? 'speaking' : 'listening'}
-                    analyserNode={analyserNode}
-                  />
-                </div>
-                
-                <p className="text-center mt-4 text-white">
-                  {isRealtimeConnected ? (isSpeaking ? 'Speaking...' : 'Listening...') : 'Click to start voice call'}
-                </p>
-              </div>
-            )}
-
-            <h1 className="text-4xl md:text-5xl font-bold text-white mb-8" style={{ 
-              background: 'linear-gradient(45deg, #667eea 0%, #764ba2 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent'
-            }}>
+            <h1 className="text-4xl md:text-5xl font-bold mb-8 gradient-text">
               {currentLanguage === 'sw' ? 'Nini ninaweza kukusaidia?' : 'What can I help you with?'}
             </h1>
             
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-w-2xl">
               <Button
-                onClick={() => handleAIInteraction("Generate a song about love", 'text', undefined, true)}
-                variant="ghost"
-                className="h-20 flex flex-col items-center justify-center space-y-2 text-white hover:bg-white/5 border border-white/10"
+                onClick={() => handleAIInteraction("Tell me a fun fact")}
+                variant="outline"
+                className="h-20 flex flex-col items-center justify-center space-y-2"
               >
-                <Music className="w-6 h-6" />
-                <span className="text-sm">Generate Song</span>
+                <span className="text-2xl">💡</span>
+                <span className="text-sm">Fun Fact</span>
               </Button>
               <Button
-                onClick={() => handleAIInteraction("What song is this?", 'text', undefined, true)}
-                variant="ghost"
-                className="h-20 flex flex-col items-center justify-center space-y-2 text-white hover:bg-white/5 border border-white/10"
+                onClick={() => handleAIInteraction("Help me write something creative")}
+                variant="outline"
+                className="h-20 flex flex-col items-center justify-center space-y-2"
               >
-                <Volume2 className="w-6 h-6" />
-                <span className="text-sm">Identify Song</span>
+                <span className="text-2xl">✍️</span>
+                <span className="text-sm">Creative Writing</span>
               </Button>
               <Button
-                onClick={() => handleAIInteraction("Set alarm for 7:00 AM", 'text', undefined, true)}
-                variant="ghost"
-                className="h-20 flex flex-col items-center justify-center space-y-2 text-white hover:bg-white/5 border border-white/10"
+                onClick={() => handleAIInteraction("Explain a complex topic simply")}
+                variant="outline"
+                className="h-20 flex flex-col items-center justify-center space-y-2"
               >
-                <Clock className="w-6 h-6" />
-                <span className="text-sm">Set Alarm</span>
+                <span className="text-2xl">🎓</span>
+                <span className="text-sm">Learn Something</span>
               </Button>
               <Button
-                onClick={() => { setCurrentMode('voice'); connectRealtimeVoice(); }}
-                variant="ghost"
-                className="h-20 flex flex-col items-center justify-center space-y-2 text-white hover:bg-white/5 border border-white/10"
+                onClick={() => handleAIInteraction("Help me solve a problem")}
+                variant="outline"
+                className="h-20 flex flex-col items-center justify-center space-y-2"
               >
-                <Phone className="w-6 h-6" />
-                <span className="text-sm">Voice Call</span>
+                <span className="text-2xl">🧩</span>
+                <span className="text-sm">Problem Solving</span>
+              </Button>
+              <Button
+                onClick={() => handleAIInteraction("Give me coding help")}
+                variant="outline"
+                className="h-20 flex flex-col items-center justify-center space-y-2"
+              >
+                <span className="text-2xl">💻</span>
+                <span className="text-sm">Coding Help</span>
+              </Button>
+              <Button
+                onClick={() => navigate('/telemed')}
+                variant="outline"
+                className="h-20 flex flex-col items-center justify-center space-y-2 border-sky-500/50 text-sky-600 hover:bg-sky-500/10"
+              >
+                <Heart className="w-6 h-6" />
+                <span className="text-sm">Telemed Health</span>
               </Button>
             </div>
           </div>
         ) : (
-          <div>
-            {/* Video Feed */}
-            {isVideoOn && (
-              <div className="p-4">
-                <div className="relative max-w-2xl mx-auto">
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    muted
-                    playsInline
-                    className="w-full rounded-xl border-2 border-green-400"
-                  />
-                  <Badge className="absolute top-2 left-2 bg-green-500/20 text-green-400 border-0">
-                    <Video className="w-3 h-3 mr-1" /> Live
-                  </Badge>
-                </div>
-                <div className="flex justify-center gap-2 mt-4">
-                  <Button onClick={takePhoto} size="sm" className="text-white bg-white/10 hover:bg-white/20">
-                    <Camera className="w-4 h-4 mr-2" /> Take Photo
-                  </Button>
-                  <Button onClick={stopVideo} size="sm" variant="destructive">
-                    <VideoOff className="w-4 h-4 mr-2" /> Stop Camera
-                  </Button>
-                </div>
+          <div className="p-4 space-y-4">
+            {conversation.map((msg) => (
+              <Message 
+                key={msg.id} 
+                content={msg.content}
+                type={msg.type}
+                timestamp={msg.timestamp}
+                imageUrl={msg.imageUrl}
+              />
+            ))}
+            {isProcessing && (
+              <div className="flex items-center space-x-2 text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Thinking...</span>
               </div>
             )}
-
-            {/* Messages */}
-            <div className="space-y-4 p-6">
-              {conversation.map((message) => (
-                <Message
-                  key={message.id}
-                  content={message.content}
-                  type={message.type}
-                  timestamp={message.timestamp}
-                  imageUrl={message.imageUrl}
-                  onEdit={(newContent) => {
-                    setConversation(prev => 
-                      prev.map(msg => msg.id === message.id ? { ...msg, content: newContent } : msg)
-                    );
-                  }}
-                />
-              ))}
-              
-              {isProcessing && (
-                <div className="flex justify-start">
-                  <div className="px-5 py-4 text-white">
-                    <div className="flex space-x-1">
-                      <div className="w-2 h-2 bg-white/50 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
-                      <div className="w-2 h-2 bg-white/50 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
-                      <div className="w-2 h-2 bg-white/50 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
         )}
       </div>
 
       {/* Input Area */}
-      <div className="bg-black p-6">
-        <div className="max-w-3xl mx-auto">
-          {/* Attached Files */}
-          {attachedFiles.length > 0 && (
-            <div className="mb-4 flex flex-wrap gap-2">
-              {attachedFiles.map((file, index) => (
-                <div key={index} className="flex items-center gap-2 bg-white/5 rounded-lg px-3 py-2">
-                  {file.type?.startsWith('image/') ? (
-                    <ImageIcon className="w-4 h-4 text-blue-400" />
-                  ) : file.type?.includes('pdf') ? (
-                    <FileText className="w-4 h-4 text-red-400" />
-                  ) : (
-                    <FileIcon className="w-4 h-4 text-white/50" />
-                  )}
-                  <span className="text-sm text-white truncate max-w-32">{file.name}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setAttachedFiles(prev => prev.filter((_, i) => i !== index))}
-                    className="h-6 w-6 p-0 text-white/50 hover:text-red-400 hover:bg-transparent"
-                  >
-                    <X className="w-3 h-3" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {currentMode === 'text' && (
-            <div className="relative bg-white/5 rounded-2xl">
-              <Textarea
-                ref={inputRef}
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                placeholder={attachedFiles.length > 0 ? 'Add instructions...' : 'Message Nurath.AI...'}
-                className="resize-none bg-transparent px-6 py-4 pr-20 text-white placeholder-white/40 focus:outline-none focus:ring-0 rounded-2xl border-0 min-h-[80px]"
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    if (inputText.trim() || attachedFiles.length > 0) {
-                      handleAIInteraction(inputText, currentMode, attachedFiles.length > 0 ? attachedFiles : undefined, false);
-                      setInputText("");
-                    }
-                  }
-                }}
-              />
-              <div className="absolute bottom-4 right-4 flex items-center space-x-2">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="text-white/50 hover:text-white hover:bg-white/10"
-                >
-                  <Paperclip className="w-4 h-4" />
-                </Button>
-                <Button
-                  onClick={() => {
-                    if (inputText.trim() || attachedFiles.length > 0) {
-                      handleAIInteraction(inputText, currentMode, attachedFiles.length > 0 ? attachedFiles : undefined, false);
-                      setInputText("");
-                    }
-                  }}
-                  disabled={(!inputText.trim() && attachedFiles.length === 0) || isProcessing}
-                  size="sm"
-                  className="bg-white text-black hover:bg-white/90"
-                >
-                  <Send className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {currentMode === 'voice' && (
-            <div className="text-center p-8">
-              <div className="flex flex-col items-center space-y-4">
-                <div className={`w-24 h-24 rounded-full overflow-hidden border-4 ${
-                  isSpeaking ? 'border-green-400' : isListening ? 'border-red-400' : 'border-white/20'
-                } transition-all`}>
-                  <img
-                    src={isSpeaking ? aiAvatarImages.speaking : isListening ? aiAvatarImages.listening : aiAvatarImages.default}
-                    alt="Nurath AI"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                
-                <AudioWaveform 
-                  isActive={isListening || isSpeaking} 
-                  type={isSpeaking ? 'speaking' : 'listening'}
-                  analyserNode={analyserNode}
-                />
-                
-                <p className="text-lg font-medium text-white">
-                  {isRealtimeConnected 
-                    ? (isSpeaking ? 'AI Speaking...' : 'Listening to you...') 
-                    : 'Start a voice call'}
-                </p>
-                
-                {/* Voice Call Button */}
-                <Button
-                  onClick={isRealtimeConnected ? disconnectRealtimeVoice : connectRealtimeVoice}
-                  size="lg"
-                  disabled={isProcessing}
-                  className={`rounded-full w-20 h-20 ${
-                    isRealtimeConnected 
-                      ? 'bg-red-500 hover:bg-red-600' 
-                      : 'bg-green-500 hover:bg-green-600'
-                  } transition-all`}
-                >
-                  {isRealtimeConnected ? <PhoneOff className="w-8 h-8" /> : <Phone className="w-8 h-8" />}
-                </Button>
-                
-                <p className="text-white/40 text-xs">
-                  {isRealtimeConnected 
-                    ? 'Real-time voice active - just speak naturally' 
-                    : 'Click to start real-time voice conversation'}
-                </p>
-                
-                {/* Current Persona */}
-                <p className="text-white/60 text-sm">
-                  Persona: {personas.find(p => p.id === currentPersona)?.name}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {currentMode === 'video' && (
-            <div className="text-center p-8">
-              <div className="flex flex-col items-center space-y-4">
-                {!isVideoOn && (
-                  <div className="w-24 h-24 rounded-full flex items-center justify-center bg-white/10">
-                    <Video className="w-12 h-12 text-white" />
-                  </div>
+      <div className="p-4 border-t border-border bg-card">
+        {/* Attached Files Preview */}
+        {attachedFiles.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-3">
+            {attachedFiles.map((file, index) => (
+              <div key={index} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted text-sm">
+                {file.type.startsWith('image/') ? (
+                  <ImageIcon className="w-4 h-4" />
+                ) : (
+                  <FileIcon className="w-4 h-4" />
                 )}
-                
-                <p className="text-lg font-medium text-white">
-                  {isVideoOn ? 'Video active - I can see you!' : 'Start video call'}
-                </p>
-                
-                <div className="flex space-x-4">
-                  <Button
-                    onClick={isVideoOn ? stopVideo : startVideo}
-                    size="lg"
-                    disabled={isProcessing}
-                    className={`rounded-full ${isVideoOn ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}
-                  >
-                    {isVideoOn ? <VideoOff className="w-6 h-6" /> : <Video className="w-6 h-6" />}
-                  </Button>
-                  
-                  {isVideoOn && (
-                    <Button
-                      onClick={takePhoto}
-                      size="lg"
-                      disabled={isProcessing}
-                      className="rounded-full bg-white text-black hover:bg-white/90"
-                    >
-                      <Eye className="w-6 h-6" />
-                    </Button>
-                  )}
-                </div>
+                <span className="max-w-32 truncate">{file.name}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-5 w-5 p-0"
+                  onClick={() => setAttachedFiles(prev => prev.filter((_, i) => i !== index))}
+                >
+                  <X className="w-3 h-3" />
+                </Button>
               </div>
-            </div>
-          )}
+            ))}
+          </div>
+        )}
+
+        <div className="flex items-end gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isProcessing}
+          >
+            <Paperclip className="w-5 h-5" />
+          </Button>
+          
+          <Textarea
+            ref={inputRef}
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            placeholder={currentLanguage === 'sw' ? 'Andika ujumbe...' : 'Type a message...'}
+            className="flex-1 min-h-[44px] max-h-32 resize-none"
+            rows={1}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (inputText.trim() || attachedFiles.length > 0) {
+                  handleAIInteraction(inputText);
+                  setInputText("");
+                }
+              }
+            }}
+            disabled={isProcessing}
+          />
+          
+          <Button
+            onClick={() => {
+              if (inputText.trim() || attachedFiles.length > 0) {
+                handleAIInteraction(inputText);
+                setInputText("");
+              }
+            }}
+            disabled={(!inputText.trim() && attachedFiles.length === 0) || isProcessing}
+            size="icon"
+          >
+            {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+          </Button>
         </div>
       </div>
 
@@ -1511,71 +591,66 @@ const MultimodalAI = () => {
         hidden
         accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.csv,.xlsx,.json"
         onChange={(e) => e.target.files && handleFileUpload(e.target.files)}
+        multiple
       />
-      <audio ref={audioRef} preload="auto" />
 
       {/* Auth Dialog */}
       <Dialog open={showAuthDialog} onOpenChange={setShowAuthDialog}>
-        <DialogContent className="bg-black border-white/10 text-white">
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle className="text-white">Welcome to Nurath.AI</DialogTitle>
+            <DialogTitle>Welcome to Nurath.AI</DialogTitle>
           </DialogHeader>
           <Tabs defaultValue="login" className="w-full">
-            <TabsList className="w-full bg-white/5">
-              <TabsTrigger value="login" className="flex-1 text-white data-[state=active]:bg-white/10">Login</TabsTrigger>
-              <TabsTrigger value="signup" className="flex-1 text-white data-[state=active]:bg-white/10">Sign Up</TabsTrigger>
+            <TabsList className="w-full">
+              <TabsTrigger value="login" className="flex-1">Login</TabsTrigger>
+              <TabsTrigger value="signup" className="flex-1">Sign Up</TabsTrigger>
             </TabsList>
             <TabsContent value="login" className="space-y-4 mt-4">
               <div className="space-y-2">
-                <Label className="text-white">Email</Label>
+                <Label>Email</Label>
                 <Input 
                   type="email" 
                   value={authEmail} 
                   onChange={(e) => setAuthEmail(e.target.value)}
-                  className="bg-white/5 border-white/10 text-white"
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-white">Password</Label>
+                <Label>Password</Label>
                 <Input 
                   type="password" 
                   value={authPassword} 
                   onChange={(e) => setAuthPassword(e.target.value)}
-                  className="bg-white/5 border-white/10 text-white"
                 />
               </div>
-              <Button onClick={handleLogin} className="w-full bg-white text-black hover:bg-white/90">
+              <Button onClick={handleLogin} className="w-full">
                 Login
               </Button>
             </TabsContent>
             <TabsContent value="signup" className="space-y-4 mt-4">
               <div className="space-y-2">
-                <Label className="text-white">Name</Label>
+                <Label>Name</Label>
                 <Input 
                   value={authName} 
                   onChange={(e) => setAuthName(e.target.value)}
-                  className="bg-white/5 border-white/10 text-white"
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-white">Email</Label>
+                <Label>Email</Label>
                 <Input 
                   type="email" 
                   value={authEmail} 
                   onChange={(e) => setAuthEmail(e.target.value)}
-                  className="bg-white/5 border-white/10 text-white"
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-white">Password</Label>
+                <Label>Password</Label>
                 <Input 
                   type="password" 
                   value={authPassword} 
                   onChange={(e) => setAuthPassword(e.target.value)}
-                  className="bg-white/5 border-white/10 text-white"
                 />
               </div>
-              <Button onClick={handleSignup} className="w-full bg-white text-black hover:bg-white/90">
+              <Button onClick={handleSignup} className="w-full">
                 Sign Up
               </Button>
             </TabsContent>
@@ -1585,16 +660,16 @@ const MultimodalAI = () => {
 
       {/* History Dialog */}
       <Dialog open={showHistoryDialog} onOpenChange={setShowHistoryDialog}>
-        <DialogContent className="bg-black border-white/10 text-white max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-white flex items-center justify-between">
+            <DialogTitle className="flex items-center justify-between">
               <span>Chat History</span>
               {chatHistory.length > 0 && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={clearAllHistory}
-                  className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                  className="text-destructive hover:text-destructive"
                 >
                   <Trash2 className="w-4 h-4 mr-2" />
                   Clear All
@@ -1604,23 +679,23 @@ const MultimodalAI = () => {
           </DialogHeader>
           <div className="space-y-2">
             {chatHistory.length === 0 ? (
-              <p className="text-white/50 text-center py-8">No chat history yet</p>
+              <p className="text-muted-foreground text-center py-8">No chat history yet</p>
             ) : (
               chatHistory.map((chat) => (
                 <div
                   key={chat.id}
                   onClick={() => loadChat(chat)}
-                  className="p-4 bg-white/5 rounded-lg cursor-pointer hover:bg-white/10 transition-colors group flex items-center justify-between"
+                  className="p-4 bg-muted rounded-lg cursor-pointer hover:bg-accent transition-colors group flex items-center justify-between"
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="text-white font-medium truncate">{chat.title}</p>
-                    <p className="text-white/50 text-sm">{new Date(chat.date).toLocaleDateString()}</p>
+                    <p className="font-medium truncate">{chat.title}</p>
+                    <p className="text-muted-foreground text-sm">{new Date(chat.date).toLocaleDateString()}</p>
                   </div>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={(e) => deleteChat(chat.id, e)}
-                    className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-opacity"
+                    className="opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive transition-opacity"
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>
