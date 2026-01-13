@@ -11,7 +11,8 @@ import {
   BarChart2,
   Users,
   ArrowRight,
-  MessageSquare
+  MessageSquare,
+  Heart
 } from "lucide-react";
 import Logo from "@/components/Logo";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -36,9 +37,9 @@ const Index = () => {
       description: "Identify music, images, and get personalized daily assistance"
     },
     {
-      icon: <Users className="h-8 w-8 text-blue-500" />,
-      title: "Video Calls",
-      description: "Real-time video conversations with your AI assistant"
+      icon: <Heart className="h-8 w-8 text-sky-500" />,
+      title: "Telemed Health",
+      description: "Find doctors, hospitals, and book medical appointments"
     },
     {
       icon: <BookOpen className="h-8 w-8 text-pink-500" />,
@@ -100,7 +101,7 @@ const Index = () => {
                 Your Personal AI Assistant
               </h1>
               <p className="text-xl md:text-2xl mb-8 text-gray-200 max-w-lg">
-                Nurath.AI is your intelligent companion for daily tasks, music discovery, video calls, and personalized assistance.
+                Nurath.AI is your intelligent companion for daily tasks, music discovery, healthcare, and personalized assistance.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button 
@@ -115,9 +116,17 @@ const Index = () => {
                   size="lg" 
                   variant="outline" 
                   className="border-white text-white hover:bg-white/10"
-                  onClick={() => navigate("/")}
+                  onClick={() => navigate("/chat")}
                 >
                   Try Nurath AI
+                </Button>
+                <Button 
+                  size="lg" 
+                  className="bg-gradient-to-r from-sky-500 to-cyan-600 hover:from-sky-600 hover:to-cyan-700 text-white"
+                  onClick={() => navigate("/telemed")}
+                >
+                  <Heart className="mr-2 h-5 w-5" />
+                  Telemed Health
                 </Button>
               </div>
             </div>

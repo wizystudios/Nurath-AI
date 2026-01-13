@@ -9,20 +9,20 @@ export function ThemeToggle() {
   const toggleTheme = () => {
     const newTheme = theme === "dark" ? "light" : "dark";
     setTheme(newTheme);
-    toast.success(`Theme: ${newTheme === "dark" ? "Dark" : "Light"}`);
+    toast.success(`Switched to ${newTheme === "dark" ? "Dark" : "Light"} mode`);
   };
 
   return (
     <Button 
       variant="ghost" 
       size="icon"
-      className="text-white/70 hover:text-white hover:bg-white/10"
+      className="hover:bg-accent"
       onClick={toggleTheme}
     >
       {theme === "dark" ? (
-        <Sun className="h-5 w-5" />
+        <Sun className="h-5 w-5 text-foreground" />
       ) : (
-        <Moon className="h-5 w-5" />
+        <Moon className="h-5 w-5 text-foreground" />
       )}
       <span className="sr-only">Toggle theme</span>
     </Button>
