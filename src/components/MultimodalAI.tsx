@@ -355,146 +355,107 @@ const MultimodalAI = () => {
 
   return (
     <div className="flex flex-col h-screen bg-background">
-      {/* Header */}
-      <header className="flex items-center justify-between p-4 border-b border-border bg-card">
-        <div className="flex items-center space-x-4">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="text-xl font-semibold">
-                Nurath.AI
-                <ChevronDown className="w-5 h-5 ml-2" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56">
-              <DropdownMenuItem onClick={startNewChat} className="cursor-pointer">
-                <Plus className="w-4 h-4 mr-3" />
-                New Chat
+      {/* Header - Full width, no container */}
+      <header className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-background">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="text-xl font-semibold px-2">
+              Nurath.AI
+              <ChevronDown className="w-4 h-4 ml-1.5 opacity-60" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-52">
+            <DropdownMenuItem onClick={startNewChat} className="cursor-pointer">
+              <Plus className="w-4 h-4 mr-3" />
+              New Chat
+            </DropdownMenuItem>
+            
+            <DropdownMenuItem onClick={() => setShowHistoryDialog(true)} className="cursor-pointer">
+              <History className="w-4 h-4 mr-3" />
+              Chat History
+            </DropdownMenuItem>
+            
+            <DropdownMenuSeparator />
+            
+            <DropdownMenuItem onClick={() => navigate('/telemed')} className="cursor-pointer text-sky-600">
+              <Heart className="w-4 h-4 mr-3" />
+              Telemed Health
+            </DropdownMenuItem>
+            
+            <DropdownMenuSeparator />
+            
+            {user ? (
+              <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive">
+                <LogOut className="w-4 h-4 mr-3" />
+                Logout
               </DropdownMenuItem>
-              
-              <DropdownMenuItem onClick={() => setShowHistoryDialog(true)} className="cursor-pointer">
-                <History className="w-4 h-4 mr-3" />
-                Chat History
+            ) : (
+              <DropdownMenuItem onClick={() => setShowAuthDialog(true)} className="cursor-pointer">
+                <LogIn className="w-4 h-4 mr-3" />
+                Sign Up / Login
               </DropdownMenuItem>
-              
-              <DropdownMenuSeparator />
-              
-              <DropdownMenuItem onClick={() => exportConversation('txt')} className="cursor-pointer">
-                <FileText className="w-4 h-4 mr-3" />
-                Export as TXT
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => exportConversation('pdf')} className="cursor-pointer">
-                <FileIcon className="w-4 h-4 mr-3" />
-                Export as PDF
-              </DropdownMenuItem>
-              
-              <DropdownMenuSeparator />
-              
-              <DropdownMenuItem 
-                onClick={() => {
-                  const newLang = currentLanguage === 'en' ? 'sw' : 'en';
-                  setCurrentLanguage(newLang);
-                  toast.success(`Language: ${newLang === 'sw' ? 'Swahili' : 'English'}`);
-                }}
-                className="cursor-pointer"
-              >
-                <Globe className="w-4 h-4 mr-3" />
-                {currentLanguage === 'sw' ? 'Kiswahili' : 'English'}
-              </DropdownMenuItem>
-              
-              <DropdownMenuSeparator />
-              
-              <DropdownMenuItem onClick={() => navigate('/telemed')} className="cursor-pointer text-sky-600">
-                <Heart className="w-4 h-4 mr-3" />
-                Telemed Health
-              </DropdownMenuItem>
-              
-              <DropdownMenuSeparator />
-              
-              {user ? (
-                <>
-                  <DropdownMenuItem className="cursor-default">
-                    <User className="w-4 h-4 mr-3" />
-                    {profile?.full_name || user.email}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive">
-                    <LogOut className="w-4 h-4 mr-3" />
-                    Logout
-                  </DropdownMenuItem>
-                </>
-              ) : (
-                <DropdownMenuItem onClick={() => setShowAuthDialog(true)} className="cursor-pointer">
-                  <LogIn className="w-4 h-4 mr-3" />
-                  Login / Sign Up
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
         
         <ThemeToggle />
       </header>
 
       {/* Chat Area */}
-      <div className="flex-1 overflow-y-auto" ref={chatContainerRef}>
+      <div className="flex-1 overflow-y-auto flex flex-col" ref={chatContainerRef}>
         {conversation.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center p-8">
-            <h1 className="text-4xl md:text-5xl font-bold mb-8 gradient-text">
-              {currentLanguage === 'sw' ? 'Nini ninaweza kukusaidia?' : 'What can I help you with?'}
-            </h1>
+          <div className="flex-1 flex flex-col items-center justify-center px-4 py-8">
+            {/* Centered title and input */}
+            <div className="w-full max-w-2xl text-center mb-auto pt-16">
+              <h1 className="text-3xl md:text-4xl font-bold mb-6 bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+                {currentLanguage === 'sw' ? 'Nini ninaweza kukusaidia?' : 'What can I help you with?'}
+              </h1>
+            </div>
             
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-w-2xl">
-              <Button
-                onClick={() => handleAIInteraction("Tell me a fun fact")}
-                variant="outline"
-                className="h-20 flex flex-col items-center justify-center space-y-2"
-              >
-                <span className="text-2xl">💡</span>
-                <span className="text-sm">Fun Fact</span>
-              </Button>
-              <Button
-                onClick={() => handleAIInteraction("Help me write something creative")}
-                variant="outline"
-                className="h-20 flex flex-col items-center justify-center space-y-2"
-              >
-                <span className="text-2xl">✍️</span>
-                <span className="text-sm">Creative Writing</span>
-              </Button>
-              <Button
-                onClick={() => handleAIInteraction("Explain a complex topic simply")}
-                variant="outline"
-                className="h-20 flex flex-col items-center justify-center space-y-2"
-              >
-                <span className="text-2xl">🎓</span>
-                <span className="text-sm">Learn Something</span>
-              </Button>
-              <Button
-                onClick={() => handleAIInteraction("Help me solve a problem")}
-                variant="outline"
-                className="h-20 flex flex-col items-center justify-center space-y-2"
-              >
-                <span className="text-2xl">🧩</span>
-                <span className="text-sm">Problem Solving</span>
-              </Button>
-              <Button
-                onClick={() => handleAIInteraction("Give me coding help")}
-                variant="outline"
-                className="h-20 flex flex-col items-center justify-center space-y-2"
-              >
-                <span className="text-2xl">💻</span>
-                <span className="text-sm">Coding Help</span>
-              </Button>
-              <Button
-                onClick={() => navigate('/telemed')}
-                variant="outline"
-                className="h-20 flex flex-col items-center justify-center space-y-2 border-sky-500/50 text-sky-600 hover:bg-sky-500/10"
-              >
-                <Heart className="w-6 h-6" />
-                <span className="text-sm">Telemed Health</span>
-              </Button>
+            {/* Quick actions at bottom */}
+            <div className="w-full max-w-2xl mt-auto pb-4">
+              <div className="flex flex-wrap justify-center gap-2 mb-4">
+                <button
+                  onClick={() => handleAIInteraction("Tell me a fun fact")}
+                  className="px-4 py-2 text-sm rounded-full bg-muted/50 hover:bg-muted transition-colors flex items-center gap-2"
+                >
+                  <span>💡</span> Fun Fact
+                </button>
+                <button
+                  onClick={() => handleAIInteraction("Help me write something creative")}
+                  className="px-4 py-2 text-sm rounded-full bg-muted/50 hover:bg-muted transition-colors flex items-center gap-2"
+                >
+                  <span>✍️</span> Creative Writing
+                </button>
+                <button
+                  onClick={() => handleAIInteraction("Explain a complex topic simply")}
+                  className="px-4 py-2 text-sm rounded-full bg-muted/50 hover:bg-muted transition-colors flex items-center gap-2"
+                >
+                  <span>🎓</span> Learn Something
+                </button>
+                <button
+                  onClick={() => handleAIInteraction("Help me solve a problem")}
+                  className="px-4 py-2 text-sm rounded-full bg-muted/50 hover:bg-muted transition-colors flex items-center gap-2"
+                >
+                  <span>🧩</span> Problem Solving
+                </button>
+                <button
+                  onClick={() => handleAIInteraction("Give me coding help")}
+                  className="px-4 py-2 text-sm rounded-full bg-muted/50 hover:bg-muted transition-colors flex items-center gap-2"
+                >
+                  <span>💻</span> Coding Help
+                </button>
+                <button
+                  onClick={() => navigate('/telemed')}
+                  className="px-4 py-2 text-sm rounded-full bg-sky-500/10 text-sky-600 hover:bg-sky-500/20 transition-colors flex items-center gap-2"
+                >
+                  <Heart className="w-4 h-4" /> Telemed Health
+                </button>
+              </div>
             </div>
           </div>
         ) : (
-          <div className="p-4 space-y-4">
+          <div className="p-4 space-y-4 max-w-3xl mx-auto w-full">
             {conversation.map((msg) => (
               <Message 
                 key={msg.id} 
@@ -514,73 +475,75 @@ const MultimodalAI = () => {
         )}
       </div>
 
-      {/* Input Area */}
-      <div className="p-4 border-t border-border bg-card">
-        {/* Attached Files Preview */}
-        {attachedFiles.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-3">
-            {attachedFiles.map((file, index) => (
-              <div key={index} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted text-sm">
-                {file.type.startsWith('image/') ? (
-                  <ImageIcon className="w-4 h-4" />
-                ) : (
-                  <FileIcon className="w-4 h-4" />
-                )}
-                <span className="max-w-32 truncate">{file.name}</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-5 w-5 p-0"
-                  onClick={() => setAttachedFiles(prev => prev.filter((_, i) => i !== index))}
-                >
-                  <X className="w-3 h-3" />
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
+      {/* Input Area - Full width, no container box */}
+      <div className="px-4 py-3 border-t border-border/50 bg-background">
+        <div className="max-w-3xl mx-auto">
+          {/* Attached Files Preview */}
+          {attachedFiles.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-3">
+              {attachedFiles.map((file, index) => (
+                <div key={index} className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 text-sm">
+                  {file.type.startsWith('image/') ? (
+                    <ImageIcon className="w-3 h-3" />
+                  ) : (
+                    <FileIcon className="w-3 h-3" />
+                  )}
+                  <span className="max-w-24 truncate text-xs">{file.name}</span>
+                  <button
+                    className="hover:text-destructive"
+                    onClick={() => setAttachedFiles(prev => prev.filter((_, i) => i !== index))}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
 
-        <div className="flex items-end gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isProcessing}
-          >
-            <Paperclip className="w-5 h-5" />
-          </Button>
-          
-          <Textarea
-            ref={inputRef}
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            placeholder={currentLanguage === 'sw' ? 'Andika ujumbe...' : 'Type a message...'}
-            className="flex-1 min-h-[44px] max-h-32 resize-none"
-            rows={1}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
+          <div className="flex items-end gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="shrink-0"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isProcessing}
+            >
+              <Paperclip className="w-5 h-5" />
+            </Button>
+            
+            <Textarea
+              ref={inputRef}
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              placeholder={currentLanguage === 'sw' ? 'Andika ujumbe...' : 'Message Nurath AI...'}
+              className="flex-1 min-h-[44px] max-h-32 resize-none rounded-2xl bg-muted/30 border-muted"
+              rows={1}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  if (inputText.trim() || attachedFiles.length > 0) {
+                    handleAIInteraction(inputText);
+                    setInputText("");
+                  }
+                }
+              }}
+              disabled={isProcessing}
+            />
+            
+            <Button
+              onClick={() => {
                 if (inputText.trim() || attachedFiles.length > 0) {
                   handleAIInteraction(inputText);
                   setInputText("");
                 }
-              }
-            }}
-            disabled={isProcessing}
-          />
-          
-          <Button
-            onClick={() => {
-              if (inputText.trim() || attachedFiles.length > 0) {
-                handleAIInteraction(inputText);
-                setInputText("");
-              }
-            }}
-            disabled={(!inputText.trim() && attachedFiles.length === 0) || isProcessing}
-            size="icon"
-          >
-            {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-          </Button>
+              }}
+              disabled={(!inputText.trim() && attachedFiles.length === 0) || isProcessing}
+              size="icon"
+              className="shrink-0 rounded-full"
+            >
+              {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            </Button>
+          </div>
         </div>
       </div>
 
