@@ -305,7 +305,7 @@ const Index = () => {
           </div>
           <div className="border-t border-gray-800 pt-8">
             <p className="text-gray-400 text-center text-sm">
-              © {new Date().getFullYear()} Nurath.AI | Made with ❤️ by NK Technology (Tanzania)
+              © {new Date().getFullYear()} Nurath.AI | Made with ❤️ by WeTech (Tanzania)
             </p>
           </div>
         </div>
