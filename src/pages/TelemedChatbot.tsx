@@ -185,13 +185,13 @@ const TelemedChatbot = () => {
     };
   };
 
-  const handleSend = async () => {
-    if (!input.trim()) return;
+  const sendMessage = async (message: string) => {
+    if (!message.trim()) return;
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       role: 'user',
-      content: input,
+      content: message,
       type: 'text',
     };
 
@@ -200,7 +200,7 @@ const TelemedChatbot = () => {
     setIsLoading(true);
 
     try {
-      const response = await processMessage(input);
+      const response = await processMessage(message);
       const botMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'bot',
@@ -214,6 +214,10 @@ const TelemedChatbot = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSend = () => {
+    sendMessage(input);
   };
 
   const handleBookDoctor = (doctor: Doctor) => {
@@ -335,10 +339,7 @@ const TelemedChatbot = () => {
               variant="outline"
               size="sm"
               className="whitespace-nowrap bg-white/50 dark:bg-slate-800/50"
-              onClick={() => {
-                setInput(action.command);
-                handleSend();
-              }}
+              onClick={() => sendMessage(action.command)}
             >
               <action.icon className="h-4 w-4 mr-2" />
               {action.label}
