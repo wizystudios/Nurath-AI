@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import Message from "./Message";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,20 +20,22 @@ import {
   History,
   LogIn,
   LogOut,
-  User,
-  Globe,
-  Trash2,
-  Download,
-  FileText,
+  Heart,
+  Stethoscope,
+  Building2,
+  Pill,
+  FlaskConical,
   File as FileIcon,
   Image as ImageIcon,
   Loader2,
-  Heart
+  Trash2,
+  MapPin,
+  Phone,
+  Calendar,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useNavigate } from "react-router-dom";
+
 import {
   Dialog,
   DialogContent,
@@ -42,6 +45,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 interface ConversationMessage {
   type: 'user' | 'ai';
@@ -50,6 +55,8 @@ interface ConversationMessage {
   attachments?: any[];
   id: string;
   imageUrl?: string;
+  telemedData?: any;
+  telemedType?: 'doctors' | 'hospitals';
 }
 
 interface ChatHistory {
@@ -59,7 +66,26 @@ interface ChatHistory {
   messages: ConversationMessage[];
 }
 
+const TELEMED_QUICK_ACTIONS = [
+  { label: 'Find a Doctor', icon: Stethoscope, command: 'Find me a doctor' },
+  { label: 'Hospitals', icon: Building2, command: 'Show me nearby hospitals' },
+  { label: 'Pharmacies', icon: Pill, command: 'Find pharmacies' },
+  { label: 'Lab Tests', icon: FlaskConical, command: 'Show lab testing facilities' },
+  { label: 'Health Tips', icon: Heart, command: 'Give me some health tips' },
+];
+
+const GENERAL_QUICK_ACTIONS = [
+  { label: '💡 Fun Fact', command: 'Tell me a fun fact' },
+  { label: '✍️ Creative Writing', command: 'Help me write something creative' },
+  { label: '🎓 Learn Something', command: 'Explain a complex topic simply' },
+  { label: '🧩 Problem Solving', command: 'Help me solve a problem' },
+  { label: '💻 Coding Help', command: 'Give me coding help' },
+];
+
 const MultimodalAI = () => {
+  const [searchParams] = useSearchParams();
+  const isTelemedMode = searchParams.get('mode') === 'telemed';
+  
   const [inputText, setInputText] = useState("");
   const [conversation, setConversation] = useState<ConversationMessage[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -165,47 +191,6 @@ const MultimodalAI = () => {
     toast.success("All history cleared");
   }, []);
 
-  // Export conversation
-  const exportConversation = useCallback((format: 'txt' | 'pdf') => {
-    if (conversation.length === 0) {
-      toast.error("No conversation to export");
-      return;
-    }
-
-    const content = conversation.map(msg => {
-      const time = new Date(msg.timestamp).toLocaleString();
-      const sender = msg.type === 'user' ? 'You' : 'Nurath AI';
-      return `[${time}] ${sender}:\n${msg.content}\n`;
-    }).join('\n---\n\n');
-
-    if (format === 'txt') {
-      const blob = new Blob([content], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `nurath-chat-${new Date().toISOString().split('T')[0]}.txt`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success("Chat exported as TXT");
-    } else {
-      const printWindow = window.open('', '_blank');
-      if (printWindow) {
-        printWindow.document.write(`
-          <html>
-            <head><title>Nurath AI Chat Export</title>
-            <style>body{font-family:Arial,sans-serif;padding:20px}.message{margin-bottom:20px;padding:15px;border-radius:8px}.user{background:#e3f2fd}.ai{background:#f5f5f5}.time{color:#666;font-size:12px}.sender{font-weight:bold;margin-bottom:5px}</style>
-            </head>
-            <body><h1>Nurath AI Chat Export</h1><p>Exported on ${new Date().toLocaleString()}</p><hr>
-              ${conversation.map(msg => `<div class="message ${msg.type}"><div class="time">${new Date(msg.timestamp).toLocaleString()}</div><div class="sender">${msg.type === 'user' ? 'You' : 'Nurath AI'}</div><div>${msg.content}</div></div>`).join('')}
-            </body></html>
-        `);
-        printWindow.document.close();
-        printWindow.print();
-      }
-      toast.success("Print dialog opened for PDF");
-    }
-  }, [conversation]);
-
   // File upload
   const handleFileUpload = useCallback(async (files: FileList) => {
     const newFiles: any[] = [];
@@ -236,6 +221,33 @@ const MultimodalAI = () => {
     toast.success(`${newFiles.length} file(s) attached`);
   }, []);
 
+  // Telemed database search helpers
+  const searchDoctors = async (query: string) => {
+    const { data } = await supabase
+      .from('doctors')
+      .select('*, organization:organizations(*)')
+      .eq('is_approved', true)
+      .or(`full_name.ilike.%${query}%,specialty.ilike.%${query}%,location.ilike.%${query}%`)
+      .limit(5);
+    return data || [];
+  };
+
+  const searchOrganizations = async (type: string, query?: string) => {
+    let queryBuilder = supabase
+      .from('organizations')
+      .select('*')
+      .eq('is_approved', true)
+      .eq('is_suspended', false)
+      .eq('type', type as any);
+
+    if (query) {
+      queryBuilder = queryBuilder.or(`name.ilike.%${query}%,location.ilike.%${query}%`);
+    }
+
+    const { data } = await queryBuilder.limit(5);
+    return data || [];
+  };
+
   // Main AI interaction
   const handleAIInteraction = useCallback(async (input: string, attachments?: any[]) => {
     try {
@@ -258,10 +270,44 @@ const MultimodalAI = () => {
 
       setConversation(prev => [...prev, newMessage]);
 
+      // In telemed mode, also search the database for relevant results
+      let telemedData: any = null;
+      let telemedType: 'doctors' | 'hospitals' | undefined;
+      
+      if (isTelemedMode) {
+        const lowerInput = input.toLowerCase();
+        if (lowerInput.includes('doctor') || lowerInput.includes('specialist') || lowerInput.includes('daktari')) {
+          const query = input.replace(/find|me|a|show|doctor|doctors|specialist/gi, '').trim() || '';
+          const doctors = await searchDoctors(query);
+          if (doctors.length > 0) {
+            telemedData = doctors;
+            telemedType = 'doctors';
+          }
+        } else if (lowerInput.includes('hospital') || lowerInput.includes('hospitali')) {
+          const hospitals = await searchOrganizations('hospital');
+          if (hospitals.length > 0) {
+            telemedData = hospitals;
+            telemedType = 'hospitals';
+          }
+        } else if (lowerInput.includes('pharmacy') || lowerInput.includes('duka') || lowerInput.includes('medicine')) {
+          const pharmacies = await searchOrganizations('pharmacy');
+          if (pharmacies.length > 0) {
+            telemedData = pharmacies;
+            telemedType = 'hospitals';
+          }
+        } else if (lowerInput.includes('lab') || lowerInput.includes('test') || lowerInput.includes('maabara')) {
+          const labs = await searchOrganizations('lab');
+          if (labs.length > 0) {
+            telemedData = labs;
+            telemedType = 'hospitals';
+          }
+        }
+      }
+
       const { data, error } = await supabase.functions.invoke('multimodal-ai', {
         body: {
           input,
-          mode: 'text',
+          mode: isTelemedMode ? 'telemed' : 'text',
           attachments: filesToSend,
           context: {
             userId: user?.id,
@@ -278,7 +324,9 @@ const MultimodalAI = () => {
         content: data?.text || 'I had trouble processing your request.',
         timestamp: new Date(),
         id: (Date.now() + 1).toString(),
-        imageUrl: data?.imageUrl
+        imageUrl: data?.imageUrl,
+        telemedData,
+        telemedType,
       };
 
       setConversation(prev => [...prev, aiMessage]);
@@ -297,7 +345,7 @@ const MultimodalAI = () => {
     } finally {
       setIsProcessing(false);
     }
-  }, [conversation, user, attachedFiles, currentLanguage]);
+  }, [conversation, user, attachedFiles, currentLanguage, isTelemedMode]);
 
   // Auth handlers
   const handleLogin = async () => {
@@ -353,14 +401,99 @@ const MultimodalAI = () => {
     toast.success("Chat loaded");
   }, []);
 
+  // Render telemed data cards inline
+  const renderTelemedCards = (msg: ConversationMessage) => {
+    if (!msg.telemedData) return null;
+
+    if (msg.telemedType === 'doctors') {
+      return (
+        <div className="space-y-2 mt-3">
+          {msg.telemedData.map((doctor: any) => (
+            <Card key={doctor.id} className="bg-muted/30 border-border/50">
+              <CardContent className="p-3">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-sm">{doctor.full_name}</h4>
+                    <p className="text-xs text-muted-foreground">{doctor.specialty}</p>
+                    {doctor.location && (
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                        <MapPin className="h-3 w-3" />
+                        {doctor.location}
+                      </div>
+                    )}
+                    {doctor.consultation_fee && (
+                      <p className="text-xs font-medium text-primary mt-1">
+                        TZS {doctor.consultation_fee.toLocaleString()}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Badge variant={doctor.is_online ? 'default' : 'secondary'} className="text-xs">
+                      {doctor.is_online ? 'Online' : 'Offline'}
+                    </Badge>
+                    <Button size="sm" className="text-xs h-7" onClick={() => navigate(`/telemed/book/${doctor.id}`)}>
+                      <Calendar className="h-3 w-3 mr-1" />
+                      Book
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      );
+    }
+
+    if (msg.telemedType === 'hospitals') {
+      return (
+        <div className="space-y-2 mt-3">
+          {msg.telemedData.map((org: any) => (
+            <Card key={org.id} className="bg-muted/30 border-border/50">
+              <CardContent className="p-3">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-sm">{org.name}</h4>
+                    <Badge variant="outline" className="text-xs mt-1">{org.type}</Badge>
+                    {org.location && (
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                        <MapPin className="h-3 w-3" />
+                        {org.location}
+                      </div>
+                    )}
+                  </div>
+                  {org.phone && (
+                    <Button size="sm" variant="outline" className="text-xs h-7" asChild>
+                      <a href={`tel:${org.phone}`}>
+                        <Phone className="h-3 w-3 mr-1" />
+                        Call
+                      </a>
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      );
+    }
+
+    return null;
+  };
+
+  const quickActions = isTelemedMode ? TELEMED_QUICK_ACTIONS : GENERAL_QUICK_ACTIONS;
+  const headerTitle = isTelemedMode ? 'Nurath.AI Health' : 'Nurath.AI';
+  const placeholder = isTelemedMode 
+    ? (currentLanguage === 'sw' ? 'Uliza swali la afya...' : 'Ask a health question...')
+    : (currentLanguage === 'sw' ? 'Andika ujumbe...' : 'Message Nurath AI...');
+
   return (
     <div className="flex flex-col h-screen bg-background">
-      {/* Header - Full width, no container */}
+      {/* Header */}
       <header className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-background">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="text-xl font-semibold px-2">
-              Nurath.AI
+              {headerTitle}
               <ChevronDown className="w-4 h-4 ml-1.5 opacity-60" />
             </Button>
           </DropdownMenuTrigger>
@@ -376,11 +509,24 @@ const MultimodalAI = () => {
             </DropdownMenuItem>
             
             <DropdownMenuSeparator />
-            
-            <DropdownMenuItem onClick={() => navigate('/telemed')} className="cursor-pointer text-sky-600">
-              <Heart className="w-4 h-4 mr-3" />
-              Telemed Health
-            </DropdownMenuItem>
+
+            {isTelemedMode ? (
+              <>
+                <DropdownMenuItem onClick={() => navigate('/chat')} className="cursor-pointer">
+                  <Plus className="w-4 h-4 mr-3" />
+                  General AI
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/telemed/auth')} className="cursor-pointer text-sky-600">
+                  <LogIn className="w-4 h-4 mr-3" />
+                  Staff Login
+                </DropdownMenuItem>
+              </>
+            ) : (
+              <DropdownMenuItem onClick={() => navigate('/chat?mode=telemed')} className="cursor-pointer text-sky-600">
+                <Heart className="w-4 h-4 mr-3" />
+                Telemed Health
+              </DropdownMenuItem>
+            )}
             
             <DropdownMenuSeparator />
             
@@ -405,80 +551,79 @@ const MultimodalAI = () => {
       <div className="flex-1 overflow-y-auto flex flex-col" ref={chatContainerRef}>
         {conversation.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center px-4 py-8">
-            {/* Centered title and input */}
             <div className="w-full max-w-2xl text-center mb-auto pt-16">
               <h1 className="text-3xl md:text-4xl font-bold mb-6 bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-                {currentLanguage === 'sw' ? 'Nini ninaweza kukusaidia?' : 'What can I help you with?'}
+                {isTelemedMode
+                  ? (currentLanguage === 'sw' ? 'Ninaweza kukusaidiaje na afya yako?' : 'How can I help with your health?')
+                  : (currentLanguage === 'sw' ? 'Nini ninaweza kukusaidia?' : 'What can I help you with?')
+                }
               </h1>
+              {isTelemedMode && (
+                <p className="text-muted-foreground mb-4">Find doctors, hospitals, pharmacies, and get health advice</p>
+              )}
             </div>
             
-            {/* Quick actions at bottom */}
             <div className="w-full max-w-2xl mt-auto pb-4">
               <div className="flex flex-wrap justify-center gap-2 mb-4">
-                <button
-                  onClick={() => handleAIInteraction("Tell me a fun fact")}
-                  className="px-4 py-2 text-sm rounded-full bg-muted/50 hover:bg-muted transition-colors flex items-center gap-2"
-                >
-                  <span>💡</span> Fun Fact
-                </button>
-                <button
-                  onClick={() => handleAIInteraction("Help me write something creative")}
-                  className="px-4 py-2 text-sm rounded-full bg-muted/50 hover:bg-muted transition-colors flex items-center gap-2"
-                >
-                  <span>✍️</span> Creative Writing
-                </button>
-                <button
-                  onClick={() => handleAIInteraction("Explain a complex topic simply")}
-                  className="px-4 py-2 text-sm rounded-full bg-muted/50 hover:bg-muted transition-colors flex items-center gap-2"
-                >
-                  <span>🎓</span> Learn Something
-                </button>
-                <button
-                  onClick={() => handleAIInteraction("Help me solve a problem")}
-                  className="px-4 py-2 text-sm rounded-full bg-muted/50 hover:bg-muted transition-colors flex items-center gap-2"
-                >
-                  <span>🧩</span> Problem Solving
-                </button>
-                <button
-                  onClick={() => handleAIInteraction("Give me coding help")}
-                  className="px-4 py-2 text-sm rounded-full bg-muted/50 hover:bg-muted transition-colors flex items-center gap-2"
-                >
-                  <span>💻</span> Coding Help
-                </button>
-                <button
-                  onClick={() => navigate('/telemed')}
-                  className="px-4 py-2 text-sm rounded-full bg-sky-500/10 text-sky-600 hover:bg-sky-500/20 transition-colors flex items-center gap-2"
-                >
-                  <Heart className="w-4 h-4" /> Telemed Health
-                </button>
+                {isTelemedMode ? (
+                  TELEMED_QUICK_ACTIONS.map((action, i) => (
+                    <button
+                      key={i}
+                      onClick={() => handleAIInteraction(action.command)}
+                      className="px-4 py-2 text-sm rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors flex items-center gap-2"
+                    >
+                      <action.icon className="w-4 h-4" />
+                      {action.label}
+                    </button>
+                  ))
+                ) : (
+                  <>
+                    {GENERAL_QUICK_ACTIONS.map((action, i) => (
+                      <button
+                        key={i}
+                        onClick={() => handleAIInteraction(action.command)}
+                        className="px-4 py-2 text-sm rounded-full bg-muted/50 hover:bg-muted transition-colors flex items-center gap-2"
+                      >
+                        {action.label}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => navigate('/chat?mode=telemed')}
+                      className="px-4 py-2 text-sm rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors flex items-center gap-2"
+                    >
+                      <Heart className="w-4 h-4" /> Telemed Health
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </div>
         ) : (
           <div className="p-4 space-y-4 max-w-3xl mx-auto w-full">
             {conversation.map((msg) => (
-              <Message 
-                key={msg.id} 
-                content={msg.content}
-                type={msg.type}
-                timestamp={msg.timestamp}
-                imageUrl={msg.imageUrl}
-              />
+              <div key={msg.id}>
+                <Message 
+                  content={msg.content}
+                  type={msg.type}
+                  timestamp={msg.timestamp}
+                  imageUrl={msg.imageUrl}
+                />
+                {msg.type === 'ai' && renderTelemedCards(msg)}
+              </div>
             ))}
             {isProcessing && (
               <div className="flex items-center space-x-2 text-muted-foreground">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Thinking...</span>
+                <span>{isTelemedMode ? 'Searching & thinking...' : 'Thinking...'}</span>
               </div>
             )}
           </div>
         )}
       </div>
 
-      {/* Input Area - Full width, no container box */}
+      {/* Input Area */}
       <div className="px-4 py-3 border-t border-border/50 bg-background">
         <div className="max-w-3xl mx-auto">
-          {/* Attached Files Preview */}
           {attachedFiles.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-3">
               {attachedFiles.map((file, index) => (
@@ -501,21 +646,23 @@ const MultimodalAI = () => {
           )}
 
           <div className="flex items-end gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="shrink-0"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isProcessing}
-            >
-              <Paperclip className="w-5 h-5" />
-            </Button>
+            {!isTelemedMode && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="shrink-0"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isProcessing}
+              >
+                <Paperclip className="w-5 h-5" />
+              </Button>
+            )}
             
             <Textarea
               ref={inputRef}
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              placeholder={currentLanguage === 'sw' ? 'Andika ujumbe...' : 'Message Nurath AI...'}
+              placeholder={placeholder}
               className="flex-1 min-h-[44px] max-h-32 resize-none rounded-2xl bg-muted/30 border-muted"
               rows={1}
               onKeyDown={(e) => {
@@ -571,51 +718,28 @@ const MultimodalAI = () => {
             <TabsContent value="login" className="space-y-4 mt-4">
               <div className="space-y-2">
                 <Label>Email</Label>
-                <Input 
-                  type="email" 
-                  value={authEmail} 
-                  onChange={(e) => setAuthEmail(e.target.value)}
-                />
+                <Input type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label>Password</Label>
-                <Input 
-                  type="password" 
-                  value={authPassword} 
-                  onChange={(e) => setAuthPassword(e.target.value)}
-                />
+                <Input type="password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} />
               </div>
-              <Button onClick={handleLogin} className="w-full">
-                Login
-              </Button>
+              <Button onClick={handleLogin} className="w-full">Login</Button>
             </TabsContent>
             <TabsContent value="signup" className="space-y-4 mt-4">
               <div className="space-y-2">
                 <Label>Name</Label>
-                <Input 
-                  value={authName} 
-                  onChange={(e) => setAuthName(e.target.value)}
-                />
+                <Input value={authName} onChange={(e) => setAuthName(e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label>Email</Label>
-                <Input 
-                  type="email" 
-                  value={authEmail} 
-                  onChange={(e) => setAuthEmail(e.target.value)}
-                />
+                <Input type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label>Password</Label>
-                <Input 
-                  type="password" 
-                  value={authPassword} 
-                  onChange={(e) => setAuthPassword(e.target.value)}
-                />
+                <Input type="password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} />
               </div>
-              <Button onClick={handleSignup} className="w-full">
-                Sign Up
-              </Button>
+              <Button onClick={handleSignup} className="w-full">Sign Up</Button>
             </TabsContent>
           </Tabs>
         </DialogContent>
@@ -628,12 +752,7 @@ const MultimodalAI = () => {
             <DialogTitle className="flex items-center justify-between">
               <span>Chat History</span>
               {chatHistory.length > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearAllHistory}
-                  className="text-destructive hover:text-destructive"
-                >
+                <Button variant="ghost" size="sm" onClick={clearAllHistory} className="text-destructive hover:text-destructive">
                   <Trash2 className="w-4 h-4 mr-2" />
                   Clear All
                 </Button>

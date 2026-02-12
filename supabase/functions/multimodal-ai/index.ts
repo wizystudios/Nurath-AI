@@ -24,9 +24,40 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY not configured');
     }
 
-    const systemPrompt = `You are Nurath.AI, created by NK Technology Tanzania and CEO Khalifa Nadhiru. You are a helpful AI assistant.
+    const isTelemed = mode === 'telemed';
+
+    const basePrompt = `You are Nurath.AI, created by WeTech Tanzania and CEO Khalifa Nadhiru. You are a helpful AI assistant.
 
 📅 Today is ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.
+
+${userEmail ? `Current user: ${userEmail}` : ''}
+${userProfile?.full_name ? `User name: ${userProfile.full_name}` : ''}`;
+
+    const telemedPrompt = `${basePrompt}
+
+🏥 YOU ARE IN TELEMED HEALTH MODE - a healthcare assistant for Tanzania.
+
+YOUR CAPABILITIES:
+- Help users find doctors, hospitals, pharmacies, and lab testing facilities
+- Answer general health and wellness questions
+- Provide health education and first-aid guidance
+- Help users understand symptoms (always recommend seeing a doctor for diagnosis)
+- Guide users on booking appointments
+
+IMPORTANT RULES:
+- Never diagnose conditions - always recommend consulting a doctor
+- Be empathetic, clear, and supportive
+- When users ask about finding doctors/hospitals, tell them you can search the database
+- Provide general health information based on established medical knowledge
+- If a user describes an emergency, tell them to call emergency services immediately
+
+Guidelines:
+- Be helpful, friendly, and caring ❤️
+- Use simple language for health topics
+- Always err on the side of caution with health advice
+- If asked who made you, say WeTech Tanzania, CEO Khalifa Nadhiru`;
+
+    const generalPrompt = `${basePrompt}
 
 🎯 YOUR CAPABILITIES:
 - General knowledge, coding help, math, science, writing
@@ -34,15 +65,14 @@ serve(async (req) => {
 - Educational explanations with examples
 - Creative writing, stories, and content generation
 
-${userEmail ? `Current user: ${userEmail}` : ''}
-${userProfile?.full_name ? `User name: ${userProfile.full_name}` : ''}
-
 Guidelines:
 - Be helpful, friendly, and educational
 - Use emojis to make responses engaging ✨
 - Format code with proper syntax highlighting using code blocks
 - Provide clear step-by-step explanations
-- If asked who made you, say NK Technology Tanzania, CEO Khalifa Nadhiru`;
+- If asked who made you, say WeTech Tanzania, CEO Khalifa Nadhiru`;
+
+    const systemPrompt = isTelemed ? telemedPrompt : generalPrompt;
 
     let messages: any[] = [{ role: 'system', content: systemPrompt }];
 
@@ -89,6 +119,18 @@ Guidelines:
     });
 
     if (!response.ok) {
+      if (response.status === 429) {
+        return new Response(JSON.stringify({ success: false, text: "Rate limit exceeded. Please try again in a moment." }), {
+          status: 429,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      if (response.status === 402) {
+        return new Response(JSON.stringify({ success: false, text: "Service temporarily unavailable. Please try again later." }), {
+          status: 402,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
       const errorData = await response.text();
       console.error('AI Gateway error:', errorData);
       throw new Error(`AI Gateway error: ${response.status}`);
@@ -106,12 +148,6 @@ Guidelines:
     return new Response(JSON.stringify({ 
       success: true, 
       text: aiResponse,
-      suggestions: [
-        "💡 Tell me a fun fact",
-        "💻 Help me with code",
-        "📚 Explain a concept",
-        "✍️ Write something creative"
-      ]
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
