@@ -55,7 +55,7 @@ const App: React.FC = () => {
           <TooltipProvider>
             <Toaster position="top-center" richColors />
             <Routes>
-              {/* Nurath AI is now the main route */}
+              {/* Main AI chat interface */}
               <Route path="/" element={<Chat />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/profile" element={<Profile />} />

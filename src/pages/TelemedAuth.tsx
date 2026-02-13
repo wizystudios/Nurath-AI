@@ -18,8 +18,13 @@ const TelemedAuth = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (!loading && user && userRole) {
-      redirectBasedOnRole(userRole.role, userRole.organization_id);
+    if (!loading && user) {
+      if (userRole) {
+        redirectBasedOnRole(userRole.role, userRole.organization_id);
+      } else {
+        // Authenticated but no telemed role — go to telemed chatbot
+        navigate('/chat?mode=telemed');
+      }
     }
   }, [user, userRole, loading]);
 
@@ -27,7 +32,6 @@ const TelemedAuth = () => {
     if (role === 'super_admin') {
       navigate('/telemed/admin');
     } else if (role === 'org_admin' && orgId) {
-      // Check org type to redirect to correct dashboard
       const { data } = await supabase.from('organizations').select('type').eq('id', orgId).single();
       if (data?.type === 'pharmacy') navigate('/telemed/pharmacy');
       else if (data?.type === 'lab') navigate('/telemed/lab');
@@ -35,7 +39,7 @@ const TelemedAuth = () => {
     } else if (role === 'doctor') {
       navigate('/telemed/doctor');
     } else {
-      navigate('/telemed');
+      navigate('/?mode=telemed');
     }
   };
 
@@ -70,7 +74,7 @@ const TelemedAuth = () => {
   };
 
   const handleGuestContinue = () => {
-    navigate('/telemed');
+    navigate('/?mode=telemed');
   };
 
   if (loading) {

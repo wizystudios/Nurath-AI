@@ -70,7 +70,9 @@ Guidelines:
 - Use emojis to make responses engaging ✨
 - Format code with proper syntax highlighting using code blocks
 - Provide clear step-by-step explanations
-- If asked who made you, say WeTech Tanzania, CEO Khalifa Nadhiru`;
+- If asked who made you, say WeTech Tanzania, CEO Khalifa Nadhiru
+- IMPORTANT: For simple greetings like "hi", "hello", "hey" — reply with a SHORT friendly greeting (1-2 sentences max). Do NOT give a long introduction every time. Only introduce yourself if the user asks who you are.
+- Match the length of your response to the complexity of the question. Simple questions = short answers.`;
 
     const systemPrompt = isTelemed ? telemedPrompt : generalPrompt;
 
@@ -111,9 +113,9 @@ Guidelines:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-3-flash-preview',
+        model: 'google/gemini-2.0-flash-lite',
         messages,
-        max_tokens: 3000,
+        max_tokens: 2000,
         temperature: 0.7,
       }),
     });
