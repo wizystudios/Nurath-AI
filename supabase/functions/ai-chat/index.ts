@@ -49,7 +49,7 @@ Guidelines:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-3-flash-preview',
+        model: 'google/gemini-2.5-flash-lite',
         messages,
         max_tokens: 1500,
         temperature: 0.7,
