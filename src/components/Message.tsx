@@ -50,13 +50,13 @@ const Message: React.FC<MessageProps> = ({ content, type, timestamp, onEdit, ima
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div className={`relative max-w-[85%] py-2 text-white ${isEditing ? 'ring-1 ring-white/20 rounded-lg px-3' : ''}`}>
+      <div className={`relative max-w-[85%] py-2 text-foreground ${isEditing ? 'ring-1 ring-border rounded-lg px-3' : ''}`}>
         {isEditing ? (
           <div className="space-y-3">
             <textarea
               value={editedContent}
               onChange={(e) => setEditedContent(e.target.value)}
-              className="w-full min-h-[100px] bg-transparent border border-white/10 rounded-lg p-2 text-white resize-none focus:outline-none focus:border-white/30"
+              className="w-full min-h-[100px] bg-transparent border border-border rounded-lg p-2 text-foreground resize-none focus:outline-none focus:border-ring"
               autoFocus
             />
             <div className="flex gap-2 justify-end">
@@ -64,14 +64,14 @@ const Message: React.FC<MessageProps> = ({ content, type, timestamp, onEdit, ima
                 size="sm"
                 variant="ghost"
                 onClick={handleCancel}
-                className="text-white/60 hover:text-white hover:bg-white/10"
+                className="text-muted-foreground hover:text-foreground hover:bg-accent"
               >
                 Cancel
               </Button>
               <Button
                 size="sm"
                 onClick={handleEdit}
-                className="bg-white text-black hover:bg-white/90"
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
               >
                 Save
               </Button>
@@ -97,13 +97,13 @@ const Message: React.FC<MessageProps> = ({ content, type, timestamp, onEdit, ima
           <div
             className={`absolute ${
               type === 'user' ? '-bottom-6 right-0' : '-bottom-6 left-0'
-            } flex gap-1 bg-black/80 rounded-lg p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10`}
+            } flex gap-1 bg-popover border border-border rounded-lg p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10`}
           >
             <Button
               size="sm"
               variant="ghost"
               onClick={handleCopy}
-              className="h-6 w-6 p-0 hover:bg-white/10 text-white/60 hover:text-white"
+              className="h-6 w-6 p-0 hover:bg-accent text-muted-foreground hover:text-foreground"
               title="Copy message"
             >
               {copied ? (
@@ -117,7 +117,7 @@ const Message: React.FC<MessageProps> = ({ content, type, timestamp, onEdit, ima
                 size="sm"
                 variant="ghost"
                 onClick={handleEdit}
-                className="h-6 w-6 p-0 hover:bg-white/10 text-white/60 hover:text-white"
+                className="h-6 w-6 p-0 hover:bg-accent text-muted-foreground hover:text-foreground"
                 title="Edit message"
               >
                 <Edit className="h-3 w-3" />
@@ -127,7 +127,7 @@ const Message: React.FC<MessageProps> = ({ content, type, timestamp, onEdit, ima
         )}
 
         {/* Timestamp */}
-        <div className={`text-xs text-white/30 mt-1 ${type === 'user' ? 'text-right' : 'text-left'}`}>
+        <div className={`text-xs text-muted-foreground mt-1 ${type === 'user' ? 'text-right' : 'text-left'}`}>
           {timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </div>
       </div>
