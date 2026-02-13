@@ -512,7 +512,7 @@ const MultimodalAI = () => {
 
             {isTelemedMode ? (
               <>
-                <DropdownMenuItem onClick={() => navigate('/chat')} className="cursor-pointer">
+              <DropdownMenuItem onClick={() => navigate('/')} className="cursor-pointer">
                   <Plus className="w-4 h-4 mr-3" />
                   General AI
                 </DropdownMenuItem>
@@ -522,7 +522,7 @@ const MultimodalAI = () => {
                 </DropdownMenuItem>
               </>
             ) : (
-              <DropdownMenuItem onClick={() => navigate('/chat?mode=telemed')} className="cursor-pointer text-sky-600">
+              <DropdownMenuItem onClick={() => navigate('/?mode=telemed')} className="cursor-pointer text-sky-600">
                 <Heart className="w-4 h-4 mr-3" />
                 Telemed Health
               </DropdownMenuItem>
@@ -588,7 +588,7 @@ const MultimodalAI = () => {
                       </button>
                     ))}
                     <button
-                      onClick={() => navigate('/chat?mode=telemed')}
+                      onClick={() => navigate('/?mode=telemed')}
                       className="px-4 py-2 text-sm rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors flex items-center gap-2"
                     >
                       <Heart className="w-4 h-4" /> Telemed Health
