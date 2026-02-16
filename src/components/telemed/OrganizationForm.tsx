@@ -143,6 +143,8 @@ const OrganizationForm: React.FC<OrganizationFormProps> = ({ onClose, onSuccess 
                   <SelectItem value="pharmacy">Pharmacy</SelectItem>
                   <SelectItem value="lab">Laboratory</SelectItem>
                   <SelectItem value="polyclinic">Polyclinic</SelectItem>
+                  <SelectItem value="clinic">Clinic</SelectItem>
+                  <SelectItem value="health_center">Health Center</SelectItem>
                 </SelectContent>
               </Select>
             </div>

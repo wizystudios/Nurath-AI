@@ -942,7 +942,13 @@ export type Database = {
       }
     }
     Enums: {
-      organization_type: "hospital" | "pharmacy" | "lab" | "polyclinic"
+      organization_type:
+        | "hospital"
+        | "pharmacy"
+        | "lab"
+        | "polyclinic"
+        | "clinic"
+        | "health_center"
       telemed_role: "super_admin" | "org_admin" | "doctor" | "patient"
     }
     CompositeTypes: {
@@ -1071,7 +1077,14 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      organization_type: ["hospital", "pharmacy", "lab", "polyclinic"],
+      organization_type: [
+        "hospital",
+        "pharmacy",
+        "lab",
+        "polyclinic",
+        "clinic",
+        "health_center",
+      ],
       telemed_role: ["super_admin", "org_admin", "doctor", "patient"],
     },
   },

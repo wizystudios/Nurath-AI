@@ -57,6 +57,7 @@ const App: React.FC = () => {
             <Routes>
               {/* Main AI chat interface */}
               <Route path="/" element={<Chat />} />
+              <Route path="/chat" element={<Chat />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/dashboard" element={<Dashboard />} />
