@@ -23,7 +23,7 @@ const TelemedAuth = () => {
         redirectBasedOnRole(userRole.role, userRole.organization_id);
       } else {
         // Authenticated but no telemed role — go to telemed chatbot
-        navigate('/chat?mode=telemed');
+        navigate('/?mode=telemed');
       }
     }
   }, [user, userRole, loading]);
