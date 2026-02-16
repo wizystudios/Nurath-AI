@@ -102,8 +102,8 @@ const TelemedAuth = () => {
         <CardContent>
           <Tabs defaultValue="login" className="space-y-4">
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="login">Staff Login</TabsTrigger>
-              <TabsTrigger value="guest">Patient Access</TabsTrigger>
+              <TabsTrigger value="login">Login to your account</TabsTrigger>
+              <TabsTrigger value="guest">Continue as Guest</TabsTrigger>
             </TabsList>
 
             <TabsContent value="login">

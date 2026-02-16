@@ -1,5 +1,5 @@
 export type TelemedRole = 'super_admin' | 'org_admin' | 'doctor' | 'patient';
-export type OrganizationType = 'hospital' | 'pharmacy' | 'lab' | 'polyclinic';
+export type OrganizationType = 'hospital' | 'pharmacy' | 'lab' | 'polyclinic' | 'clinic' | 'health_center';
 
 export interface UserRole {
   id: string;
@@ -141,6 +141,8 @@ export interface DashboardStats {
   totalPharmacies: number;
   totalLabs: number;
   totalPolyclinics: number;
+  totalClinics: number;
+  totalHealthCenters: number;
   totalDoctors: number;
   totalPatients: number;
   totalAppointments: number;

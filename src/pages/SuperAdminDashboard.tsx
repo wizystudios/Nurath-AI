@@ -40,6 +40,8 @@ const SuperAdminDashboard = () => {
     totalPharmacies: 0,
     totalLabs: 0,
     totalPolyclinics: 0,
+    totalClinics: 0,
+    totalHealthCenters: 0,
     totalDoctors: 0,
     totalPatients: 0,
     totalAppointments: 0,
@@ -64,11 +66,13 @@ const SuperAdminDashboard = () => {
 
   const fetchStats = async () => {
     try {
-      const [hospitals, pharmacies, labs, polyclinics, doctors, appointments] = await Promise.all([
+      const [hospitals, pharmacies, labs, polyclinics, clinics, healthCenters, doctors, appointments] = await Promise.all([
         supabase.from('organizations').select('id', { count: 'exact' }).eq('type', 'hospital'),
         supabase.from('organizations').select('id', { count: 'exact' }).eq('type', 'pharmacy'),
         supabase.from('organizations').select('id', { count: 'exact' }).eq('type', 'lab'),
         supabase.from('organizations').select('id', { count: 'exact' }).eq('type', 'polyclinic'),
+        supabase.from('organizations').select('id', { count: 'exact' }).eq('type', 'clinic'),
+        supabase.from('organizations').select('id', { count: 'exact' }).eq('type', 'health_center'),
         supabase.from('doctors').select('id', { count: 'exact' }),
         supabase.from('appointments').select('id', { count: 'exact' }),
       ]);
@@ -78,8 +82,10 @@ const SuperAdminDashboard = () => {
         totalPharmacies: pharmacies.count || 0,
         totalLabs: labs.count || 0,
         totalPolyclinics: polyclinics.count || 0,
+        totalClinics: clinics.count || 0,
+        totalHealthCenters: healthCenters.count || 0,
         totalDoctors: doctors.count || 0,
-        totalPatients: 0, // Would need patient tracking
+        totalPatients: 0,
         totalAppointments: appointments.count || 0,
       });
     } catch (err) {
@@ -109,6 +115,8 @@ const SuperAdminDashboard = () => {
     { label: 'Pharmacies', value: stats.totalPharmacies, icon: Pill, color: 'bg-green-500' },
     { label: 'Labs', value: stats.totalLabs, icon: FlaskConical, color: 'bg-purple-500' },
     { label: 'Polyclinics', value: stats.totalPolyclinics, icon: Activity, color: 'bg-orange-500' },
+    { label: 'Clinics', value: stats.totalClinics, icon: Heart, color: 'bg-rose-500' },
+    { label: 'Health Centers', value: stats.totalHealthCenters, icon: TrendingUp, color: 'bg-teal-500' },
     { label: 'Doctors', value: stats.totalDoctors, icon: Stethoscope, color: 'bg-cyan-500' },
     { label: 'Appointments', value: stats.totalAppointments, icon: Calendar, color: 'bg-pink-500' },
   ];
@@ -177,7 +185,7 @@ const SuperAdminDashboard = () => {
                     <Building2 className="h-6 w-6 text-blue-600" />
                   </div>
                   <h3 className="font-semibold">Register Organization</h3>
-                  <p className="text-sm text-muted-foreground">Hospital, Pharmacy, Lab, or Polyclinic</p>
+                  <p className="text-sm text-muted-foreground">Hospital, Pharmacy, Lab, Clinic & more</p>
                 </CardContent>
               </Card>
 
