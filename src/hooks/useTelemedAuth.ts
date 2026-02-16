@@ -16,8 +16,9 @@ export function useTelemedAuth() {
         setSession(session);
         setUser(session?.user ?? null);
         
-        // Defer role fetch with setTimeout to prevent deadlock
         if (session?.user) {
+          // Set loading true before fetching role to prevent premature redirects
+          setLoading(true);
           setTimeout(() => {
             fetchUserRole(session.user.id);
           }, 0);
