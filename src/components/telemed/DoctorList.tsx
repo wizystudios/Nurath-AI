@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { Stethoscope, MapPin, Phone, Ban, CheckCircle, Loader2, Building2 } from 'lucide-react';
+import { Stethoscope, MapPin, Phone, Ban, CheckCircle, Loader2, Building2, Pencil } from 'lucide-react';
 import { Doctor } from '@/types/telemed';
+import DoctorForm from './DoctorForm';
 
 interface DoctorListProps {
   onRefresh: () => void;
@@ -16,6 +17,7 @@ const DoctorList: React.FC<DoctorListProps> = ({ onRefresh }) => {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [editingDoctor, setEditingDoctor] = useState<Doctor | null>(null);
 
   useEffect(() => {
     fetchDoctors();
@@ -61,7 +63,7 @@ const DoctorList: React.FC<DoctorListProps> = ({ onRefresh }) => {
   if (loading) {
     return (
       <div className="flex justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-sky-500" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -98,12 +100,12 @@ const DoctorList: React.FC<DoctorListProps> = ({ onRefresh }) => {
                           <Badge variant="secondary">Private Practice</Badge>
                         )}
                         {doctor.is_approved ? (
-                          <Badge variant="default" className="bg-green-500">Approved</Badge>
+                          <Badge className="bg-green-500 text-white">Approved</Badge>
                         ) : (
                           <Badge variant="secondary">Pending</Badge>
                         )}
                         {doctor.is_online && (
-                          <Badge className="bg-emerald-500">Online</Badge>
+                          <Badge className="bg-emerald-500 text-white">Online</Badge>
                         )}
                       </div>
                       
@@ -128,20 +130,21 @@ const DoctorList: React.FC<DoctorListProps> = ({ onRefresh }) => {
                           </span>
                         )}
                         {doctor.consultation_fee && (
-                          <span className="font-medium text-sky-600">
+                          <span className="font-medium text-primary">
                             TZS {doctor.consultation_fee.toLocaleString()}
                           </span>
                         )}
                       </div>
-
-                      {doctor.bio && (
-                        <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
-                          {doctor.bio}
-                        </p>
-                      )}
                     </div>
                   </div>
                   <div className="flex gap-2 flex-shrink-0">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setEditingDoctor(doctor)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
                     <Button
                       size="sm"
                       variant={doctor.is_approved ? 'outline' : 'default'}
@@ -159,6 +162,18 @@ const DoctorList: React.FC<DoctorListProps> = ({ onRefresh }) => {
             </Card>
           ))}
         </div>
+      )}
+
+      {editingDoctor && (
+        <DoctorForm
+          editDoctor={editingDoctor}
+          onClose={() => setEditingDoctor(null)}
+          onSuccess={() => {
+            setEditingDoctor(null);
+            fetchDoctors();
+            onRefresh();
+          }}
+        />
       )}
     </div>
   );

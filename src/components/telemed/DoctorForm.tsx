@@ -9,11 +9,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
-import { Organization } from '@/types/telemed';
+import { Organization, Doctor } from '@/types/telemed';
 
 interface DoctorFormProps {
   onClose: () => void;
   onSuccess: () => void;
+  editDoctor?: Doctor | null;
 }
 
 const SPECIALTIES = [
@@ -32,24 +33,24 @@ const SPECIALTIES = [
   'Other',
 ];
 
-const DoctorForm: React.FC<DoctorFormProps> = ({ onClose, onSuccess }) => {
+const DoctorForm: React.FC<DoctorFormProps> = ({ onClose, onSuccess, editDoctor }) => {
   const [loading, setLoading] = useState(false);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const isEditing = !!editDoctor;
   
   const [formData, setFormData] = useState({
-    full_name: '',
-    specialty: '',
-    bio: '',
-    phone: '',
-    email: '',
-    location: '',
-    consultation_fee: '',
-    organization_id: '',
-    is_private: false,
-    is_approved: true,
+    full_name: editDoctor?.full_name || '',
+    specialty: editDoctor?.specialty || '',
+    bio: editDoctor?.bio || '',
+    phone: editDoctor?.phone || '',
+    email: editDoctor?.email || '',
+    location: editDoctor?.location || '',
+    consultation_fee: editDoctor?.consultation_fee?.toString() || '',
+    organization_id: editDoctor?.organization_id || '',
+    is_private: editDoctor?.is_private || false,
+    is_approved: editDoctor?.is_approved ?? true,
   });
 
-  // Doctor account credentials
   const [createAccount, setCreateAccount] = useState(false);
   const [doctorEmail, setDoctorEmail] = useState('');
   const [doctorPassword, setDoctorPassword] = useState('');
@@ -62,7 +63,6 @@ const DoctorForm: React.FC<DoctorFormProps> = ({ onClose, onSuccess }) => {
     const { data } = await supabase
       .from('organizations')
       .select('*')
-      .in('type', ['hospital', 'polyclinic'])
       .eq('is_approved', true);
     
     setOrganizations((data as Organization[]) || []);
@@ -79,40 +79,7 @@ const DoctorForm: React.FC<DoctorFormProps> = ({ onClose, onSuccess }) => {
     setLoading(true);
 
     try {
-      let userId = null;
-
-      // Create doctor account if requested
-      if (createAccount && doctorEmail && doctorPassword) {
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-          email: doctorEmail,
-          password: doctorPassword,
-          options: {
-            emailRedirectTo: `${window.location.origin}/telemed/auth`,
-            data: {
-              full_name: formData.full_name,
-            },
-          },
-        });
-
-        if (authError) {
-          console.error('Auth error:', authError);
-          toast.warning('Failed to create doctor account, continuing without it');
-        } else if (authData.user) {
-          userId = authData.user.id;
-          
-          // Assign doctor role
-          await supabase.from('user_roles').insert({
-            user_id: userId,
-            role: 'doctor',
-            organization_id: formData.organization_id || null,
-          });
-        }
-      }
-
-      // Create doctor record
-      const { error: doctorError } = await supabase.from('doctors').insert({
-        user_id: userId,
-        organization_id: formData.organization_id || null,
+      const doctorData = {
         full_name: formData.full_name,
         specialty: formData.specialty,
         bio: formData.bio || null,
@@ -120,17 +87,55 @@ const DoctorForm: React.FC<DoctorFormProps> = ({ onClose, onSuccess }) => {
         email: formData.email || doctorEmail || null,
         location: formData.location || null,
         consultation_fee: formData.consultation_fee ? parseFloat(formData.consultation_fee) : null,
+        organization_id: formData.organization_id || null,
         is_private: formData.is_private,
         is_approved: formData.is_approved,
-      });
+      };
 
-      if (doctorError) throw doctorError;
+      if (isEditing) {
+        const { error } = await supabase
+          .from('doctors')
+          .update(doctorData)
+          .eq('id', editDoctor.id);
+        if (error) throw error;
+        toast.success('Doctor updated successfully!');
+      } else {
+        let userId = null;
 
-      toast.success('Doctor registered successfully!');
+        if (createAccount && doctorEmail && doctorPassword) {
+          const { data: authData, error: authError } = await supabase.auth.signUp({
+            email: doctorEmail,
+            password: doctorPassword,
+            options: {
+              emailRedirectTo: `${window.location.origin}/telemed/auth`,
+              data: { full_name: formData.full_name },
+            },
+          });
+
+          if (authError) {
+            toast.warning('Failed to create doctor account, continuing without it');
+          } else if (authData.user) {
+            userId = authData.user.id;
+            await supabase.from('user_roles').insert({
+              user_id: userId,
+              role: 'doctor',
+              organization_id: formData.organization_id || null,
+            });
+          }
+        }
+
+        const { error } = await supabase.from('doctors').insert({
+          ...doctorData,
+          user_id: userId,
+        });
+        if (error) throw error;
+        toast.success('Doctor registered successfully!');
+      }
+
       onSuccess();
     } catch (err: any) {
       console.error('Error:', err);
-      toast.error(err.message || 'Failed to register doctor');
+      toast.error(err.message || 'Failed to save doctor');
     } finally {
       setLoading(false);
     }
@@ -140,7 +145,7 @@ const DoctorForm: React.FC<DoctorFormProps> = ({ onClose, onSuccess }) => {
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Register New Doctor</DialogTitle>
+          <DialogTitle>{isEditing ? 'Edit Doctor' : 'Register New Doctor'}</DialogTitle>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -252,7 +257,7 @@ const DoctorForm: React.FC<DoctorFormProps> = ({ onClose, onSuccess }) => {
 
           {!formData.is_private && (
             <div className="space-y-2">
-              <Label htmlFor="org">Hospital / Polyclinic</Label>
+              <Label htmlFor="org">Hospital / Organization</Label>
               <Select
                 value={formData.organization_id}
                 onValueChange={(value) => setFormData({ ...formData, organization_id: value })}
@@ -262,52 +267,54 @@ const DoctorForm: React.FC<DoctorFormProps> = ({ onClose, onSuccess }) => {
                 </SelectTrigger>
                 <SelectContent>
                   {organizations.map((org) => (
-                    <SelectItem key={org.id} value={org.id}>{org.name}</SelectItem>
+                    <SelectItem key={org.id} value={org.id}>{org.name} ({org.type})</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
           )}
 
-          {/* Account Section */}
-          <div className="border-t pt-4 mt-4">
-            <div className="flex items-center space-x-2 mb-4">
-              <Switch
-                id="createAccount"
-                checked={createAccount}
-                onCheckedChange={setCreateAccount}
-              />
-              <Label htmlFor="createAccount">Create Doctor Login Account</Label>
-            </div>
-
-            {createAccount && (
-              <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                <div className="space-y-2">
-                  <Label htmlFor="doctorEmail">Login Email *</Label>
-                  <Input
-                    id="doctorEmail"
-                    type="email"
-                    value={doctorEmail}
-                    onChange={(e) => setDoctorEmail(e.target.value)}
-                    placeholder="doctor@login.com"
-                    required={createAccount}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="doctorPassword">Password *</Label>
-                  <Input
-                    id="doctorPassword"
-                    type="password"
-                    value={doctorPassword}
-                    onChange={(e) => setDoctorPassword(e.target.value)}
-                    placeholder="Min 6 characters"
-                    required={createAccount}
-                    minLength={6}
-                  />
-                </div>
+          {/* Account Section - only for new doctors */}
+          {!isEditing && (
+            <div className="border-t pt-4 mt-4">
+              <div className="flex items-center space-x-2 mb-4">
+                <Switch
+                  id="createAccount"
+                  checked={createAccount}
+                  onCheckedChange={setCreateAccount}
+                />
+                <Label htmlFor="createAccount">Create Doctor Login Account</Label>
               </div>
-            )}
-          </div>
+
+              {createAccount && (
+                <div className="grid grid-cols-2 gap-4 p-4 bg-muted rounded-xl">
+                  <div className="space-y-2">
+                    <Label htmlFor="doctorEmail">Login Email *</Label>
+                    <Input
+                      id="doctorEmail"
+                      type="email"
+                      value={doctorEmail}
+                      onChange={(e) => setDoctorEmail(e.target.value)}
+                      placeholder="doctor@login.com"
+                      required={createAccount}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="doctorPassword">Password *</Label>
+                    <Input
+                      id="doctorPassword"
+                      type="password"
+                      value={doctorPassword}
+                      onChange={(e) => setDoctorPassword(e.target.value)}
+                      placeholder="Min 6 characters"
+                      required={createAccount}
+                      minLength={6}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="flex justify-end gap-2 pt-4">
             <Button type="button" variant="outline" onClick={onClose}>
@@ -317,10 +324,10 @@ const DoctorForm: React.FC<DoctorFormProps> = ({ onClose, onSuccess }) => {
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Registering...
+                  {isEditing ? 'Updating...' : 'Registering...'}
                 </>
               ) : (
-                'Register Doctor'
+                isEditing ? 'Update Doctor' : 'Register Doctor'
               )}
             </Button>
           </div>
