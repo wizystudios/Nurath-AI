@@ -30,6 +30,7 @@ import DoctorList from '@/components/telemed/DoctorList';
 import AppointmentList from '@/components/telemed/AppointmentList';
 import FAQManager from '@/components/telemed/FAQManager';
 import SystemSettings from '@/components/telemed/SystemSettings';
+import UserManagement from '@/components/telemed/UserManagement';
 
 const SuperAdminDashboard = () => {
   const navigate = useNavigate();
@@ -66,7 +67,7 @@ const SuperAdminDashboard = () => {
 
   const fetchStats = async () => {
     try {
-      const [hospitals, pharmacies, labs, polyclinics, clinics, healthCenters, doctors, appointments] = await Promise.all([
+      const [hospitals, pharmacies, labs, polyclinics, clinics, healthCenters, doctors, appointments, users] = await Promise.all([
         supabase.from('organizations').select('id', { count: 'exact' }).eq('type', 'hospital'),
         supabase.from('organizations').select('id', { count: 'exact' }).eq('type', 'pharmacy'),
         supabase.from('organizations').select('id', { count: 'exact' }).eq('type', 'lab'),
@@ -75,6 +76,7 @@ const SuperAdminDashboard = () => {
         supabase.from('organizations').select('id', { count: 'exact' }).eq('type', 'health_center'),
         supabase.from('doctors').select('id', { count: 'exact' }),
         supabase.from('appointments').select('id', { count: 'exact' }),
+        supabase.from('profiles').select('id', { count: 'exact' }),
       ]);
 
       setStats({
@@ -85,7 +87,7 @@ const SuperAdminDashboard = () => {
         totalClinics: clinics.count || 0,
         totalHealthCenters: healthCenters.count || 0,
         totalDoctors: doctors.count || 0,
-        totalPatients: 0,
+        totalPatients: users.count || 0,
         totalAppointments: appointments.count || 0,
       });
     } catch (err) {
@@ -111,13 +113,13 @@ const SuperAdminDashboard = () => {
   }
 
   const statCards = [
+    { label: 'Users', value: stats.totalPatients, icon: Users, color: 'bg-indigo-500' },
+    { label: 'Doctors', value: stats.totalDoctors, icon: Stethoscope, color: 'bg-cyan-500' },
     { label: 'Hospitals', value: stats.totalHospitals, icon: Building2, color: 'bg-blue-500' },
     { label: 'Pharmacies', value: stats.totalPharmacies, icon: Pill, color: 'bg-green-500' },
     { label: 'Labs', value: stats.totalLabs, icon: FlaskConical, color: 'bg-purple-500' },
-    { label: 'Polyclinics', value: stats.totalPolyclinics, icon: Activity, color: 'bg-orange-500' },
     { label: 'Clinics', value: stats.totalClinics, icon: Heart, color: 'bg-rose-500' },
     { label: 'Health Centers', value: stats.totalHealthCenters, icon: TrendingUp, color: 'bg-teal-500' },
-    { label: 'Doctors', value: stats.totalDoctors, icon: Stethoscope, color: 'bg-cyan-500' },
     { label: 'Appointments', value: stats.totalAppointments, icon: Calendar, color: 'bg-pink-500' },
   ];
 
@@ -148,8 +150,9 @@ const SuperAdminDashboard = () => {
 
       <main className="container mx-auto px-4 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3 md:grid-cols-6 mb-6">
+          <TabsList className="grid w-full grid-cols-4 md:grid-cols-7 mb-6">
             <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="organizations">Organizations</TabsTrigger>
             <TabsTrigger value="doctors">Doctors</TabsTrigger>
             <TabsTrigger value="appointments">Appointments</TabsTrigger>
@@ -159,7 +162,7 @@ const SuperAdminDashboard = () => {
 
           <TabsContent value="overview" className="space-y-6">
             {/* Stats Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
               {statCards.map((stat) => (
                 <Card key={stat.label} className="overflow-hidden">
                   <CardContent className="p-4">
@@ -219,6 +222,10 @@ const SuperAdminDashboard = () => {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          <TabsContent value="users">
+            <UserManagement />
           </TabsContent>
 
           <TabsContent value="organizations">

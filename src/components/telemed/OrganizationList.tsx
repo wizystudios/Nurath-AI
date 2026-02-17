@@ -6,18 +6,21 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Building2, Pill, FlaskConical, Activity, MapPin, Phone, Ban, CheckCircle, Star, Loader2 } from 'lucide-react';
+import { Building2, Pill, FlaskConical, Activity, MapPin, Phone, Ban, CheckCircle, Star, Loader2, Pencil, Heart, TrendingUp } from 'lucide-react';
 import { Organization, OrganizationType } from '@/types/telemed';
+import OrganizationForm from './OrganizationForm';
 
 interface OrganizationListProps {
   onRefresh: () => void;
 }
 
-const TYPE_ICONS = {
+const TYPE_ICONS: Record<string, any> = {
   hospital: Building2,
   pharmacy: Pill,
   lab: FlaskConical,
   polyclinic: Activity,
+  clinic: Heart,
+  health_center: TrendingUp,
 };
 
 const OrganizationList: React.FC<OrganizationListProps> = ({ onRefresh }) => {
@@ -25,6 +28,7 @@ const OrganizationList: React.FC<OrganizationListProps> = ({ onRefresh }) => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [editingOrg, setEditingOrg] = useState<Organization | null>(null);
 
   useEffect(() => {
     fetchOrganizations();
@@ -35,7 +39,7 @@ const OrganizationList: React.FC<OrganizationListProps> = ({ onRefresh }) => {
     let query = supabase.from('organizations').select('*').order('created_at', { ascending: false });
     
     if (typeFilter !== 'all') {
-      query = query.eq('type', typeFilter as 'hospital' | 'pharmacy' | 'lab' | 'polyclinic');
+      query = query.eq('type', typeFilter as OrganizationType);
     }
 
     const { data, error } = await query;
@@ -101,7 +105,7 @@ const OrganizationList: React.FC<OrganizationListProps> = ({ onRefresh }) => {
   if (loading) {
     return (
       <div className="flex justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-sky-500" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -125,6 +129,8 @@ const OrganizationList: React.FC<OrganizationListProps> = ({ onRefresh }) => {
             <SelectItem value="pharmacy">Pharmacies</SelectItem>
             <SelectItem value="lab">Labs</SelectItem>
             <SelectItem value="polyclinic">Polyclinics</SelectItem>
+            <SelectItem value="clinic">Clinics</SelectItem>
+            <SelectItem value="health_center">Health Centers</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -138,27 +144,27 @@ const OrganizationList: React.FC<OrganizationListProps> = ({ onRefresh }) => {
       ) : (
         <div className="grid gap-4">
           {filteredOrgs.map((org) => {
-            const Icon = TYPE_ICONS[org.type];
+            const Icon = TYPE_ICONS[org.type] || Building2;
             return (
               <Card key={org.id} className={org.is_suspended ? 'opacity-60' : ''}>
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between">
                     <div className="flex gap-4">
-                      <div className="w-12 h-12 bg-sky-100 dark:bg-sky-900 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <Icon className="h-6 w-6 text-sky-600" />
+                      <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <Icon className="h-6 w-6 text-primary" />
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="font-semibold">{org.name}</h3>
                           {org.is_featured && (
-                            <Badge variant="default" className="bg-yellow-500">
+                            <Badge className="bg-yellow-500 text-white">
                               <Star className="h-3 w-3 mr-1" />
                               Featured
                             </Badge>
                           )}
                           <Badge variant="outline">{org.type}</Badge>
                           {org.is_approved ? (
-                            <Badge variant="default" className="bg-green-500">Approved</Badge>
+                            <Badge className="bg-green-500 text-white">Approved</Badge>
                           ) : (
                             <Badge variant="secondary">Pending</Badge>
                           )}
@@ -190,6 +196,13 @@ const OrganizationList: React.FC<OrganizationListProps> = ({ onRefresh }) => {
                     <div className="flex gap-2 flex-shrink-0">
                       <Button
                         size="sm"
+                        variant="outline"
+                        onClick={() => setEditingOrg(org)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
                         variant={org.is_featured ? 'default' : 'outline'}
                         onClick={() => toggleFeatured(org)}
                       >
@@ -216,6 +229,18 @@ const OrganizationList: React.FC<OrganizationListProps> = ({ onRefresh }) => {
             );
           })}
         </div>
+      )}
+
+      {editingOrg && (
+        <OrganizationForm
+          editOrganization={editingOrg}
+          onClose={() => setEditingOrg(null)}
+          onSuccess={() => {
+            setEditingOrg(null);
+            fetchOrganizations();
+            onRefresh();
+          }}
+        />
       )}
     </div>
   );
