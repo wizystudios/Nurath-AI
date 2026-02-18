@@ -25,6 +25,7 @@ import OrgAdminDashboard from './pages/OrgAdminDashboard';
 import DoctorDashboard from './pages/DoctorDashboard';
 import PharmacyDashboard from './pages/PharmacyDashboard';
 import LabDashboard from './pages/LabDashboard';
+import PatientDashboard from './pages/PatientDashboard';
 
 const queryClient = new QueryClient();
 
@@ -74,6 +75,7 @@ const App: React.FC = () => {
               <Route path="/telemed/doctor" element={<DoctorDashboard />} />
               <Route path="/telemed/pharmacy" element={<PharmacyDashboard />} />
               <Route path="/telemed/lab" element={<LabDashboard />} />
+              <Route path="/telemed/patient" element={<PatientDashboard />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </TooltipProvider>

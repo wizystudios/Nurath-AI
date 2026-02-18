@@ -1,6 +1,19 @@
 export type TelemedRole = 'super_admin' | 'org_admin' | 'doctor' | 'patient';
 export type OrganizationType = 'hospital' | 'pharmacy' | 'lab' | 'polyclinic' | 'clinic' | 'health_center';
 
+export interface OrgService {
+  id: string;
+  organization_id: string;
+  name: string;
+  description: string | null;
+  category: string | null;
+  price: number | null;
+  is_available: boolean;
+  duration_minutes: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface UserRole {
   id: string;
   user_id: string;
@@ -22,11 +35,12 @@ export interface Organization {
   logo_url: string | null;
   cover_url: string | null;
   license_no: string | null;
+  ambulance_phone: string | null;
   is_featured: boolean;
   is_approved: boolean;
   is_suspended: boolean;
-  opening_hours: Record<string, { start: string; end: string }>;
-  services: string[];
+  opening_hours: any;
+  services: any;
   created_at: string;
   updated_at: string;
 }
@@ -42,10 +56,11 @@ export interface Doctor {
   phone: string | null;
   email: string | null;
   consultation_fee: number | null;
+  experience_years: number | null;
   is_private: boolean;
   is_online: boolean;
   is_approved: boolean;
-  schedule: Record<string, { start: string; end: string }>;
+  schedule: any;
   location: string | null;
   created_at: string;
   updated_at: string;
