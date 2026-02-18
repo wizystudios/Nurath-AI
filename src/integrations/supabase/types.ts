@@ -321,6 +321,7 @@ export type Database = {
           consultation_fee: number | null
           created_at: string | null
           email: string | null
+          experience_years: number | null
           full_name: string
           id: string
           is_approved: boolean | null
@@ -340,6 +341,7 @@ export type Database = {
           consultation_fee?: number | null
           created_at?: string | null
           email?: string | null
+          experience_years?: number | null
           full_name: string
           id?: string
           is_approved?: boolean | null
@@ -359,6 +361,7 @@ export type Database = {
           consultation_fee?: number | null
           created_at?: string | null
           email?: string | null
+          experience_years?: number | null
           full_name?: string
           id?: string
           is_approved?: boolean | null
@@ -480,9 +483,57 @@ export type Database = {
           },
         ]
       }
+      org_services: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          description: string | null
+          duration_minutes: number | null
+          id: string
+          is_available: boolean | null
+          name: string
+          organization_id: string
+          price: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          duration_minutes?: number | null
+          id?: string
+          is_available?: boolean | null
+          name: string
+          organization_id: string
+          price?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          duration_minutes?: number | null
+          id?: string
+          is_available?: boolean | null
+          name?: string
+          organization_id?: string
+          price?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_services_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organizations: {
         Row: {
           address: string | null
+          ambulance_phone: string | null
           cover_url: string | null
           created_at: string | null
           description: string | null
@@ -504,6 +555,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          ambulance_phone?: string | null
           cover_url?: string | null
           created_at?: string | null
           description?: string | null
@@ -525,6 +577,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          ambulance_phone?: string | null
           cover_url?: string | null
           created_at?: string | null
           description?: string | null

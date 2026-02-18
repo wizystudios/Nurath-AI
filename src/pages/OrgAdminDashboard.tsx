@@ -30,6 +30,7 @@ import { Organization, Doctor } from '@/types/telemed';
 import DoctorForm from '@/components/telemed/DoctorForm';
 import DoctorList from '@/components/telemed/DoctorList';
 import AppointmentList from '@/components/telemed/AppointmentList';
+import OrgServicesManager from '@/components/telemed/OrgServicesManager';
 
 const OrgAdminDashboard = () => {
   const navigate = useNavigate();
@@ -152,9 +153,10 @@ const OrgAdminDashboard = () => {
 
       <main className="container mx-auto px-4 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4 mb-6">
+          <TabsList className="grid w-full grid-cols-5 mb-6">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="doctors">Doctors</TabsTrigger>
+            <TabsTrigger value="services">Services</TabsTrigger>
             <TabsTrigger value="appointments">Appointments</TabsTrigger>
             <TabsTrigger value="profile">Profile</TabsTrigger>
           </TabsList>
@@ -239,6 +241,13 @@ const OrgAdminDashboard = () => {
               </Button>
             </div>
             <DoctorList key={refreshKey} onRefresh={handleRefresh} />
+          </TabsContent>
+
+          <TabsContent value="services">
+            <h2 className="text-xl font-semibold mb-4">Services & Pricing</h2>
+            {userRole?.organization_id && (
+              <OrgServicesManager organizationId={userRole.organization_id} />
+            )}
           </TabsContent>
 
           <TabsContent value="appointments">

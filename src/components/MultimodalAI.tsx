@@ -32,6 +32,10 @@ import {
   MapPin,
   Phone,
   Calendar,
+  Mail,
+  User,
+  MessageSquare,
+  LayoutDashboard,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -42,11 +46,146 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+
+// ─── Clickable Doctor Card with bottom-sheet detail ───────────────────────────
+const DoctorCard: React.FC<{ doctor: any; onBook: () => void }> = ({ doctor, onBook }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Card className="bg-muted/30 border-border/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setOpen(true)}>
+        <CardContent className="p-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <Stethoscope className="h-5 w-5 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm">{doctor.full_name}</p>
+              <p className="text-xs text-muted-foreground">{doctor.specialty}</p>
+              {doctor.organization?.name && <p className="text-xs text-muted-foreground">{doctor.organization.name}</p>}
+            </div>
+            <div className="text-right flex-shrink-0">
+              {doctor.consultation_fee && <p className="text-xs font-semibold text-primary">Tsh {Number(doctor.consultation_fee).toLocaleString()}</p>}
+              <Badge variant={doctor.is_online ? 'default' : 'secondary'} className="text-xs mt-1">{doctor.is_online ? 'Online' : 'Offline'}</Badge>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetContent side="bottom" className="h-auto max-h-[85vh] rounded-t-2xl overflow-y-auto">
+          <SheetHeader className="flex flex-row items-center gap-4 pb-4">
+            <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
+              <Stethoscope className="h-7 w-7 text-primary" />
+            </div>
+            <div>
+              <SheetTitle>Dr. {doctor.full_name}</SheetTitle>
+              <p className="text-muted-foreground text-sm">{doctor.specialty}</p>
+            </div>
+          </SheetHeader>
+          <div className="space-y-3 py-2">
+            {doctor.phone && <div className="flex items-center gap-2 text-sm"><Phone className="h-4 w-4 text-muted-foreground" />{doctor.phone}</div>}
+            {doctor.email && <div className="flex items-center gap-2 text-sm"><Mail className="h-4 w-4 text-muted-foreground" />{doctor.email}</div>}
+            {doctor.location && <div className="flex items-center gap-2 text-sm"><MapPin className="h-4 w-4 text-muted-foreground" />{doctor.location}</div>}
+            {doctor.experience_years && <div className="flex items-center gap-2 text-sm"><User className="h-4 w-4 text-muted-foreground" />Experience: {doctor.experience_years} years</div>}
+            {doctor.consultation_fee && <div className="flex items-center gap-2 text-sm font-medium"><span className="text-muted-foreground">Fee:</span> Tsh {Number(doctor.consultation_fee).toLocaleString()}</div>}
+            {doctor.bio && <div className="mt-3"><p className="text-sm font-medium mb-1">About</p><p className="text-sm text-muted-foreground">{doctor.bio}</p></div>}
+            {doctor.organization?.name && <div className="flex items-center gap-2 text-sm"><Building2 className="h-4 w-4 text-muted-foreground" />{doctor.organization.name}</div>}
+          </div>
+          <div className="flex gap-3 pt-4">
+            <Button className="flex-1" onClick={() => { setOpen(false); onBook(); }}>
+              <Calendar className="h-4 w-4 mr-2" /> Book Appointment
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+    </>
+  );
+};
+
+// ─── Clickable Organization Card with bottom-sheet detail ────────────────────
+const OrgCard: React.FC<{ org: any }> = ({ org }) => {
+  const [open, setOpen] = useState(false);
+  const [services, setServices] = useState<any[]>([]);
+  const loadServices = async () => {
+    const { data } = await supabase.from('org_services').select('*').eq('organization_id', org.id).eq('is_available', true);
+    setServices(data || []);
+  };
+  return (
+    <>
+      <Card className="bg-muted/30 border-border/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => { setOpen(true); loadServices(); }}>
+        <CardContent className="p-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <Building2 className="h-5 w-5 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm">{org.name}</p>
+              {org.location && <div className="flex items-center gap-1 text-xs text-muted-foreground"><MapPin className="h-3 w-3" />{org.location}</div>}
+            </div>
+            <Badge variant="outline" className="text-xs capitalize">{org.type}</Badge>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetContent side="bottom" className="h-auto max-h-[85vh] rounded-t-2xl overflow-y-auto">
+          <SheetHeader className="pb-4">
+            <SheetTitle>{org.name}</SheetTitle>
+            <Badge variant="outline" className="w-fit capitalize">{org.type?.replace('_', ' ')}</Badge>
+          </SheetHeader>
+          {org.phone && (
+            <a href={`tel:${org.phone}`} className="block w-full mb-3">
+              {org.type === 'hospital' && org.ambulance_phone ? (
+                <Button className="w-full bg-destructive hover:bg-destructive/90">
+                  <Phone className="h-4 w-4 mr-2" /> Call Ambulance 24/7
+                </Button>
+              ) : null}
+            </a>
+          )}
+          <div className="space-y-2 text-sm">
+            {org.phone && <div className="flex items-center gap-2"><Phone className="h-4 w-4 text-muted-foreground" />{org.phone}</div>}
+            {org.ambulance_phone && <div className="flex items-center gap-2"><Phone className="h-4 w-4 text-destructive" /> Ambulance: {org.ambulance_phone}</div>}
+            {org.email && <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-muted-foreground" />{org.email}</div>}
+            {org.description && <p className="text-muted-foreground py-2">{org.description}</p>}
+          </div>
+          {services.length > 0 && (
+            <div className="mt-4">
+              <p className="font-semibold mb-2">Services ({services.length})</p>
+              <ScrollArea className="max-h-48">
+                <div className="space-y-2">
+                  {services.map((svc: any) => (
+                    <div key={svc.id} className="flex items-center justify-between p-2 bg-muted rounded-lg">
+                      <div>
+                        <p className="text-sm font-medium">{svc.name}</p>
+                        {svc.category && <p className="text-xs text-muted-foreground capitalize">{svc.category}</p>}
+                        {svc.description && <p className="text-xs text-muted-foreground">{svc.description}</p>}
+                      </div>
+                      {svc.price && <p className="text-sm font-semibold text-primary">Tsh {Number(svc.price).toLocaleString()}</p>}
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+    </>
+  );
+};
+
+// ─── Main Component ──────────────────────────────────────────────────────────
 
 interface ConversationMessage {
   type: 'user' | 'ai';
@@ -401,44 +540,18 @@ const MultimodalAI = () => {
     toast.success("Chat loaded");
   }, []);
 
-  // Render telemed data cards inline
+  // Render telemed data cards inline — clickable with detail sheet
   const renderTelemedCards = (msg: ConversationMessage) => {
     if (!msg.telemedData) return null;
 
     if (msg.telemedType === 'doctors') {
       return (
         <div className="space-y-2 mt-3">
+          <p className="text-sm text-muted-foreground">
+            {msg.telemedData.length} doctor{msg.telemedData.length !== 1 ? 's' : ''} found. Tap a card for details:
+          </p>
           {msg.telemedData.map((doctor: any) => (
-            <Card key={doctor.id} className="bg-muted/30 border-border/50">
-              <CardContent className="p-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-sm">{doctor.full_name}</h4>
-                    <p className="text-xs text-muted-foreground">{doctor.specialty}</p>
-                    {doctor.location && (
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-                        <MapPin className="h-3 w-3" />
-                        {doctor.location}
-                      </div>
-                    )}
-                    {doctor.consultation_fee && (
-                      <p className="text-xs font-medium text-primary mt-1">
-                        TZS {doctor.consultation_fee.toLocaleString()}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <Badge variant={doctor.is_online ? 'default' : 'secondary'} className="text-xs">
-                      {doctor.is_online ? 'Online' : 'Offline'}
-                    </Badge>
-                    <Button size="sm" className="text-xs h-7" onClick={() => navigate(`/telemed/book/${doctor.id}`)}>
-                      <Calendar className="h-3 w-3 mr-1" />
-                      Book
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <DoctorCard key={doctor.id} doctor={doctor} onBook={() => navigate(`/telemed/book/${doctor.id}`)} />
           ))}
         </div>
       );
@@ -447,31 +560,11 @@ const MultimodalAI = () => {
     if (msg.telemedType === 'hospitals') {
       return (
         <div className="space-y-2 mt-3">
+          <p className="text-sm text-muted-foreground">
+            {msg.telemedData.length} result{msg.telemedData.length !== 1 ? 's' : ''} found. Tap for details:
+          </p>
           {msg.telemedData.map((org: any) => (
-            <Card key={org.id} className="bg-muted/30 border-border/50">
-              <CardContent className="p-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-sm">{org.name}</h4>
-                    <Badge variant="outline" className="text-xs mt-1">{org.type}</Badge>
-                    {org.location && (
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-                        <MapPin className="h-3 w-3" />
-                        {org.location}
-                      </div>
-                    )}
-                  </div>
-                  {org.phone && (
-                    <Button size="sm" variant="outline" className="text-xs h-7" asChild>
-                      <a href={`tel:${org.phone}`}>
-                        <Phone className="h-3 w-3 mr-1" />
-                        Call
-                      </a>
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+            <OrgCard key={org.id} org={org} />
           ))}
         </div>
       );
@@ -516,13 +609,19 @@ const MultimodalAI = () => {
                   <Plus className="w-4 h-4 mr-3" />
                   General AI
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate('/telemed/auth')} className="cursor-pointer text-sky-600">
+                <DropdownMenuItem onClick={() => navigate('/telemed/auth')} className="cursor-pointer">
                   <LogIn className="w-4 h-4 mr-3" />
-                  Staff Login
+                  Healthcare Login
                 </DropdownMenuItem>
+                {user && (
+                  <DropdownMenuItem onClick={() => navigate('/telemed/patient')} className="cursor-pointer">
+                    <LayoutDashboard className="w-4 h-4 mr-3" />
+                    My Health Dashboard
+                  </DropdownMenuItem>
+                )}
               </>
             ) : (
-              <DropdownMenuItem onClick={() => navigate('/?mode=telemed')} className="cursor-pointer text-sky-600">
+              <DropdownMenuItem onClick={() => navigate('/?mode=telemed')} className="cursor-pointer text-primary">
                 <Heart className="w-4 h-4 mr-3" />
                 Telemed Health
               </DropdownMenuItem>
