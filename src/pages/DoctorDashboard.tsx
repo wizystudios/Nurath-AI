@@ -36,6 +36,7 @@ const DoctorDashboard = () => {
   const [activeTab, setActiveTab] = useState('appointments');
   const [isOnline, setIsOnline] = useState(false);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+  const [newBookingCount, setNewBookingCount] = useState(0);
 
   useEffect(() => {
     if (!loading && (!user || !isDoctor())) {
@@ -49,6 +50,51 @@ const DoctorDashboard = () => {
       fetchDoctorProfile();
     }
   }, [user]);
+
+  // Real-time subscription for new appointments
+  useEffect(() => {
+    if (!doctor) return;
+    const channel = supabase
+      .channel('doctor-appointments-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'appointments',
+          filter: `doctor_id=eq.${doctor.id}`,
+        },
+        (payload) => {
+          const newAppt = payload.new as Appointment;
+          setAppointments((prev) => [newAppt, ...prev]);
+          setNewBookingCount((c) => c + 1);
+          toast.info(`New booking from ${newAppt.patient_name || 'a patient'}!`, {
+            description: `${newAppt.appointment_date} at ${newAppt.appointment_time}`,
+            duration: 8000,
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'appointments',
+          filter: `doctor_id=eq.${doctor.id}`,
+        },
+        (payload) => {
+          const updated = payload.new as Appointment;
+          setAppointments((prev) =>
+            prev.map((a) => (a.id === updated.id ? updated : a))
+          );
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [doctor]);
 
   const fetchDoctorProfile = async () => {
     const { data, error } = await supabase
@@ -185,7 +231,14 @@ const DoctorDashboard = () => {
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-3 mb-6">
-            <TabsTrigger value="appointments">Appointments</TabsTrigger>
+            <TabsTrigger value="appointments" className="relative" onClick={() => setNewBookingCount(0)}>
+              Appointments
+              {newBookingCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
+                  {newBookingCount}
+                </span>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="chats">Patient Chats</TabsTrigger>
             <TabsTrigger value="profile">My Profile</TabsTrigger>
           </TabsList>

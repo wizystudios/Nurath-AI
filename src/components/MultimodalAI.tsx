@@ -361,17 +361,24 @@ const MultimodalAI = () => {
   }, []);
 
   // Telemed database search helpers
-  const searchDoctors = async (query: string) => {
-    const { data } = await supabase
+  const searchDoctors = async (query: string, location?: string) => {
+    let q = supabase
       .from('doctors')
       .select('*, organization:organizations(*)')
-      .eq('is_approved', true)
-      .or(`full_name.ilike.%${query}%,specialty.ilike.%${query}%,location.ilike.%${query}%`)
-      .limit(5);
+      .eq('is_approved', true);
+    
+    const filters = [`full_name.ilike.%${query}%,specialty.ilike.%${query}%,location.ilike.%${query}%`];
+    q = q.or(filters[0]);
+    
+    if (location) {
+      q = q.ilike('location', `%${location}%`);
+    }
+    
+    const { data } = await q.limit(10);
     return data || [];
   };
 
-  const searchOrganizations = async (type: string, query?: string) => {
+  const searchOrganizations = async (type: string, query?: string, location?: string) => {
     let queryBuilder = supabase
       .from('organizations')
       .select('*')
@@ -382,8 +389,11 @@ const MultimodalAI = () => {
     if (query) {
       queryBuilder = queryBuilder.or(`name.ilike.%${query}%,location.ilike.%${query}%`);
     }
+    if (location) {
+      queryBuilder = queryBuilder.ilike('location', `%${location}%`);
+    }
 
-    const { data } = await queryBuilder.limit(5);
+    const { data } = await queryBuilder.limit(10);
     return data || [];
   };
 
