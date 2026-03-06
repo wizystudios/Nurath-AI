@@ -425,29 +425,39 @@ const MultimodalAI = () => {
       
       if (isTelemedMode) {
         const lowerInput = input.toLowerCase();
+        // Extract location keywords like "in Dar es Salaam", "near Mwanza", etc.
+        const locationMatch = input.match(/(?:in|near|at|around|karibu na)\s+([A-Za-z\s]+?)(?:\s*$|[,.])/i);
+        const locationFilter = locationMatch ? locationMatch[1].trim() : undefined;
+
         if (lowerInput.includes('doctor') || lowerInput.includes('specialist') || lowerInput.includes('daktari')) {
-          const query = input.replace(/find|me|a|show|doctor|doctors|specialist/gi, '').trim() || '';
-          const doctors = await searchDoctors(query);
+          const query = input.replace(/find|me|a|show|doctor|doctors|specialist|in|near|at|around|karibu\s+na/gi, '').replace(locationFilter || '', '').trim() || '';
+          const doctors = await searchDoctors(query, locationFilter);
           if (doctors.length > 0) {
             telemedData = doctors;
             telemedType = 'doctors';
           }
         } else if (lowerInput.includes('hospital') || lowerInput.includes('hospitali')) {
-          const hospitals = await searchOrganizations('hospital');
+          const hospitals = await searchOrganizations('hospital', undefined, locationFilter);
           if (hospitals.length > 0) {
             telemedData = hospitals;
             telemedType = 'hospitals';
           }
         } else if (lowerInput.includes('pharmacy') || lowerInput.includes('duka') || lowerInput.includes('medicine')) {
-          const pharmacies = await searchOrganizations('pharmacy');
+          const pharmacies = await searchOrganizations('pharmacy', undefined, locationFilter);
           if (pharmacies.length > 0) {
             telemedData = pharmacies;
             telemedType = 'hospitals';
           }
         } else if (lowerInput.includes('lab') || lowerInput.includes('test') || lowerInput.includes('maabara')) {
-          const labs = await searchOrganizations('lab');
+          const labs = await searchOrganizations('lab', undefined, locationFilter);
           if (labs.length > 0) {
             telemedData = labs;
+            telemedType = 'hospitals';
+          }
+        } else if (lowerInput.includes('clinic') || lowerInput.includes('kliniki')) {
+          const clinics = await searchOrganizations('clinic', undefined, locationFilter);
+          if (clinics.length > 0) {
+            telemedData = clinics;
             telemedType = 'hospitals';
           }
         }
