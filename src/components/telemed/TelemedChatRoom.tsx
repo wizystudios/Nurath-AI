@@ -6,8 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Send, User, Bot, MessageSquare, Loader2 } from 'lucide-react';
+import { Send, User, Bot, MessageSquare, Loader2, Video } from 'lucide-react';
 import { TelemedChat, TelemedMessage } from '@/types/telemed';
+import VideoCall from './VideoCall';
 
 interface TelemedChatRoomProps {
   doctorId?: string;
