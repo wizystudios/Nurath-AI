@@ -29,6 +29,7 @@ const TelemedChatRoom: React.FC<TelemedChatRoomProps> = ({
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [showVideoCall, setShowVideoCall] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
