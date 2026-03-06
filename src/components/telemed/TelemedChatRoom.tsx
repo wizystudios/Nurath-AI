@@ -222,18 +222,27 @@ const TelemedChatRoom: React.FC<TelemedChatRoomProps> = ({
         {selectedChat ? (
           <>
             <CardHeader className="py-3 border-b">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-sky-100 dark:bg-sky-900 rounded-full flex items-center justify-center">
-                  <User className="h-4 w-4 text-sky-600" />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-sky-100 dark:bg-sky-900 rounded-full flex items-center justify-center">
+                    <User className="h-4 w-4 text-sky-600" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-sm">
+                      {userRole === 'doctor' ? selectedChat.patient_name : selectedChat.doctor?.full_name}
+                    </CardTitle>
+                    <p className="text-xs text-muted-foreground">
+                      {userRole === 'doctor' ? 'Patient' : selectedChat.doctor?.specialty}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <CardTitle className="text-sm">
-                    {userRole === 'doctor' ? selectedChat.patient_name : selectedChat.doctor?.full_name}
-                  </CardTitle>
-                  <p className="text-xs text-muted-foreground">
-                    {userRole === 'doctor' ? 'Patient' : selectedChat.doctor?.specialty}
-                  </p>
-                </div>
+                <VideoCall
+                  chatId={selectedChat.id}
+                  userId={userRole === 'doctor' ? (doctorId || '') : (patientId || '')}
+                  userName={userRole === 'doctor' ? 'Doctor' : (patientName || 'Patient')}
+                  userRole={userRole}
+                  onEnd={() => setShowVideoCall(false)}
+                />
               </div>
             </CardHeader>
             <CardContent className="p-0 flex flex-col h-[400px]">
