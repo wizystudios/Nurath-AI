@@ -29,7 +29,7 @@ const ROLE_COLORS: Record<string, string> = {
 
 const ROLE_LABELS: Record<string, string> = {
   super_admin: 'Super Admin',
-  org_admin: 'Org Admin',
+  org_admin: 'Hospital Owner / Org Admin',
   doctor: 'Doctor',
   patient: 'Patient',
 };
@@ -194,7 +194,7 @@ const UserManagement: React.FC = () => {
                     <SelectContent>
                       <SelectItem value="patient">Patient</SelectItem>
                       <SelectItem value="doctor">Doctor</SelectItem>
-                      <SelectItem value="org_admin">Org Admin</SelectItem>
+                      <SelectItem value="org_admin">Hospital / Clinic / Lab / Pharmacy Owner</SelectItem>
                       <SelectItem value="super_admin">Super Admin</SelectItem>
                     </SelectContent>
                   </Select>
