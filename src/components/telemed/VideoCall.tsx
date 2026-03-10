@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import {
   Video, VideoOff, Mic, MicOff, Phone, PhoneOff,
-  Maximize2, Minimize2,
+  Maximize2, Minimize2, Monitor, MonitorOff,
 } from 'lucide-react';
 
 interface VideoCallProps {
@@ -36,8 +36,10 @@ const VideoCall: React.FC<VideoCallProps> = ({ chatId, userId, userName, userRol
   const [isVideoOn, setIsVideoOn] = useState(true);
   const [isAudioOn, setIsAudioOn] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [remoteName, setRemoteName] = useState('');
   const [callDuration, setCallDuration] = useState(0);
+  const screenStreamRef = useRef<MediaStream | null>(null);
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -227,6 +229,35 @@ const VideoCall: React.FC<VideoCallProps> = ({ chatId, userId, userName, userRol
     setIsAudioOn((a) => !a);
   };
 
+  const toggleScreenShare = async () => {
+    if (!pcRef.current || !localStream) return;
+    try {
+      if (isScreenSharing) {
+        // Stop screen share, restore camera
+        screenStreamRef.current?.getTracks().forEach(t => t.stop());
+        screenStreamRef.current = null;
+        const videoTrack = localStream.getVideoTracks()[0];
+        if (videoTrack) {
+          const sender = pcRef.current.getSenders().find(s => s.track?.kind === 'video');
+          await sender?.replaceTrack(videoTrack);
+        }
+        setIsScreenSharing(false);
+      } else {
+        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        screenStreamRef.current = screenStream;
+        const screenTrack = screenStream.getVideoTracks()[0];
+        const sender = pcRef.current.getSenders().find(s => s.track?.kind === 'video');
+        await sender?.replaceTrack(screenTrack);
+        screenTrack.onended = () => {
+          toggleScreenShare();
+        };
+        setIsScreenSharing(true);
+      }
+    } catch {
+      toast.error('Screen sharing failed');
+    }
+  };
+
   const toggleFullscreen = () => {
     if (!isFullscreen) {
       containerRef.current?.requestFullscreen?.();
@@ -341,6 +372,12 @@ const VideoCall: React.FC<VideoCallProps> = ({ chatId, userId, userName, userRol
           className="bg-red-500 hover:bg-red-600 rounded-full h-12 w-12 p-0"
         >
           <PhoneOff className="h-5 w-5 text-white" />
+        </Button>
+        <Button
+          onClick={toggleScreenShare}
+          className={`rounded-full h-12 w-12 p-0 ${isScreenSharing ? 'bg-primary hover:bg-primary/80' : 'bg-white/20 hover:bg-white/30'}`}
+        >
+          {isScreenSharing ? <MonitorOff className="h-5 w-5 text-white" /> : <Monitor className="h-5 w-5 text-white" />}
         </Button>
         <Button
           onClick={toggleFullscreen}

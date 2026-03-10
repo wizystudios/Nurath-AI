@@ -400,7 +400,7 @@ const MultimodalAI = () => {
   // Main AI interaction
   const handleAIInteraction = useCallback(async (input: string, attachments?: any[]) => {
     try {
-      if (!input.trim() && !attachments?.length) {
+      if (!input.trim() && !attachedFiles.length && !attachments?.length) {
         toast.error("Please enter a message");
         return;
       }
@@ -463,10 +463,18 @@ const MultimodalAI = () => {
         }
       }
 
+      // Determine mode based on attachments
+      let mode = isTelemedMode ? 'telemed' : 'text';
+      if (filesToSend?.length) {
+        const firstFile = filesToSend[0];
+        if (firstFile.type?.startsWith('image/')) mode = 'image';
+        else mode = 'document';
+      }
+
       const { data, error } = await supabase.functions.invoke('multimodal-ai', {
         body: {
-          input,
-          mode: isTelemedMode ? 'telemed' : 'text',
+          input: input || (filesToSend?.length ? `Analyze this ${filesToSend[0]?.type?.startsWith('image/') ? 'image' : 'file'}: ${filesToSend[0]?.name}` : ''),
+          mode,
           attachments: filesToSend,
           context: {
             userId: user?.id,
@@ -731,9 +739,12 @@ const MultimodalAI = () => {
               </div>
             ))}
             {isProcessing && (
-              <div className="flex items-center space-x-2 text-muted-foreground">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>{isTelemedMode ? 'Searching & thinking...' : 'Thinking...'}</span>
+              <div className="flex items-start mb-4">
+                <div className="flex items-center gap-1.5 px-3 py-2">
+                  <span className="w-2 h-2 rounded-full bg-primary animate-bounce [animation-delay:0ms]" />
+                  <span className="w-2 h-2 rounded-full bg-primary animate-bounce [animation-delay:150ms]" />
+                  <span className="w-2 h-2 rounded-full bg-primary animate-bounce [animation-delay:300ms]" />
+                </div>
               </div>
             )}
           </div>
@@ -765,17 +776,15 @@ const MultimodalAI = () => {
           )}
 
           <div className="flex items-end gap-2">
-            {!isTelemedMode && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="shrink-0"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isProcessing}
-              >
-                <Paperclip className="w-5 h-5" />
-              </Button>
-            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="shrink-0"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isProcessing}
+            >
+              <Paperclip className="w-5 h-5" />
+            </Button>
             
             <Textarea
               ref={inputRef}
