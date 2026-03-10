@@ -374,6 +374,12 @@ const VideoCall: React.FC<VideoCallProps> = ({ chatId, userId, userName, userRol
           <PhoneOff className="h-5 w-5 text-white" />
         </Button>
         <Button
+          onClick={toggleScreenShare}
+          className={`rounded-full h-12 w-12 p-0 ${isScreenSharing ? 'bg-primary hover:bg-primary/80' : 'bg-white/20 hover:bg-white/30'}`}
+        >
+          {isScreenSharing ? <MonitorOff className="h-5 w-5 text-white" /> : <Monitor className="h-5 w-5 text-white" />}
+        </Button>
+        <Button
           onClick={toggleFullscreen}
           className="rounded-full h-12 w-12 p-0 bg-white/20 hover:bg-white/30"
         >

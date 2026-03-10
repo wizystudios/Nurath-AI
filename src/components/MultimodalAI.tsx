@@ -768,17 +768,15 @@ const MultimodalAI = () => {
           )}
 
           <div className="flex items-end gap-2">
-            {!isTelemedMode && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="shrink-0"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isProcessing}
-              >
-                <Paperclip className="w-5 h-5" />
-              </Button>
-            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="shrink-0"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isProcessing}
+            >
+              <Paperclip className="w-5 h-5" />
+            </Button>
             
             <Textarea
               ref={inputRef}
