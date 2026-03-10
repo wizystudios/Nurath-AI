@@ -229,32 +229,45 @@ const VideoCall: React.FC<VideoCallProps> = ({ chatId, userId, userName, userRol
     setIsAudioOn((a) => !a);
   };
 
-  const toggleScreenShare = async () => {
+  const stopScreenShare = useCallback(async () => {
     if (!pcRef.current || !localStream) return;
+    screenStreamRef.current?.getTracks().forEach(t => t.stop());
+    screenStreamRef.current = null;
+    const videoTrack = localStream.getVideoTracks()[0];
+    if (videoTrack) {
+      const sender = pcRef.current.getSenders().find(s => s.track?.kind === 'video');
+      await sender?.replaceTrack(videoTrack);
+    }
+    if (localVideoRef.current) localVideoRef.current.srcObject = localStream;
+    setIsScreenSharing(false);
+  }, [localStream]);
+
+  const toggleScreenShare = async () => {
+    if (!pcRef.current || !localStream) {
+      toast.error('You must be in a call to share screen');
+      return;
+    }
     try {
       if (isScreenSharing) {
-        // Stop screen share, restore camera
-        screenStreamRef.current?.getTracks().forEach(t => t.stop());
-        screenStreamRef.current = null;
-        const videoTrack = localStream.getVideoTracks()[0];
-        if (videoTrack) {
-          const sender = pcRef.current.getSenders().find(s => s.track?.kind === 'video');
-          await sender?.replaceTrack(videoTrack);
-        }
-        setIsScreenSharing(false);
+        await stopScreenShare();
       } else {
-        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
         screenStreamRef.current = screenStream;
         const screenTrack = screenStream.getVideoTracks()[0];
         const sender = pcRef.current.getSenders().find(s => s.track?.kind === 'video');
         await sender?.replaceTrack(screenTrack);
+        // Show screen share in local PIP
+        if (localVideoRef.current) localVideoRef.current.srcObject = screenStream;
         screenTrack.onended = () => {
-          toggleScreenShare();
+          stopScreenShare();
         };
         setIsScreenSharing(true);
+        toast.success('Screen sharing started');
       }
-    } catch {
-      toast.error('Screen sharing failed');
+    } catch (err: any) {
+      if (err.name !== 'NotAllowedError') {
+        toast.error('Screen sharing failed');
+      }
     }
   };
 
