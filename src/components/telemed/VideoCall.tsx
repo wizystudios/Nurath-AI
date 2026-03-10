@@ -229,6 +229,35 @@ const VideoCall: React.FC<VideoCallProps> = ({ chatId, userId, userName, userRol
     setIsAudioOn((a) => !a);
   };
 
+  const toggleScreenShare = async () => {
+    if (!pcRef.current || !localStream) return;
+    try {
+      if (isScreenSharing) {
+        // Stop screen share, restore camera
+        screenStreamRef.current?.getTracks().forEach(t => t.stop());
+        screenStreamRef.current = null;
+        const videoTrack = localStream.getVideoTracks()[0];
+        if (videoTrack) {
+          const sender = pcRef.current.getSenders().find(s => s.track?.kind === 'video');
+          await sender?.replaceTrack(videoTrack);
+        }
+        setIsScreenSharing(false);
+      } else {
+        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        screenStreamRef.current = screenStream;
+        const screenTrack = screenStream.getVideoTracks()[0];
+        const sender = pcRef.current.getSenders().find(s => s.track?.kind === 'video');
+        await sender?.replaceTrack(screenTrack);
+        screenTrack.onended = () => {
+          toggleScreenShare();
+        };
+        setIsScreenSharing(true);
+      }
+    } catch {
+      toast.error('Screen sharing failed');
+    }
+  };
+
   const toggleFullscreen = () => {
     if (!isFullscreen) {
       containerRef.current?.requestFullscreen?.();
