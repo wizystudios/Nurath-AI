@@ -400,7 +400,7 @@ const MultimodalAI = () => {
   // Main AI interaction
   const handleAIInteraction = useCallback(async (input: string, attachments?: any[]) => {
     try {
-      if (!input.trim() && !attachments?.length) {
+      if (!input.trim() && !attachedFiles.length && !attachments?.length) {
         toast.error("Please enter a message");
         return;
       }
