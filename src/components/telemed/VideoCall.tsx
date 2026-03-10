@@ -211,8 +211,11 @@ const VideoCall: React.FC<VideoCallProps> = ({ chatId, userId, userName, userRol
     if (notify) sendSignal('call-ended');
     pcRef.current?.close();
     pcRef.current = null;
+    screenStreamRef.current?.getTracks().forEach(t => t.stop());
+    screenStreamRef.current = null;
     localStream?.getTracks().forEach((t) => t.stop());
     setLocalStream(null);
+    setIsScreenSharing(false);
     setCallState('idle');
     setCallDuration(0);
     if (timerRef.current) clearInterval(timerRef.current);
