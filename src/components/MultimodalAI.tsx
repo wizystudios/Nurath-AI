@@ -378,6 +378,21 @@ const MultimodalAI = () => {
     return data || [];
   };
 
+  const getDoctorAvailability = async (doctorId: string, dateStr?: string) => {
+    const targetDate = dateStr || new Date().toISOString().split('T')[0];
+    const { data: bookedSlots } = await supabase
+      .from('appointments')
+      .select('appointment_time, status')
+      .eq('doctor_id', doctorId)
+      .eq('appointment_date', targetDate)
+      .in('status', ['pending', 'confirmed']);
+    
+    const allSlots = ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30'];
+    const bookedTimes = (bookedSlots || []).map(s => s.appointment_time?.substring(0, 5));
+    const freeSlots = allSlots.filter(s => !bookedTimes.includes(s));
+    return { bookedTimes, freeSlots, date: targetDate };
+  };
+
   const searchOrganizations = async (type: string, query?: string, location?: string) => {
     let queryBuilder = supabase
       .from('organizations')
@@ -429,12 +444,26 @@ const MultimodalAI = () => {
         const locationMatch = input.match(/(?:in|near|at|around|karibu na)\s+([A-Za-z\s]+?)(?:\s*$|[,.])/i);
         const locationFilter = locationMatch ? locationMatch[1].trim() : undefined;
 
-        if (lowerInput.includes('doctor') || lowerInput.includes('specialist') || lowerInput.includes('daktari')) {
-          const query = input.replace(/find|me|a|show|doctor|doctors|specialist|in|near|at|around|karibu\s+na/gi, '').replace(locationFilter || '', '').trim() || '';
+        if (lowerInput.includes('doctor') || lowerInput.includes('specialist') || lowerInput.includes('daktari') || lowerInput.includes('available') || lowerInput.includes('free time')) {
+          const query = input.replace(/find|me|a|show|doctor|doctors|specialist|in|near|at|around|karibu\s+na|available|free\s+time|when|book/gi, '').replace(locationFilter || '', '').trim() || '';
           const doctors = await searchDoctors(query, locationFilter);
           if (doctors.length > 0) {
             telemedData = doctors;
             telemedType = 'doctors';
+            // Fetch availability for each doctor found
+            const availabilityInfo: string[] = [];
+            for (const doc of doctors.slice(0, 3)) {
+              const avail = await getDoctorAvailability(doc.id);
+              if (avail.freeSlots.length > 0) {
+                availabilityInfo.push(`Dr. ${doc.full_name} has free slots today (${avail.date}): ${avail.freeSlots.join(', ')}. Booked times: ${avail.bookedTimes.length > 0 ? avail.bookedTimes.join(', ') : 'none'}.`);
+              } else {
+                availabilityInfo.push(`Dr. ${doc.full_name} is fully booked today. Try another date.`);
+              }
+            }
+            // Pass availability to the AI for natural language response
+            if (availabilityInfo.length > 0) {
+              input = input + '\n\n[SYSTEM: Doctor availability info for your response - share this with the user naturally]\n' + availabilityInfo.join('\n');
+            }
           }
         } else if (lowerInput.includes('hospital') || lowerInput.includes('hospitali')) {
           const hospitals = await searchOrganizations('hospital', undefined, locationFilter);
