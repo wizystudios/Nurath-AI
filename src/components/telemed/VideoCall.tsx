@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import {
   Video, VideoOff, Mic, MicOff, Phone, PhoneOff,
-  Maximize2, Minimize2,
+  Maximize2, Minimize2, Monitor, MonitorOff,
 } from 'lucide-react';
 
 interface VideoCallProps {
