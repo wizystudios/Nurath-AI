@@ -378,6 +378,21 @@ const MultimodalAI = () => {
     return data || [];
   };
 
+  const getDoctorAvailability = async (doctorId: string, dateStr?: string) => {
+    const targetDate = dateStr || new Date().toISOString().split('T')[0];
+    const { data: bookedSlots } = await supabase
+      .from('appointments')
+      .select('appointment_time, status')
+      .eq('doctor_id', doctorId)
+      .eq('appointment_date', targetDate)
+      .in('status', ['pending', 'confirmed']);
+    
+    const allSlots = ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30'];
+    const bookedTimes = (bookedSlots || []).map(s => s.appointment_time?.substring(0, 5));
+    const freeSlots = allSlots.filter(s => !bookedTimes.includes(s));
+    return { bookedTimes, freeSlots, date: targetDate };
+  };
+
   const searchOrganizations = async (type: string, query?: string, location?: string) => {
     let queryBuilder = supabase
       .from('organizations')
