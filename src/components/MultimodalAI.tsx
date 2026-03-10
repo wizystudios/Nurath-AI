@@ -463,10 +463,18 @@ const MultimodalAI = () => {
         }
       }
 
+      // Determine mode based on attachments
+      let mode = isTelemedMode ? 'telemed' : 'text';
+      if (filesToSend?.length) {
+        const firstFile = filesToSend[0];
+        if (firstFile.type?.startsWith('image/')) mode = 'image';
+        else mode = 'document';
+      }
+
       const { data, error } = await supabase.functions.invoke('multimodal-ai', {
         body: {
-          input,
-          mode: isTelemedMode ? 'telemed' : 'text',
+          input: input || (filesToSend?.length ? `Analyze this ${filesToSend[0]?.type?.startsWith('image/') ? 'image' : 'file'}: ${filesToSend[0]?.name}` : ''),
+          mode,
           attachments: filesToSend,
           context: {
             userId: user?.id,
