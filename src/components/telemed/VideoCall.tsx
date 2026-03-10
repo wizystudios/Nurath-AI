@@ -36,8 +36,10 @@ const VideoCall: React.FC<VideoCallProps> = ({ chatId, userId, userName, userRol
   const [isVideoOn, setIsVideoOn] = useState(true);
   const [isAudioOn, setIsAudioOn] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [remoteName, setRemoteName] = useState('');
   const [callDuration, setCallDuration] = useState(0);
+  const screenStreamRef = useRef<MediaStream | null>(null);
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
