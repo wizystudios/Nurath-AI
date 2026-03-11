@@ -11,46 +11,20 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { 
-  Send,
-  Paperclip,
-  Plus,
-  X,
-  ChevronDown,
-  History,
-  LogIn,
-  LogOut,
-  Heart,
-  Stethoscope,
-  Building2,
-  Pill,
-  FlaskConical,
-  File as FileIcon,
-  Image as ImageIcon,
-  Loader2,
-  Trash2,
-  MapPin,
-  Phone,
-  Calendar,
-  Mail,
-  User,
-  MessageSquare,
-  LayoutDashboard,
+import {
+  Send, Paperclip, Plus, X, ChevronDown, History,
+  LogIn, LogOut, Heart, Stethoscope, Building2, Pill,
+  FlaskConical, File as FileIcon, Image as ImageIcon,
+  Loader2, Trash2, MapPin, Phone, Calendar, Mail, User,
+  MessageSquare, LayoutDashboard, Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
+  Sheet, SheetContent, SheetHeader, SheetTitle,
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -59,8 +33,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-// ─── Clickable Doctor Card with bottom-sheet detail ───────────────────────────
-const DoctorCard: React.FC<{ doctor: any; onBook: () => void }> = ({ doctor, onBook }) => {
+// ─── Doctor Card ───
+const DoctorCard: React.FC<{ doctor: any; onBook: () => void; onChat: () => void }> = ({ doctor, onBook, onChat }) => {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -107,6 +81,9 @@ const DoctorCard: React.FC<{ doctor: any; onBook: () => void }> = ({ doctor, onB
             <Button className="flex-1" onClick={() => { setOpen(false); onBook(); }}>
               <Calendar className="h-4 w-4 mr-2" /> Book Appointment
             </Button>
+            <Button variant="outline" className="flex-1" onClick={() => { setOpen(false); onChat(); }}>
+              <MessageSquare className="h-4 w-4 mr-2" /> Chat with Doctor
+            </Button>
           </div>
         </SheetContent>
       </Sheet>
@@ -114,17 +91,25 @@ const DoctorCard: React.FC<{ doctor: any; onBook: () => void }> = ({ doctor, onB
   );
 };
 
-// ─── Clickable Organization Card with bottom-sheet detail ────────────────────
-const OrgCard: React.FC<{ org: any }> = ({ org }) => {
+// ─── Organization Card ───
+const OrgCard: React.FC<{ org: any; onViewDoctors?: (orgId: string) => void }> = ({ org, onViewDoctors }) => {
   const [open, setOpen] = useState(false);
   const [services, setServices] = useState<any[]>([]);
-  const loadServices = async () => {
-    const { data } = await supabase.from('org_services').select('*').eq('organization_id', org.id).eq('is_available', true);
-    setServices(data || []);
+  const [doctors, setDoctors] = useState<any[]>([]);
+  const navigate = useNavigate();
+
+  const loadDetails = async () => {
+    const [svcRes, docRes] = await Promise.all([
+      supabase.from('org_services').select('*').eq('organization_id', org.id).eq('is_available', true),
+      supabase.from('doctors').select('*').eq('organization_id', org.id).eq('is_approved', true),
+    ]);
+    setServices(svcRes.data || []);
+    setDoctors(docRes.data || []);
   };
+
   return (
     <>
-      <Card className="bg-muted/30 border-border/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => { setOpen(true); loadServices(); }}>
+      <Card className="bg-muted/30 border-border/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => { setOpen(true); loadDetails(); }}>
         <CardContent className="p-3">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -134,7 +119,7 @@ const OrgCard: React.FC<{ org: any }> = ({ org }) => {
               <p className="font-semibold text-sm">{org.name}</p>
               {org.location && <div className="flex items-center gap-1 text-xs text-muted-foreground"><MapPin className="h-3 w-3" />{org.location}</div>}
             </div>
-            <Badge variant="outline" className="text-xs capitalize">{org.type}</Badge>
+            <Badge variant="outline" className="text-xs capitalize">{org.type?.replace('_', ' ')}</Badge>
           </div>
         </CardContent>
       </Card>
@@ -145,21 +130,46 @@ const OrgCard: React.FC<{ org: any }> = ({ org }) => {
             <SheetTitle>{org.name}</SheetTitle>
             <Badge variant="outline" className="w-fit capitalize">{org.type?.replace('_', ' ')}</Badge>
           </SheetHeader>
-          {org.phone && (
-            <a href={`tel:${org.phone}`} className="block w-full mb-3">
-              {org.type === 'hospital' && org.ambulance_phone ? (
-                <Button className="w-full bg-destructive hover:bg-destructive/90">
-                  <Phone className="h-4 w-4 mr-2" /> Call Ambulance 24/7
-                </Button>
-              ) : null}
+
+          {org.ambulance_phone && (
+            <a href={`tel:${org.ambulance_phone}`} className="block w-full mb-3">
+              <Button className="w-full bg-destructive hover:bg-destructive/90">
+                <Phone className="h-4 w-4 mr-2" /> Call Ambulance 24/7
+              </Button>
             </a>
           )}
+
           <div className="space-y-2 text-sm">
-            {org.phone && <div className="flex items-center gap-2"><Phone className="h-4 w-4 text-muted-foreground" />{org.phone}</div>}
-            {org.ambulance_phone && <div className="flex items-center gap-2"><Phone className="h-4 w-4 text-destructive" /> Ambulance: {org.ambulance_phone}</div>}
+            {org.phone && <div className="flex items-center gap-2"><Phone className="h-4 w-4 text-muted-foreground" /><a href={`tel:${org.phone}`}>{org.phone}</a></div>}
             {org.email && <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-muted-foreground" />{org.email}</div>}
             {org.description && <p className="text-muted-foreground py-2">{org.description}</p>}
           </div>
+
+          {/* Doctors under this organization */}
+          {doctors.length > 0 && (
+            <div className="mt-4">
+              <p className="font-semibold mb-2">Doctors ({doctors.length})</p>
+              <ScrollArea className="max-h-48">
+                <div className="space-y-2">
+                  {doctors.map((doc: any) => (
+                    <div key={doc.id} className="flex items-center justify-between p-2 bg-muted rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <Stethoscope className="h-4 w-4 text-primary" />
+                        <div>
+                          <p className="text-sm font-medium">{doc.full_name}</p>
+                          <p className="text-xs text-muted-foreground">{doc.specialty}</p>
+                        </div>
+                      </div>
+                      <Button size="sm" variant="outline" onClick={() => { setOpen(false); navigate(`/telemed/book/${doc.id}`); }}>
+                        Book
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
+
           {services.length > 0 && (
             <div className="mt-4">
               <p className="font-semibold mb-2">Services ({services.length})</p>
@@ -170,7 +180,6 @@ const OrgCard: React.FC<{ org: any }> = ({ org }) => {
                       <div>
                         <p className="text-sm font-medium">{svc.name}</p>
                         {svc.category && <p className="text-xs text-muted-foreground capitalize">{svc.category}</p>}
-                        {svc.description && <p className="text-xs text-muted-foreground">{svc.description}</p>}
                       </div>
                       {svc.price && <p className="text-sm font-semibold text-primary">Tsh {Number(svc.price).toLocaleString()}</p>}
                     </div>
@@ -178,6 +187,10 @@ const OrgCard: React.FC<{ org: any }> = ({ org }) => {
                 </div>
               </ScrollArea>
             </div>
+          )}
+
+          {doctors.length === 0 && services.length === 0 && (
+            <p className="text-sm text-muted-foreground mt-4">No doctors or services listed yet.</p>
           )}
         </SheetContent>
       </Sheet>
@@ -196,6 +209,7 @@ interface ConversationMessage {
   imageUrl?: string;
   telemedData?: any;
   telemedType?: 'doctors' | 'hospitals';
+  fileUrls?: string[];
 }
 
 interface ChatHistory {
@@ -207,24 +221,23 @@ interface ChatHistory {
 
 const TELEMED_QUICK_ACTIONS = [
   { label: 'Find a Doctor', icon: Stethoscope, command: 'Find me a doctor' },
-  { label: 'Hospitals', icon: Building2, command: 'Show me nearby hospitals' },
+  { label: 'Hospitals', icon: Building2, command: 'Show me hospitals' },
   { label: 'Pharmacies', icon: Pill, command: 'Find pharmacies' },
   { label: 'Lab Tests', icon: FlaskConical, command: 'Show lab testing facilities' },
-  { label: 'Health Tips', icon: Heart, command: 'Give me some health tips' },
+  { label: 'Health Tips', icon: Heart, command: 'Give me health tips' },
 ];
 
 const GENERAL_QUICK_ACTIONS = [
   { label: '💡 Fun Fact', command: 'Tell me a fun fact' },
-  { label: '✍️ Creative Writing', command: 'Help me write something creative' },
-  { label: '🎓 Learn Something', command: 'Explain a complex topic simply' },
-  { label: '🧩 Problem Solving', command: 'Help me solve a problem' },
-  { label: '💻 Coding Help', command: 'Give me coding help' },
+  { label: '✍️ Writing', command: 'Help me write something creative' },
+  { label: '🎓 Learn', command: 'Explain a complex topic simply' },
+  { label: '💻 Code', command: 'Give me coding help' },
 ];
 
 const MultimodalAI = () => {
   const [searchParams] = useSearchParams();
   const isTelemedMode = searchParams.get('mode') === 'telemed';
-  
+
   const [inputText, setInputText] = useState("");
   const [conversation, setConversation] = useState<ConversationMessage[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -234,93 +247,61 @@ const MultimodalAI = () => {
   const [currentConversationId, setCurrentConversationId] = useState<string>(Date.now().toString());
   const [currentLanguage, setCurrentLanguage] = useState('en');
   const [attachedFiles, setAttachedFiles] = useState<any[]>([]);
-  const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [showHistoryDialog, setShowHistoryDialog] = useState(false);
-  const [authEmail, setAuthEmail] = useState('');
-  const [authPassword, setAuthPassword] = useState('');
-  const [authName, setAuthName] = useState('');
-  
+
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
-  // Auto-scroll to bottom
   useEffect(() => {
     if (chatContainerRef.current) {
-      setTimeout(() => {
-        chatContainerRef.current!.scrollTop = chatContainerRef.current!.scrollHeight;
-      }, 100);
+      setTimeout(() => { chatContainerRef.current!.scrollTop = chatContainerRef.current!.scrollHeight; }, 100);
     }
   }, [conversation]);
 
-  // Load chat history from localStorage
   useEffect(() => {
-    const savedHistory = localStorage.getItem('nurath-chat-history');
-    if (savedHistory) {
-      try {
-        setChatHistory(JSON.parse(savedHistory));
-      } catch (e) {
-        console.error('Failed to load chat history:', e);
-      }
-    }
+    const saved = localStorage.getItem('nurath-chat-history');
+    if (saved) { try { setChatHistory(JSON.parse(saved)); } catch {} }
   }, []);
 
-  // Save chat history
   const saveChatHistory = useCallback(() => {
     if (conversation.length > 0 && currentConversationId) {
       const existingIndex = chatHistory.findIndex(h => h.id === currentConversationId);
       const title = conversation[0]?.content?.substring(0, 30) || 'New Chat';
-      
-      const updatedHistory = existingIndex >= 0 
+      const updatedHistory = existingIndex >= 0
         ? chatHistory.map((h, i) => i === existingIndex ? { ...h, messages: conversation, title } : h)
         : [...chatHistory, { id: currentConversationId, title, date: new Date().toISOString(), messages: conversation }];
-      
       setChatHistory(updatedHistory);
       localStorage.setItem('nurath-chat-history', JSON.stringify(updatedHistory.slice(-20)));
     }
   }, [conversation, currentConversationId, chatHistory]);
 
-  useEffect(() => {
-    saveChatHistory();
-  }, [conversation, saveChatHistory]);
+  useEffect(() => { saveChatHistory(); }, [conversation, saveChatHistory]);
 
-  // Auth state check
   useEffect(() => {
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
-      
       if (user) {
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-        setProfile(profileData);
-        if (profileData?.language_preference) {
-          setCurrentLanguage(profileData.language_preference);
-        }
+        const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+        setProfile(data);
+        if (data?.language_preference) setCurrentLanguage(data.language_preference);
       }
     };
-    
     checkUser();
-    
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
       setUser(session?.user || null);
-      if (!session?.user) {
-        setProfile(null);
-      }
+      if (!session?.user) setProfile(null);
     });
-    
     return () => subscription.unsubscribe();
   }, []);
 
   const deleteChat = useCallback((chatId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    const updatedHistory = chatHistory.filter(h => h.id !== chatId);
-    setChatHistory(updatedHistory);
-    localStorage.setItem('nurath-chat-history', JSON.stringify(updatedHistory));
+    const updated = chatHistory.filter(h => h.id !== chatId);
+    setChatHistory(updated);
+    localStorage.setItem('nurath-chat-history', JSON.stringify(updated));
     toast.success("Chat deleted");
   }, [chatHistory]);
 
@@ -330,169 +311,143 @@ const MultimodalAI = () => {
     toast.success("All history cleared");
   }, []);
 
-  // File upload
+  // File upload — upload to Supabase Storage, get public URL
   const handleFileUpload = useCallback(async (files: FileList) => {
     const newFiles: any[] = [];
-    
     for (const file of Array.from(files)) {
-      if (file.size > 10 * 1024 * 1024) {
-        toast.error(`${file.name} is too large (max 10MB)`);
-        continue;
-      }
-      
+      if (file.size > 20 * 1024 * 1024) { toast.error(`${file.name} is too large (max 20MB)`); continue; }
+
+      // Read as data URL for preview and AI processing
       const reader = new FileReader();
       const fileData = await new Promise<any>((resolve) => {
         reader.onload = (e) => {
-          resolve({
-            name: file.name,
-            type: file.type,
-            data: e.target?.result,
-            size: file.size
-          });
+          resolve({ name: file.name, type: file.type, data: e.target?.result, size: file.size, file });
         };
         reader.readAsDataURL(file);
       });
-      
+
+      // Upload to Supabase Storage if user is logged in
+      if (user) {
+        try {
+          const filePath = `${user.id}/${Date.now()}-${file.name}`;
+          const { error } = await supabase.storage.from('chat-uploads').upload(filePath, file);
+          if (!error) {
+            const { data: urlData } = supabase.storage.from('chat-uploads').getPublicUrl(filePath);
+            fileData.publicUrl = urlData.publicUrl;
+          }
+        } catch {}
+      }
+
       newFiles.push(fileData);
     }
-    
     setAttachedFiles(prev => [...prev, ...newFiles]);
     toast.success(`${newFiles.length} file(s) attached`);
-  }, []);
+  }, [user]);
 
-  // Telemed database search helpers
+  // Telemed helpers
   const searchDoctors = async (query: string, location?: string) => {
-    let q = supabase
-      .from('doctors')
-      .select('*, organization:organizations(*)')
-      .eq('is_approved', true);
-    
-    const filters = [`full_name.ilike.%${query}%,specialty.ilike.%${query}%,location.ilike.%${query}%`];
-    q = q.or(filters[0]);
-    
-    if (location) {
-      q = q.ilike('location', `%${location}%`);
-    }
-    
+    let q = supabase.from('doctors').select('*, organization:organizations(*)').eq('is_approved', true);
+    if (query) q = q.or(`full_name.ilike.%${query}%,specialty.ilike.%${query}%,location.ilike.%${query}%`);
+    if (location) q = q.ilike('location', `%${location}%`);
     const { data } = await q.limit(10);
     return data || [];
   };
 
-  const getDoctorAvailability = async (doctorId: string, dateStr?: string) => {
-    const targetDate = dateStr || new Date().toISOString().split('T')[0];
-    const { data: bookedSlots } = await supabase
-      .from('appointments')
-      .select('appointment_time, status')
-      .eq('doctor_id', doctorId)
-      .eq('appointment_date', targetDate)
-      .in('status', ['pending', 'confirmed']);
-    
+  const getDoctorAvailability = async (doctorId: string) => {
+    const targetDate = new Date().toISOString().split('T')[0];
+    const { data: booked } = await supabase.from('appointments').select('appointment_time, status').eq('doctor_id', doctorId).eq('appointment_date', targetDate).in('status', ['pending', 'confirmed']);
     const allSlots = ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30'];
-    const bookedTimes = (bookedSlots || []).map(s => s.appointment_time?.substring(0, 5));
-    const freeSlots = allSlots.filter(s => !bookedTimes.includes(s));
-    return { bookedTimes, freeSlots, date: targetDate };
+    const bookedTimes = (booked || []).map(s => s.appointment_time?.substring(0, 5));
+    return { freeSlots: allSlots.filter(s => !bookedTimes.includes(s)), bookedTimes, date: targetDate };
   };
 
-  const searchOrganizations = async (type: string, query?: string, location?: string) => {
-    let queryBuilder = supabase
-      .from('organizations')
-      .select('*')
-      .eq('is_approved', true)
-      .eq('is_suspended', false)
-      .eq('type', type as any);
-
-    if (query) {
-      queryBuilder = queryBuilder.or(`name.ilike.%${query}%,location.ilike.%${query}%`);
-    }
-    if (location) {
-      queryBuilder = queryBuilder.ilike('location', `%${location}%`);
-    }
-
-    const { data } = await queryBuilder.limit(10);
+  const searchOrganizations = async (type: string, location?: string) => {
+    let q = supabase.from('organizations').select('*').eq('is_approved', true).eq('is_suspended', false).eq('type', type as any);
+    if (location) q = q.ilike('location', `%${location}%`);
+    const { data } = await q.limit(10);
     return data || [];
+  };
+
+  // Start chat with doctor
+  const startChatWithDoctor = async (doctor: any) => {
+    if (!user) { toast.error("Please log in to chat with a doctor"); navigate('/auth'); return; }
+    try {
+      // Check if chat already exists
+      const { data: existing } = await supabase.from('telemed_chats').select('*').eq('doctor_id', doctor.id).eq('patient_id', user.id).maybeSingle();
+      if (existing) {
+        toast.success(`Chat with Dr. ${doctor.full_name} - go to your dashboard`);
+        navigate('/telemed/patient');
+        return;
+      }
+      // Create new chat
+      const { error } = await supabase.from('telemed_chats').insert({
+        doctor_id: doctor.id,
+        patient_id: user.id,
+        patient_name: profile?.full_name || user.email?.split('@')[0] || 'Patient',
+        status: 'active',
+      });
+      if (error) throw error;
+      toast.success(`Chat started with Dr. ${doctor.full_name}!`);
+      navigate('/telemed/patient');
+    } catch { toast.error("Failed to start chat"); }
   };
 
   // Main AI interaction
   const handleAIInteraction = useCallback(async (input: string, attachments?: any[]) => {
     try {
-      if (!input.trim() && !attachedFiles.length && !attachments?.length) {
-        toast.error("Please enter a message");
-        return;
-      }
+      if (!input.trim() && !attachedFiles.length && !attachments?.length) { toast.error("Please enter a message"); return; }
 
       setIsProcessing(true);
-
       const filesToSend = attachedFiles.length > 0 ? attachedFiles : attachments;
 
       const newMessage: ConversationMessage = {
-        type: 'user',
-        content: input,
-        timestamp: new Date(),
-        attachments: filesToSend,
-        id: Date.now().toString()
+        type: 'user', content: input, timestamp: new Date(),
+        attachments: filesToSend, id: Date.now().toString(),
+        fileUrls: filesToSend?.map((f: any) => f.publicUrl).filter(Boolean),
       };
-
       setConversation(prev => [...prev, newMessage]);
 
-      // In telemed mode, also search the database for relevant results
       let telemedData: any = null;
       let telemedType: 'doctors' | 'hospitals' | undefined;
-      
+
       if (isTelemedMode) {
         const lowerInput = input.toLowerCase();
-        // Extract location keywords like "in Dar es Salaam", "near Mwanza", etc.
         const locationMatch = input.match(/(?:in|near|at|around|karibu na)\s+([A-Za-z\s]+?)(?:\s*$|[,.])/i);
         const locationFilter = locationMatch ? locationMatch[1].trim() : undefined;
 
-        if (lowerInput.includes('doctor') || lowerInput.includes('specialist') || lowerInput.includes('daktari') || lowerInput.includes('available') || lowerInput.includes('free time')) {
+        if (lowerInput.includes('doctor') || lowerInput.includes('specialist') || lowerInput.includes('daktari') || lowerInput.includes('available')) {
           const query = input.replace(/find|me|a|show|doctor|doctors|specialist|in|near|at|around|karibu\s+na|available|free\s+time|when|book/gi, '').replace(locationFilter || '', '').trim() || '';
           const doctors = await searchDoctors(query, locationFilter);
           if (doctors.length > 0) {
             telemedData = doctors;
             telemedType = 'doctors';
-            // Fetch availability for each doctor found
-            const availabilityInfo: string[] = [];
+            // Get availability for top 3 doctors
+            const availInfo: string[] = [];
             for (const doc of doctors.slice(0, 3)) {
               const avail = await getDoctorAvailability(doc.id);
-              if (avail.freeSlots.length > 0) {
-                availabilityInfo.push(`Dr. ${doc.full_name} has free slots today (${avail.date}): ${avail.freeSlots.join(', ')}. Booked times: ${avail.bookedTimes.length > 0 ? avail.bookedTimes.join(', ') : 'none'}.`);
-              } else {
-                availabilityInfo.push(`Dr. ${doc.full_name} is fully booked today. Try another date.`);
-              }
+              availInfo.push(avail.freeSlots.length > 0
+                ? `Dr. ${doc.full_name} (${doc.specialty}) has free slots today: ${avail.freeSlots.slice(0, 5).join(', ')}.`
+                : `Dr. ${doc.full_name} is fully booked today.`);
             }
-            // Pass availability to the AI for natural language response
-            if (availabilityInfo.length > 0) {
-              input = input + '\n\n[SYSTEM: Doctor availability info for your response - share this with the user naturally]\n' + availabilityInfo.join('\n');
-            }
+            // Inject into AI context — the AI will just summarize, no questions asked
+            input = input + '\n\n[SYSTEM: Here are the doctors found. Present them directly to the user with their availability. Do NOT ask follow-up questions — just show the results.]\n' + availInfo.join('\n');
           }
         } else if (lowerInput.includes('hospital') || lowerInput.includes('hospitali')) {
-          const hospitals = await searchOrganizations('hospital', undefined, locationFilter);
-          if (hospitals.length > 0) {
-            telemedData = hospitals;
-            telemedType = 'hospitals';
-          }
+          telemedData = await searchOrganizations('hospital', locationFilter);
+          telemedType = 'hospitals';
         } else if (lowerInput.includes('pharmacy') || lowerInput.includes('duka') || lowerInput.includes('medicine')) {
-          const pharmacies = await searchOrganizations('pharmacy', undefined, locationFilter);
-          if (pharmacies.length > 0) {
-            telemedData = pharmacies;
-            telemedType = 'hospitals';
-          }
+          telemedData = await searchOrganizations('pharmacy', locationFilter);
+          telemedType = 'hospitals';
         } else if (lowerInput.includes('lab') || lowerInput.includes('test') || lowerInput.includes('maabara')) {
-          const labs = await searchOrganizations('lab', undefined, locationFilter);
-          if (labs.length > 0) {
-            telemedData = labs;
-            telemedType = 'hospitals';
-          }
+          telemedData = await searchOrganizations('lab', locationFilter);
+          telemedType = 'hospitals';
         } else if (lowerInput.includes('clinic') || lowerInput.includes('kliniki')) {
-          const clinics = await searchOrganizations('clinic', undefined, locationFilter);
-          if (clinics.length > 0) {
-            telemedData = clinics;
-            telemedType = 'hospitals';
-          }
+          telemedData = await searchOrganizations('clinic', locationFilter);
+          telemedType = 'hospitals';
         }
       }
 
-      // Determine mode based on attachments
+      // Determine mode
       let mode = isTelemedMode ? 'telemed' : 'text';
       if (filesToSend?.length) {
         const firstFile = filesToSend[0];
@@ -505,11 +460,9 @@ const MultimodalAI = () => {
           input: input || (filesToSend?.length ? `Analyze this ${filesToSend[0]?.type?.startsWith('image/') ? 'image' : 'file'}: ${filesToSend[0]?.name}` : ''),
           mode,
           attachments: filesToSend,
-          context: {
-            userId: user?.id,
-            language: currentLanguage,
-            conversationHistory: conversation.slice(-5)
-          }
+          context: { userId: user?.id, language: currentLanguage, conversationHistory: conversation.slice(-5) },
+          userEmail: user?.email,
+          userProfile: profile,
         }
       });
 
@@ -524,115 +477,66 @@ const MultimodalAI = () => {
         telemedData,
         telemedType,
       };
-
       setConversation(prev => [...prev, aiMessage]);
       setAttachedFiles([]);
-
     } catch (error: any) {
       console.error('AI Error:', error);
-      const errorMessage: ConversationMessage = {
-        type: 'ai',
-        content: error.message || "I'm having technical difficulties. Please try again.",
-        timestamp: new Date(),
-        id: (Date.now() + 2).toString()
-      };
-      setConversation(prev => [...prev, errorMessage]);
+      setConversation(prev => [...prev, {
+        type: 'ai', content: error.message || "I'm having technical difficulties. Please try again.",
+        timestamp: new Date(), id: (Date.now() + 2).toString()
+      }]);
       toast.error(error.message);
     } finally {
       setIsProcessing(false);
     }
-  }, [conversation, user, attachedFiles, currentLanguage, isTelemedMode]);
-
-  // Auth handlers
-  const handleLogin = async () => {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: authEmail,
-        password: authPassword
-      });
-      if (error) throw error;
-      setUser(data.user);
-      setShowAuthDialog(false);
-      toast.success("Welcome back!");
-    } catch (error: any) {
-      toast.error(error.message);
-    }
-  };
-
-  const handleSignup = async () => {
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email: authEmail,
-        password: authPassword,
-        options: {
-          emailRedirectTo: window.location.origin,
-          data: { full_name: authName }
-        }
-      });
-      if (error) throw error;
-      toast.success("Check your email to verify your account!");
-      setShowAuthDialog(false);
-    } catch (error: any) {
-      toast.error(error.message);
-    }
-  };
+  }, [conversation, user, attachedFiles, currentLanguage, isTelemedMode, profile]);
 
   const handleLogout = useCallback(async () => {
     await supabase.auth.signOut();
-    setUser(null);
-    setProfile(null);
+    setUser(null); setProfile(null);
     toast.success("Logged out");
   }, []);
 
   const startNewChat = useCallback(() => {
     setCurrentConversationId(Date.now().toString());
-    setConversation([]);
-    toast.success("New chat started");
+    setConversation([]); toast.success("New chat started");
   }, []);
 
   const loadChat = useCallback((chat: ChatHistory) => {
     setCurrentConversationId(chat.id);
     setConversation(chat.messages);
     setShowHistoryDialog(false);
-    toast.success("Chat loaded");
   }, []);
 
-  // Render telemed data cards inline — clickable with detail sheet
   const renderTelemedCards = (msg: ConversationMessage) => {
-    if (!msg.telemedData) return null;
-
+    if (!msg.telemedData || msg.telemedData.length === 0) return null;
     if (msg.telemedType === 'doctors') {
       return (
         <div className="space-y-2 mt-3">
-          <p className="text-sm text-muted-foreground">
-            {msg.telemedData.length} doctor{msg.telemedData.length !== 1 ? 's' : ''} found. Tap a card for details:
-          </p>
+          <p className="text-sm text-muted-foreground">{msg.telemedData.length} doctor{msg.telemedData.length !== 1 ? 's' : ''} found:</p>
           {msg.telemedData.map((doctor: any) => (
-            <DoctorCard key={doctor.id} doctor={doctor} onBook={() => navigate(`/telemed/book/${doctor.id}`)} />
+            <DoctorCard key={doctor.id} doctor={doctor}
+              onBook={() => navigate(`/telemed/book/${doctor.id}`)}
+              onChat={() => startChatWithDoctor(doctor)}
+            />
           ))}
         </div>
       );
     }
-
     if (msg.telemedType === 'hospitals') {
       return (
         <div className="space-y-2 mt-3">
-          <p className="text-sm text-muted-foreground">
-            {msg.telemedData.length} result{msg.telemedData.length !== 1 ? 's' : ''} found. Tap for details:
-          </p>
-          {msg.telemedData.map((org: any) => (
-            <OrgCard key={org.id} org={org} />
-          ))}
+          <p className="text-sm text-muted-foreground">{msg.telemedData.length} result{msg.telemedData.length !== 1 ? 's' : ''} found:</p>
+          {msg.telemedData.map((org: any) => <OrgCard key={org.id} org={org} />)}
         </div>
       );
     }
-
     return null;
   };
 
   const quickActions = isTelemedMode ? TELEMED_QUICK_ACTIONS : GENERAL_QUICK_ACTIONS;
   const headerTitle = isTelemedMode ? 'Nurath.AI Health' : 'Nurath.AI';
-  const placeholder = isTelemedMode 
+  const placeholder = isTelemedMode
     ? (currentLanguage === 'sw' ? 'Uliza swali la afya...' : 'Ask a health question...')
     : (currentLanguage === 'sw' ? 'Andika ujumbe...' : 'Message Nurath AI...');
 
@@ -649,57 +553,40 @@ const MultimodalAI = () => {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-52">
             <DropdownMenuItem onClick={startNewChat} className="cursor-pointer">
-              <Plus className="w-4 h-4 mr-3" />
-              New Chat
+              <Plus className="w-4 h-4 mr-3" /> New Chat
             </DropdownMenuItem>
-            
             <DropdownMenuItem onClick={() => setShowHistoryDialog(true)} className="cursor-pointer">
-              <History className="w-4 h-4 mr-3" />
-              Chat History
+              <History className="w-4 h-4 mr-3" /> Chat History
             </DropdownMenuItem>
-            
             <DropdownMenuSeparator />
-
             {isTelemedMode ? (
               <>
-              <DropdownMenuItem onClick={() => navigate('/')} className="cursor-pointer">
-                  <Plus className="w-4 h-4 mr-3" />
-                  General AI
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate('/telemed/auth')} className="cursor-pointer">
-                  <LogIn className="w-4 h-4 mr-3" />
-                  Healthcare Login
+                <DropdownMenuItem onClick={() => navigate('/')} className="cursor-pointer">
+                  <Plus className="w-4 h-4 mr-3" /> General AI
                 </DropdownMenuItem>
                 {user && (
                   <DropdownMenuItem onClick={() => navigate('/telemed/patient')} className="cursor-pointer">
-                    <LayoutDashboard className="w-4 h-4 mr-3" />
-                    My Health Dashboard
+                    <LayoutDashboard className="w-4 h-4 mr-3" /> My Health Dashboard
                   </DropdownMenuItem>
                 )}
               </>
             ) : (
               <DropdownMenuItem onClick={() => navigate('/?mode=telemed')} className="cursor-pointer text-primary">
-                <Heart className="w-4 h-4 mr-3" />
-                Telemed Health
+                <Heart className="w-4 h-4 mr-3" /> Telemed Health
               </DropdownMenuItem>
             )}
-            
             <DropdownMenuSeparator />
-            
             {user ? (
               <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive">
-                <LogOut className="w-4 h-4 mr-3" />
-                Logout
+                <LogOut className="w-4 h-4 mr-3" /> Logout ({user.email?.split('@')[0]})
               </DropdownMenuItem>
             ) : (
-              <DropdownMenuItem onClick={() => setShowAuthDialog(true)} className="cursor-pointer">
-                <LogIn className="w-4 h-4 mr-3" />
-                Sign Up / Login
+              <DropdownMenuItem onClick={() => navigate('/auth')} className="cursor-pointer">
+                <LogIn className="w-4 h-4 mr-3" /> Sign Up / Login
               </DropdownMenuItem>
             )}
           </DropdownMenuContent>
         </DropdownMenu>
-        
         <ThemeToggle />
       </header>
 
@@ -718,35 +605,25 @@ const MultimodalAI = () => {
                 <p className="text-muted-foreground mb-4">Find doctors, hospitals, pharmacies, and get health advice</p>
               )}
             </div>
-            
             <div className="w-full max-w-2xl mt-auto pb-4">
               <div className="flex flex-wrap justify-center gap-2 mb-4">
                 {isTelemedMode ? (
                   TELEMED_QUICK_ACTIONS.map((action, i) => (
-                    <button
-                      key={i}
-                      onClick={() => handleAIInteraction(action.command)}
-                      className="px-4 py-2 text-sm rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors flex items-center gap-2"
-                    >
-                      <action.icon className="w-4 h-4" />
-                      {action.label}
+                    <button key={i} onClick={() => handleAIInteraction(action.command)}
+                      className="px-4 py-2 text-sm rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors flex items-center gap-2">
+                      <action.icon className="w-4 h-4" /> {action.label}
                     </button>
                   ))
                 ) : (
                   <>
                     {GENERAL_QUICK_ACTIONS.map((action, i) => (
-                      <button
-                        key={i}
-                        onClick={() => handleAIInteraction(action.command)}
-                        className="px-4 py-2 text-sm rounded-full bg-muted/50 hover:bg-muted transition-colors flex items-center gap-2"
-                      >
+                      <button key={i} onClick={() => handleAIInteraction(action.command)}
+                        className="px-4 py-2 text-sm rounded-full bg-muted/50 hover:bg-muted transition-colors">
                         {action.label}
                       </button>
                     ))}
-                    <button
-                      onClick={() => navigate('/?mode=telemed')}
-                      className="px-4 py-2 text-sm rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors flex items-center gap-2"
-                    >
+                    <button onClick={() => navigate('/?mode=telemed')}
+                      className="px-4 py-2 text-sm rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors flex items-center gap-2">
                       <Heart className="w-4 h-4" /> Telemed Health
                     </button>
                   </>
@@ -758,12 +635,21 @@ const MultimodalAI = () => {
           <div className="p-4 space-y-4 max-w-3xl mx-auto w-full">
             {conversation.map((msg) => (
               <div key={msg.id}>
-                <Message 
-                  content={msg.content}
-                  type={msg.type}
-                  timestamp={msg.timestamp}
-                  imageUrl={msg.imageUrl}
-                />
+                {/* Show attached file thumbnails for user messages */}
+                {msg.type === 'user' && msg.attachments && msg.attachments.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-2 justify-end">
+                    {msg.attachments.map((file: any, idx: number) => (
+                      <div key={idx} className="flex items-center gap-1 px-2 py-1 bg-primary/10 rounded-lg text-xs">
+                        {file.type?.startsWith('image/') ? (
+                          <img src={file.data || file.publicUrl} alt={file.name} className="w-12 h-12 rounded object-cover" />
+                        ) : (
+                          <><FileIcon className="w-3 h-3" /><span className="truncate max-w-20">{file.name}</span></>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <Message content={msg.content} type={msg.type} timestamp={msg.timestamp} imageUrl={msg.imageUrl} />
                 {msg.type === 'ai' && renderTelemedCards(msg)}
               </div>
             ))}
@@ -787,34 +673,23 @@ const MultimodalAI = () => {
             <div className="flex flex-wrap gap-2 mb-3">
               {attachedFiles.map((file, index) => (
                 <div key={index} className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 text-sm">
-                  {file.type.startsWith('image/') ? (
-                    <ImageIcon className="w-3 h-3" />
+                  {file.type?.startsWith('image/') ? (
+                    <img src={file.data} alt={file.name} className="w-6 h-6 rounded object-cover" />
                   ) : (
                     <FileIcon className="w-3 h-3" />
                   )}
                   <span className="max-w-24 truncate text-xs">{file.name}</span>
-                  <button
-                    className="hover:text-destructive"
-                    onClick={() => setAttachedFiles(prev => prev.filter((_, i) => i !== index))}
-                  >
+                  <button className="hover:text-destructive" onClick={() => setAttachedFiles(prev => prev.filter((_, i) => i !== index))}>
                     <X className="w-3 h-3" />
                   </button>
                 </div>
               ))}
             </div>
           )}
-
           <div className="flex items-end gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="shrink-0"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isProcessing}
-            >
+            <Button variant="ghost" size="icon" className="shrink-0" onClick={() => fileInputRef.current?.click()} disabled={isProcessing}>
               <Paperclip className="w-5 h-5" />
             </Button>
-            
             <Textarea
               ref={inputRef}
               value={inputText}
@@ -825,25 +700,15 @@ const MultimodalAI = () => {
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
-                  if (inputText.trim() || attachedFiles.length > 0) {
-                    handleAIInteraction(inputText);
-                    setInputText("");
-                  }
+                  if (inputText.trim() || attachedFiles.length > 0) { handleAIInteraction(inputText); setInputText(""); }
                 }
               }}
               disabled={isProcessing}
             />
-            
             <Button
-              onClick={() => {
-                if (inputText.trim() || attachedFiles.length > 0) {
-                  handleAIInteraction(inputText);
-                  setInputText("");
-                }
-              }}
+              onClick={() => { if (inputText.trim() || attachedFiles.length > 0) { handleAIInteraction(inputText); setInputText(""); } }}
               disabled={(!inputText.trim() && attachedFiles.length === 0) || isProcessing}
-              size="icon"
-              className="shrink-0 rounded-full"
+              size="icon" className="shrink-0 rounded-full"
             >
               {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             </Button>
@@ -851,56 +716,15 @@ const MultimodalAI = () => {
         </div>
       </div>
 
-      {/* Hidden file input */}
+      {/* Hidden file input — accepts all common types */}
       <input
         ref={fileInputRef}
         type="file"
         hidden
-        accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.csv,.xlsx,.json"
+        accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.csv,.xlsx,.json,.pptx"
         onChange={(e) => e.target.files && handleFileUpload(e.target.files)}
         multiple
       />
-
-      {/* Auth Dialog */}
-      <Dialog open={showAuthDialog} onOpenChange={setShowAuthDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Welcome to Nurath.AI</DialogTitle>
-          </DialogHeader>
-          <Tabs defaultValue="login" className="w-full">
-            <TabsList className="w-full">
-              <TabsTrigger value="login" className="flex-1">Login</TabsTrigger>
-              <TabsTrigger value="signup" className="flex-1">Sign Up</TabsTrigger>
-            </TabsList>
-            <TabsContent value="login" className="space-y-4 mt-4">
-              <div className="space-y-2">
-                <Label>Email</Label>
-                <Input type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Password</Label>
-                <Input type="password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} />
-              </div>
-              <Button onClick={handleLogin} className="w-full">Login</Button>
-            </TabsContent>
-            <TabsContent value="signup" className="space-y-4 mt-4">
-              <div className="space-y-2">
-                <Label>Name</Label>
-                <Input value={authName} onChange={(e) => setAuthName(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Email</Label>
-                <Input type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Password</Label>
-                <Input type="password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} />
-              </div>
-              <Button onClick={handleSignup} className="w-full">Sign Up</Button>
-            </TabsContent>
-          </Tabs>
-        </DialogContent>
-      </Dialog>
 
       {/* History Dialog */}
       <Dialog open={showHistoryDialog} onOpenChange={setShowHistoryDialog}>
@@ -910,8 +734,7 @@ const MultimodalAI = () => {
               <span>Chat History</span>
               {chatHistory.length > 0 && (
                 <Button variant="ghost" size="sm" onClick={clearAllHistory} className="text-destructive hover:text-destructive">
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Clear All
+                  <Trash2 className="w-4 h-4 mr-2" /> Clear All
                 </Button>
               )}
             </DialogTitle>
@@ -921,21 +744,14 @@ const MultimodalAI = () => {
               <p className="text-muted-foreground text-center py-8">No chat history yet</p>
             ) : (
               chatHistory.map((chat) => (
-                <div
-                  key={chat.id}
-                  onClick={() => loadChat(chat)}
-                  className="p-4 bg-muted rounded-lg cursor-pointer hover:bg-accent transition-colors group flex items-center justify-between"
-                >
+                <div key={chat.id} onClick={() => loadChat(chat)}
+                  className="p-4 bg-muted rounded-lg cursor-pointer hover:bg-accent transition-colors group flex items-center justify-between">
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">{chat.title}</p>
                     <p className="text-muted-foreground text-sm">{new Date(chat.date).toLocaleDateString()}</p>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => deleteChat(chat.id, e)}
-                    className="opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive transition-opacity"
-                  >
+                  <Button variant="ghost" size="sm" onClick={(e) => deleteChat(chat.id, e)}
+                    className="opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive transition-opacity">
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
