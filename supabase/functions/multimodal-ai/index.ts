@@ -18,7 +18,7 @@ serve(async (req) => {
   try {
     const { input, mode, attachments, context, userEmail, userProfile } = await req.json();
     
-    console.log(`🧠 Processing AI request: { input: "${input}", mode: "${mode}" }`);
+    console.log(`🧠 Processing AI request: { input: "${input?.substring(0, 50)}", mode: "${mode}" }`);
 
     if (!lovableApiKey) {
       throw new Error('LOVABLE_API_KEY not configured');
@@ -39,23 +39,25 @@ ${userProfile?.full_name ? `User name: ${userProfile.full_name}` : ''}`;
 
 YOUR CAPABILITIES:
 - Help users find doctors, hospitals, pharmacies, and lab testing facilities
-- Answer general health and wellness questions
+- Answer general health and wellness questions  
 - Provide health education and first-aid guidance
 - Help users understand symptoms (always recommend seeing a doctor for diagnosis)
 - Guide users on booking appointments
 
-IMPORTANT RULES:
+CRITICAL RULES:
 - Never diagnose conditions - always recommend consulting a doctor
 - Be empathetic, clear, and supportive
-- When users ask about finding doctors/hospitals, tell them you can search the database
-- Provide general health information based on established medical knowledge
+- When doctor search results are provided in [SYSTEM] tags, present them DIRECTLY without asking follow-up questions
+- DO NOT ask "what specialty?" or "which location?" — just show ALL available results immediately
+- Keep responses SHORT and actionable — users want answers, not conversations
 - If a user describes an emergency, tell them to call emergency services immediately
+- If asked who made you, say WeTech Tanzania, CEO Khalifa Nadhiru
 
-Guidelines:
-- Be helpful, friendly, and caring ❤️
-- Use simple language for health topics
-- Always err on the side of caution with health advice
-- If asked who made you, say WeTech Tanzania, CEO Khalifa Nadhiru`;
+RESPONSE STYLE:
+- Be DIRECT. Show results immediately.
+- Don't ask clarifying questions unless absolutely necessary.
+- Keep responses under 3 paragraphs.
+- Use bullet points for listing information.`;
 
     const generalPrompt = `${basePrompt}
 
@@ -64,6 +66,12 @@ Guidelines:
 - Code generation for HTML, CSS, JavaScript, Python, and more
 - Educational explanations with examples
 - Creative writing, stories, and content generation
+- Analyzing uploaded images, documents, and files
+
+WHEN FILES ARE UPLOADED:
+- If an image is uploaded, analyze it in detail
+- If a document is uploaded, read and summarize its content
+- Always acknowledge the file and provide useful analysis
 
 Guidelines:
 - Be helpful, friendly, and educational
@@ -71,8 +79,8 @@ Guidelines:
 - Format code with proper syntax highlighting using code blocks
 - Provide clear step-by-step explanations
 - If asked who made you, say WeTech Tanzania, CEO Khalifa Nadhiru
-- IMPORTANT: For simple greetings like "hi", "hello", "hey" — reply with a SHORT friendly greeting (1-2 sentences max). Do NOT give a long introduction every time. Only introduce yourself if the user asks who you are.
-- Match the length of your response to the complexity of the question. Simple questions = short answers.`;
+- IMPORTANT: For simple greetings like "hi", "hello", "hey" — reply with a SHORT friendly greeting (1-2 sentences max). Do NOT give a long introduction.
+- Match the length of your response to the complexity of the question.`;
 
     const systemPrompt = isTelemed ? telemedPrompt : generalPrompt;
 
@@ -88,7 +96,7 @@ Guidelines:
       });
     }
 
-    // Add user message
+    // Add user message with file support
     if (mode === 'image' && attachments?.[0]) {
       messages.push({
         role: 'user',
@@ -98,10 +106,36 @@ Guidelines:
         ]
       });
     } else if (mode === 'document' && attachments?.[0]) {
-      messages.push({
-        role: 'user',
-        content: input ? `${input}\n\nDocument: "${attachments[0].name}"` : `A document "${attachments[0].name}" was uploaded. What would you like to know about it?`
-      });
+      // For documents, include the file name and any extracted text
+      const fileInfo = `📎 File uploaded: "${attachments[0].name}" (${attachments[0].type || 'unknown type'}, ${Math.round((attachments[0].size || 0) / 1024)}KB)`;
+      
+      // If it's a text-based file, the data URL might contain readable content
+      let fileContent = '';
+      if (attachments[0].data && (
+        attachments[0].type?.includes('text') || 
+        attachments[0].type?.includes('json') || 
+        attachments[0].type?.includes('csv') ||
+        attachments[0].name?.endsWith('.txt') ||
+        attachments[0].name?.endsWith('.csv') ||
+        attachments[0].name?.endsWith('.json')
+      )) {
+        try {
+          // Decode base64 data URL
+          const base64Data = attachments[0].data.split(',')[1];
+          if (base64Data) {
+            fileContent = atob(base64Data);
+            if (fileContent.length > 5000) {
+              fileContent = fileContent.substring(0, 5000) + '\n... (truncated)';
+            }
+          }
+        } catch {}
+      }
+
+      const userContent = input 
+        ? `${input}\n\n${fileInfo}${fileContent ? '\n\nFile content:\n' + fileContent : ''}`
+        : `${fileInfo}\n\nPlease analyze this file.${fileContent ? '\n\nFile content:\n' + fileContent : ''}`;
+      
+      messages.push({ role: 'user', content: userContent });
     } else {
       messages.push({ role: 'user', content: input });
     }
