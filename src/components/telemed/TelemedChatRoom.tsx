@@ -15,6 +15,7 @@ interface TelemedChatRoomProps {
   patientId?: string;
   patientName?: string;
   userRole: 'doctor' | 'patient';
+  initialChatId?: string;
 }
 
 const TelemedChatRoom: React.FC<TelemedChatRoomProps> = ({
@@ -22,6 +23,7 @@ const TelemedChatRoom: React.FC<TelemedChatRoomProps> = ({
   patientId,
   patientName,
   userRole,
+  initialChatId,
 }) => {
   const [chats, setChats] = useState<TelemedChat[]>([]);
   const [selectedChat, setSelectedChat] = useState<TelemedChat | null>(null);
@@ -31,39 +33,11 @@ const TelemedChatRoom: React.FC<TelemedChatRoomProps> = ({
   const [sending, setSending] = useState(false);
   const [showVideoCall, setShowVideoCall] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const selectedChatIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    fetchChats();
-    
-    // Subscribe to new messages
-    const channel = supabase
-      .channel('telemed-messages')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'telemed_messages',
-        },
-        (payload) => {
-          const newMsg = payload.new as TelemedMessage;
-          if (selectedChat && newMsg.chat_id === selectedChat.id) {
-            setMessages((prev) => [...prev, newMsg]);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [doctorId, patientId, selectedChat]);
-
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages]);
+    selectedChatIdRef.current = selectedChat?.id || null;
+  }, [selectedChat]);
 
   const fetchChats = async () => {
     setLoading(true);
@@ -80,10 +54,48 @@ const TelemedChatRoom: React.FC<TelemedChatRoomProps> = ({
     if (error) {
       console.error('Error fetching chats:', error);
     } else {
-      setChats((data as TelemedChat[]) || []);
+      const chatList = (data as TelemedChat[]) || [];
+      setChats(chatList);
+
+      if (chatList.length > 0) {
+        const preferredChat = initialChatId
+          ? chatList.find((chat) => chat.id === initialChatId)
+          : chatList[0];
+
+        if (preferredChat) {
+          setSelectedChat(preferredChat);
+          fetchMessages(preferredChat.id);
+        }
+      }
     }
     setLoading(false);
   };
+
+  useEffect(() => {
+    fetchChats();
+
+    const channel = supabase
+      .channel('telemed-messages')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'telemed_messages',
+        },
+        (payload) => {
+          const newMsg = payload.new as TelemedMessage;
+          if (selectedChatIdRef.current && newMsg.chat_id === selectedChatIdRef.current) {
+            setMessages((prev) => [...prev, newMsg]);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [doctorId, patientId, initialChatId]);
 
   const fetchMessages = async (chatId: string) => {
     const { data, error } = await supabase
