@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -27,10 +27,12 @@ interface AppointmentWithDoctor extends Appointment {
 
 const PatientDashboard = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, loading } = useTelemedAuth();
   const [appointments, setAppointments] = useState<AppointmentWithDoctor[]>([]);
   const [apptLoading, setApptLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('bookings');
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') === 'chats' ? 'chats' : 'bookings');
+  const initialChatId = searchParams.get('chatId') || undefined;
 
   useEffect(() => {
     if (!loading && !user) {
@@ -241,7 +243,7 @@ const PatientDashboard = () => {
           </TabsContent>
 
           <TabsContent value="chats">
-            <TelemedChatRoom patientId={user?.id} patientName={user?.email?.split('@')[0]} userRole="patient" />
+            <TelemedChatRoom patientId={user?.id} patientName={user?.email?.split('@')[0]} userRole="patient" initialChatId={initialChatId} />
           </TabsContent>
         </Tabs>
       </main>

@@ -165,7 +165,7 @@ const TelemedBooking = () => {
               mode="single"
               selected={selectedDate}
               onSelect={setSelectedDate}
-              disabled={(date) => date < new Date() || date.getDay() === 0}
+              disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0)) || date.getDay() === 0}
               className="rounded-xl border mx-auto"
             />
           </div>
