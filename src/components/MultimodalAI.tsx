@@ -190,7 +190,13 @@ const OrgCard: React.FC<{ org: any; onViewDoctors?: (orgId: string) => void }> =
           )}
 
           {doctors.length === 0 && services.length === 0 && (
-            <p className="text-sm text-muted-foreground mt-4">No doctors or services listed yet.</p>
+            <div className="mt-4 p-4 border border-dashed border-border rounded-lg text-center space-y-2">
+              <p className="text-sm text-muted-foreground">No doctors or services listed yet.</p>
+              <p className="text-xs text-muted-foreground">If you're the admin of this organization, go to your dashboard to add doctors and services.</p>
+              <Button size="sm" variant="outline" onClick={() => { setOpen(false); navigate('/telemed/organization'); }}>
+                Go to Admin Dashboard
+              </Button>
+            </div>
           )}
         </SheetContent>
       </Sheet>
