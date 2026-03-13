@@ -100,36 +100,35 @@ const DoctorForm: React.FC<DoctorFormProps> = ({ onClose, onSuccess, editDoctor 
         if (error) throw error;
         toast.success('Doctor updated successfully!');
       } else {
-        let userId = null;
-
         if (createAccount && doctorEmail && doctorPassword) {
-          const { data: authData, error: authError } = await supabase.auth.signUp({
-            email: doctorEmail,
-            password: doctorPassword,
-            options: {
-              emailRedirectTo: `${window.location.origin}/telemed/auth`,
-              data: { full_name: formData.full_name },
+          // Use secure Edge Function to provision doctor with linked account
+          const { data: provisionData, error: provisionError } = await supabase.functions.invoke('provision-doctor', {
+            body: {
+              email: doctorEmail,
+              password: doctorPassword,
+              full_name: formData.full_name,
+              specialty: formData.specialty,
+              bio: formData.bio || null,
+              phone: formData.phone || null,
+              location: formData.location || null,
+              consultation_fee: formData.consultation_fee || null,
+              organization_id: formData.organization_id || null,
+              is_private: formData.is_private,
             },
           });
 
-          if (authError) {
-            toast.warning('Failed to create doctor account, continuing without it');
-          } else if (authData.user) {
-            userId = authData.user.id;
-            await supabase.from('user_roles').insert({
-              user_id: userId,
-              role: 'doctor',
-              organization_id: formData.organization_id || null,
-            });
-          }
+          if (provisionError) throw new Error(provisionError.message);
+          if (provisionData?.error) throw new Error(provisionData.error);
+          toast.success('Doctor registered with login account!');
+        } else {
+          // Create doctor record without login account
+          const { error } = await supabase.from('doctors').insert({
+            ...doctorData,
+            user_id: null,
+          });
+          if (error) throw error;
+          toast.success('Doctor registered successfully!');
         }
-
-        const { error } = await supabase.from('doctors').insert({
-          ...doctorData,
-          user_id: userId,
-        });
-        if (error) throw error;
-        toast.success('Doctor registered successfully!');
       }
 
       onSuccess();

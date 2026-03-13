@@ -190,7 +190,13 @@ const OrgCard: React.FC<{ org: any; onViewDoctors?: (orgId: string) => void }> =
           )}
 
           {doctors.length === 0 && services.length === 0 && (
-            <p className="text-sm text-muted-foreground mt-4">No doctors or services listed yet.</p>
+            <div className="mt-4 p-4 border border-dashed border-border rounded-lg text-center space-y-2">
+              <p className="text-sm text-muted-foreground">No doctors or services listed yet.</p>
+              <p className="text-xs text-muted-foreground">If you're the admin of this organization, go to your dashboard to add doctors and services.</p>
+              <Button size="sm" variant="outline" onClick={() => { setOpen(false); navigate('/telemed/organization'); }}>
+                Go to Admin Dashboard
+              </Button>
+            </div>
           )}
         </SheetContent>
       </Sheet>
@@ -368,27 +374,26 @@ const MultimodalAI = () => {
     return data || [];
   };
 
-  // Start chat with doctor
+  // Start chat with doctor — navigate directly to chat tab with chatId
   const startChatWithDoctor = async (doctor: any) => {
     if (!user) { toast.error("Please log in to chat with a doctor"); navigate('/auth'); return; }
     try {
       // Check if chat already exists
-      const { data: existing } = await supabase.from('telemed_chats').select('*').eq('doctor_id', doctor.id).eq('patient_id', user.id).maybeSingle();
+      const { data: existing } = await supabase.from('telemed_chats').select('id').eq('doctor_id', doctor.id).eq('patient_id', user.id).maybeSingle();
       if (existing) {
-        toast.success(`Chat with Dr. ${doctor.full_name} - go to your dashboard`);
-        navigate('/telemed/patient');
+        navigate(`/telemed/patient?tab=chats&chatId=${existing.id}`);
         return;
       }
       // Create new chat
-      const { error } = await supabase.from('telemed_chats').insert({
+      const { data: newChat, error } = await supabase.from('telemed_chats').insert({
         doctor_id: doctor.id,
         patient_id: user.id,
         patient_name: profile?.full_name || user.email?.split('@')[0] || 'Patient',
         status: 'active',
-      });
+      }).select('id').single();
       if (error) throw error;
       toast.success(`Chat started with Dr. ${doctor.full_name}!`);
-      navigate('/telemed/patient');
+      navigate(`/telemed/patient?tab=chats&chatId=${newChat.id}`);
     } catch { toast.error("Failed to start chat"); }
   };
 
