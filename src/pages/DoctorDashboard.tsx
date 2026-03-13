@@ -7,20 +7,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import {
-  Stethoscope,
-  Calendar,
-  MessageSquare,
-  LogOut,
-  Heart,
-  Clock,
-  CheckCircle,
-  X,
-  Loader2,
-  User,
-  Wifi,
-  WifiOff,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  Stethoscope, Calendar, MessageSquare, LogOut, Heart, Clock,
+  CheckCircle, X, Loader2, User, Wifi, WifiOff, CalendarClock,
 } from 'lucide-react';
 import { useTelemedAuth } from '@/hooks/useTelemedAuth';
 import { Doctor, Appointment } from '@/types/telemed';
@@ -35,8 +29,14 @@ const DoctorDashboard = () => {
   const [docLoading, setDocLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('appointments');
   const [isOnline, setIsOnline] = useState(false);
-  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [newBookingCount, setNewBookingCount] = useState(0);
+
+  // Suggest new time state
+  const [suggestDialog, setSuggestDialog] = useState<{ open: boolean; appointmentId: string; patientName: string }>({ open: false, appointmentId: '', patientName: '' });
+  const [suggestedDate, setSuggestedDate] = useState('');
+  const [suggestedTime, setSuggestedTime] = useState('');
+  const [suggestReason, setSuggestReason] = useState('');
+  const [suggesting, setSuggesting] = useState(false);
 
   useEffect(() => {
     if (!loading && (!user || !isDoctor())) {
@@ -46,9 +46,7 @@ const DoctorDashboard = () => {
   }, [user, loading, isDoctor]);
 
   useEffect(() => {
-    if (user) {
-      fetchDoctorProfile();
-    }
+    if (user) fetchDoctorProfile();
   }, [user]);
 
   // Real-time subscription for new appointments
@@ -56,44 +54,22 @@ const DoctorDashboard = () => {
     if (!doctor) return;
     const channel = supabase
       .channel('doctor-appointments-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'appointments',
-          filter: `doctor_id=eq.${doctor.id}`,
-        },
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'appointments', filter: `doctor_id=eq.${doctor.id}` },
         (payload) => {
           const newAppt = payload.new as Appointment;
           setAppointments((prev) => [newAppt, ...prev]);
           setNewBookingCount((c) => c + 1);
           toast.info(`New booking from ${newAppt.patient_name || 'a patient'}!`, {
-            description: `${newAppt.appointment_date} at ${newAppt.appointment_time}`,
-            duration: 8000,
+            description: `${newAppt.appointment_date} at ${newAppt.appointment_time}`, duration: 8000,
           });
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'appointments',
-          filter: `doctor_id=eq.${doctor.id}`,
-        },
+        })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'appointments', filter: `doctor_id=eq.${doctor.id}` },
         (payload) => {
           const updated = payload.new as Appointment;
-          setAppointments((prev) =>
-            prev.map((a) => (a.id === updated.id ? updated : a))
-          );
-        }
-      )
+          setAppointments((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
+        })
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [doctor]);
 
   const fetchDoctorProfile = async () => {
@@ -116,46 +92,65 @@ const DoctorDashboard = () => {
 
   const fetchAppointments = async (doctorId: string) => {
     const { data, error } = await supabase
-      .from('appointments')
-      .select('*')
-      .eq('doctor_id', doctorId)
+      .from('appointments').select('*').eq('doctor_id', doctorId)
       .order('appointment_date', { ascending: true });
-
-    if (error) {
-      console.error('Error fetching appointments:', error);
-    } else {
-      setAppointments((data as Appointment[]) || []);
-    }
+    if (!error) setAppointments((data as Appointment[]) || []);
   };
 
   const toggleOnlineStatus = async () => {
     if (!doctor) return;
-
     const newStatus = !isOnline;
-    const { error } = await supabase
-      .from('doctors')
-      .update({ is_online: newStatus })
-      .eq('id', doctor.id);
-
-    if (error) {
-      toast.error('Failed to update status');
-    } else {
-      setIsOnline(newStatus);
-      toast.success(newStatus ? 'You are now online' : 'You are now offline');
-    }
+    const { error } = await supabase.from('doctors').update({ is_online: newStatus }).eq('id', doctor.id);
+    if (error) toast.error('Failed to update status');
+    else { setIsOnline(newStatus); toast.success(newStatus ? 'You are now online' : 'You are now offline'); }
   };
 
   const updateAppointmentStatus = async (appointmentId: string, status: string) => {
-    const { error } = await supabase
-      .from('appointments')
-      .update({ status })
-      .eq('id', appointmentId);
+    const { error } = await supabase.from('appointments').update({ status }).eq('id', appointmentId);
+    if (error) toast.error('Failed to update appointment');
+    else { toast.success('Appointment updated'); if (doctor) fetchAppointments(doctor.id); }
+  };
 
-    if (error) {
-      toast.error('Failed to update appointment');
-    } else {
-      toast.success('Appointment updated');
+  const handleSuggestNewTime = async () => {
+    if (!suggestedDate || !suggestedTime) {
+      toast.error('Please select both date and time');
+      return;
+    }
+    setSuggesting(true);
+    try {
+      // Update the appointment: cancel original and add suggested time in notes
+      const noteText = `Doctor suggested a new time: ${suggestedDate} at ${suggestedTime}${suggestReason ? ` — Reason: ${suggestReason}` : ''}`;
+      const { error } = await supabase.from('appointments')
+        .update({ status: 'cancelled', notes: noteText })
+        .eq('id', suggestDialog.appointmentId);
+
+      if (error) throw error;
+
+      // Create a new pending appointment at the suggested time
+      const appt = appointments.find(a => a.id === suggestDialog.appointmentId);
+      if (appt) {
+        await supabase.from('appointments').insert({
+          doctor_id: appt.doctor_id,
+          patient_id: appt.patient_id,
+          patient_name: appt.patient_name,
+          patient_phone: appt.patient_phone,
+          patient_email: appt.patient_email,
+          organization_id: appt.organization_id,
+          appointment_date: suggestedDate,
+          appointment_time: suggestedTime,
+          status: 'pending',
+          notes: `Rescheduled by doctor from ${appt.appointment_date} ${appt.appointment_time}. ${suggestReason || ''}`.trim(),
+        });
+      }
+
+      toast.success(`New time suggested to ${suggestDialog.patientName}`);
+      setSuggestDialog({ open: false, appointmentId: '', patientName: '' });
+      setSuggestedDate(''); setSuggestedTime(''); setSuggestReason('');
       if (doctor) fetchAppointments(doctor.id);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to suggest new time');
+    } finally {
+      setSuggesting(false);
     }
   };
 
@@ -209,24 +204,9 @@ const DoctorDashboard = () => {
       <main className="container mx-auto px-4 py-6">
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4 mb-6">
-          <Card>
-            <CardContent className="p-4 text-center">
-              <p className="text-2xl font-bold text-yellow-600">{pendingAppointments.length}</p>
-              <p className="text-sm text-muted-foreground">Pending</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 text-center">
-              <p className="text-2xl font-bold text-green-600">{confirmedAppointments.length}</p>
-              <p className="text-sm text-muted-foreground">Confirmed</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 text-center">
-              <p className="text-2xl font-bold text-blue-600">{todayAppointments.length}</p>
-              <p className="text-sm text-muted-foreground">Today</p>
-            </CardContent>
-          </Card>
+          <Card><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-yellow-600">{pendingAppointments.length}</p><p className="text-sm text-muted-foreground">Pending</p></CardContent></Card>
+          <Card><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-green-600">{confirmedAppointments.length}</p><p className="text-sm text-muted-foreground">Confirmed</p></CardContent></Card>
+          <Card><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-blue-600">{todayAppointments.length}</p><p className="text-sm text-muted-foreground">Today</p></CardContent></Card>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -245,13 +225,8 @@ const DoctorDashboard = () => {
 
           <TabsContent value="appointments" className="space-y-4">
             <h2 className="text-xl font-semibold">Your Appointments</h2>
-            
             {appointments.length === 0 ? (
-              <Card>
-                <CardContent className="py-12 text-center text-muted-foreground">
-                  No appointments yet
-                </CardContent>
-              </Card>
+              <Card><CardContent className="py-12 text-center text-muted-foreground">No appointments yet</CardContent></Card>
             ) : (
               <div className="space-y-4">
                 {appointments.map((appointment) => (
@@ -259,62 +234,41 @@ const DoctorDashboard = () => {
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
+                          <div className="flex items-center gap-2 mb-2 flex-wrap">
                             <Badge className={
                               appointment.status === 'pending' ? 'bg-yellow-500' :
                               appointment.status === 'confirmed' ? 'bg-green-500' :
                               appointment.status === 'completed' ? 'bg-blue-500' : 'bg-red-500'
-                            }>
-                              {appointment.status}
-                            </Badge>
-                            <span className="text-sm flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              {new Date(appointment.appointment_date).toLocaleDateString()}
-                            </span>
-                            <span className="text-sm flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              {appointment.appointment_time}
-                            </span>
+                            }>{appointment.status}</Badge>
+                            <span className="text-sm flex items-center gap-1"><Calendar className="h-3 w-3" />{new Date(appointment.appointment_date).toLocaleDateString()}</span>
+                            <span className="text-sm flex items-center gap-1"><Clock className="h-3 w-3" />{appointment.appointment_time}</span>
                           </div>
                           <div className="flex items-center gap-2">
                             <User className="h-4 w-4 text-muted-foreground" />
                             <span className="font-medium">{appointment.patient_name || 'Anonymous'}</span>
                           </div>
-                          {appointment.patient_phone && (
-                            <p className="text-sm text-muted-foreground mt-1">{appointment.patient_phone}</p>
-                          )}
-                          {appointment.notes && (
-                            <p className="text-sm mt-2 p-2 bg-muted rounded">{appointment.notes}</p>
-                          )}
+                          {appointment.patient_phone && <p className="text-sm text-muted-foreground mt-1">{appointment.patient_phone}</p>}
+                          {appointment.notes && <p className="text-sm mt-2 p-2 bg-muted rounded">{appointment.notes}</p>}
                         </div>
                         
                         {appointment.status === 'pending' && (
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              className="bg-green-500 hover:bg-green-600"
-                              onClick={() => updateAppointmentStatus(appointment.id, 'confirmed')}
-                            >
-                              <CheckCircle className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => updateAppointmentStatus(appointment.id, 'cancelled')}
-                            >
-                              <X className="h-4 w-4" />
+                          <div className="flex flex-col gap-2">
+                            <div className="flex gap-2">
+                              <Button size="sm" className="bg-green-500 hover:bg-green-600" onClick={() => updateAppointmentStatus(appointment.id, 'confirmed')}>
+                                <CheckCircle className="h-4 w-4" />
+                              </Button>
+                              <Button size="sm" variant="destructive" onClick={() => updateAppointmentStatus(appointment.id, 'cancelled')}>
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            <Button size="sm" variant="outline" className="text-xs" onClick={() => setSuggestDialog({ open: true, appointmentId: appointment.id, patientName: appointment.patient_name || 'Patient' })}>
+                              <CalendarClock className="h-3 w-3 mr-1" /> Suggest Time
                             </Button>
                           </div>
                         )}
                         
                         {appointment.status === 'confirmed' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => updateAppointmentStatus(appointment.id, 'completed')}
-                          >
-                            Complete
-                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => updateAppointmentStatus(appointment.id, 'completed')}>Complete</Button>
                         )}
                       </div>
                     </CardContent>
@@ -343,50 +297,52 @@ const DoctorDashboard = () => {
                   <div>
                     <h3 className="text-xl font-semibold">{doctor?.full_name}</h3>
                     <Badge>{doctor?.specialty}</Badge>
-                    {doctor?.organization && (
-                      <p className="text-sm text-muted-foreground mt-1">{doctor.organization.name}</p>
-                    )}
+                    {doctor?.organization && <p className="text-sm text-muted-foreground mt-1">{doctor.organization.name}</p>}
                   </div>
                 </div>
-                
-                {doctor?.bio && (
-                  <div>
-                    <Label>Bio</Label>
-                    <p className="text-sm text-muted-foreground mt-1">{doctor.bio}</p>
-                  </div>
-                )}
-                
+                {doctor?.bio && <div><Label>Bio</Label><p className="text-sm text-muted-foreground mt-1">{doctor.bio}</p></div>}
                 <div className="grid md:grid-cols-2 gap-4">
-                  {doctor?.phone && (
-                    <div>
-                      <Label>Phone</Label>
-                      <p className="text-sm">{doctor.phone}</p>
-                    </div>
-                  )}
-                  {doctor?.email && (
-                    <div>
-                      <Label>Email</Label>
-                      <p className="text-sm">{doctor.email}</p>
-                    </div>
-                  )}
-                  {doctor?.location && (
-                    <div>
-                      <Label>Location</Label>
-                      <p className="text-sm">{doctor.location}</p>
-                    </div>
-                  )}
-                  {doctor?.consultation_fee && (
-                    <div>
-                      <Label>Consultation Fee</Label>
-                      <p className="text-sm font-medium">TZS {doctor.consultation_fee.toLocaleString()}</p>
-                    </div>
-                  )}
+                  {doctor?.phone && <div><Label>Phone</Label><p className="text-sm">{doctor.phone}</p></div>}
+                  {doctor?.email && <div><Label>Email</Label><p className="text-sm">{doctor.email}</p></div>}
+                  {doctor?.location && <div><Label>Location</Label><p className="text-sm">{doctor.location}</p></div>}
+                  {doctor?.consultation_fee && <div><Label>Consultation Fee</Label><p className="text-sm font-medium">TZS {doctor.consultation_fee.toLocaleString()}</p></div>}
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* Suggest New Time Dialog */}
+      <Dialog open={suggestDialog.open} onOpenChange={(open) => { if (!open) setSuggestDialog({ open: false, appointmentId: '', patientName: '' }); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><CalendarClock className="h-5 w-5" /> Suggest New Time</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">Propose an alternative time to <strong>{suggestDialog.patientName}</strong>. The original booking will be cancelled and a new one created at the suggested time.</p>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Suggested Date</Label>
+              <Input type="date" value={suggestedDate} onChange={(e) => setSuggestedDate(e.target.value)} min={new Date().toISOString().split('T')[0]} />
+            </div>
+            <div className="space-y-2">
+              <Label>Suggested Time</Label>
+              <Input type="time" value={suggestedTime} onChange={(e) => setSuggestedTime(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Reason (optional)</Label>
+              <Input placeholder="e.g., I have another appointment at that time" value={suggestReason} onChange={(e) => setSuggestReason(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSuggestDialog({ open: false, appointmentId: '', patientName: '' })}>Cancel</Button>
+            <Button onClick={handleSuggestNewTime} disabled={suggesting}>
+              {suggesting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CalendarClock className="h-4 w-4 mr-2" />}
+              Suggest Time
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

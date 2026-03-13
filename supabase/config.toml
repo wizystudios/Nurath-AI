@@ -49,3 +49,6 @@ verify_jwt = false
 
 [functions.elevenlabs-voices]
 verify_jwt = false
+
+[functions.provision-doctor]
+verify_jwt = false
