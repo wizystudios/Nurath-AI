@@ -2,23 +2,25 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import {
   Calendar, Clock, User, Stethoscope, ArrowLeft,
   CheckCircle, XCircle, Timer, Heart, MessageSquare, Loader2,
+  ChevronDown,
 } from 'lucide-react';
 import { Appointment } from '@/types/telemed';
 import { useTelemedAuth } from '@/hooks/useTelemedAuth';
+import { ThemeToggle } from '@/components/theme-toggle';
 import TelemedChatRoom from '@/components/telemed/TelemedChatRoom';
 
 const STATUS_CONFIG: Record<string, { color: string; icon: React.ElementType; label: string }> = {
-  pending:   { color: 'bg-yellow-500', icon: Timer,        label: 'Pending Approval' },
-  confirmed: { color: 'bg-green-500',  icon: CheckCircle,  label: 'Confirmed' },
-  completed: { color: 'bg-blue-500',   icon: CheckCircle,  label: 'Completed' },
-  cancelled: { color: 'bg-red-500',    icon: XCircle,      label: 'Cancelled' },
+  pending:   { color: 'bg-yellow-500', icon: Timer,       label: 'Pending' },
+  confirmed: { color: 'bg-green-500',  icon: CheckCircle, label: 'Confirmed' },
+  completed: { color: 'bg-blue-500',   icon: CheckCircle, label: 'Completed' },
+  cancelled: { color: 'bg-red-500',    icon: XCircle,     label: 'Cancelled' },
 };
 
 interface AppointmentWithDoctor extends Appointment {
@@ -37,23 +39,18 @@ const PatientDashboard = () => {
   useEffect(() => {
     if (!loading && !user) {
       toast.error('Please log in to view your dashboard');
-      navigate('/telemed/auth');
+      navigate('/auth');
     }
   }, [user, loading]);
 
-  useEffect(() => {
-    if (user) fetchAppointments();
-  }, [user]);
+  useEffect(() => { if (user) fetchAppointments(); }, [user]);
 
-  // Realtime updates
   useEffect(() => {
     if (!user) return;
     const channel = supabase
       .channel('patient-appointments')
-      .on('postgres_changes', {
-        event: '*', schema: 'public', table: 'appointments',
-        filter: `patient_id=eq.${user.id}`,
-      }, () => { fetchAppointments(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments', filter: `patient_id=eq.${user.id}` },
+        () => { fetchAppointments(); })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [user]);
@@ -65,12 +62,8 @@ const PatientDashboard = () => {
       .select('*, doctor:doctors(full_name, specialty, phone, email, consultation_fee)')
       .eq('patient_id', user!.id)
       .order('appointment_date', { ascending: false });
-
-    if (error) {
-      toast.error('Failed to load appointments');
-    } else {
-      setAppointments((data as AppointmentWithDoctor[]) || []);
-    }
+    if (error) toast.error('Failed to load appointments');
+    else setAppointments((data as AppointmentWithDoctor[]) || []);
     setApptLoading(false);
   };
 
@@ -83,121 +76,102 @@ const PatientDashboard = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-sky-500" />
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
-  const upcoming = appointments.filter(a => ['pending','confirmed'].includes(a.status || ''));
-  const past     = appointments.filter(a => ['completed','cancelled'].includes(a.status || ''));
+  const upcoming = appointments.filter(a => ['pending', 'confirmed'].includes(a.status || ''));
+  const past = appointments.filter(a => ['completed', 'cancelled'].includes(a.status || ''));
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-50 to-cyan-50 dark:from-slate-900 dark:to-slate-800">
-      <header className="bg-white dark:bg-slate-800 border-b sticky top-0 z-10 shadow-sm">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/?mode=telemed')}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div className="w-10 h-10 bg-gradient-to-br from-sky-500 to-cyan-600 rounded-xl flex items-center justify-center">
-              <Heart className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <h1 className="font-bold text-xl">My Health Dashboard</h1>
-              <p className="text-xs text-muted-foreground">{user?.email}</p>
-            </div>
-          </div>
+    <div className="flex flex-col h-screen bg-background">
+      {/* Header — matching AI chat header */}
+      <header className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-background">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/?mode=telemed')}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <h1 className="text-xl font-semibold">My Health</h1>
         </div>
+        <ThemeToggle />
       </header>
 
-      <main className="container mx-auto px-4 py-6 max-w-4xl">
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          <Card>
-            <CardContent className="p-4 text-center">
-              <p className="text-2xl font-bold text-yellow-600">{upcoming.filter(a=>a.status==='pending').length}</p>
-              <p className="text-sm text-muted-foreground">Pending</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 text-center">
-              <p className="text-2xl font-bold text-green-600">{upcoming.filter(a=>a.status==='confirmed').length}</p>
-              <p className="text-sm text-muted-foreground">Confirmed</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 text-center">
-              <p className="text-2xl font-bold text-blue-600">{past.filter(a=>a.status==='completed').length}</p>
-              <p className="text-sm text-muted-foreground">Completed</p>
-            </CardContent>
-          </Card>
-        </div>
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-3xl mx-auto px-4 py-4">
+          {/* Stats — compact inline */}
+          <div className="flex gap-3 mb-4">
+            <div className="flex-1 text-center py-3 rounded-xl bg-muted/30">
+              <p className="text-xl font-bold text-yellow-600">{upcoming.filter(a => a.status === 'pending').length}</p>
+              <p className="text-xs text-muted-foreground">Pending</p>
+            </div>
+            <div className="flex-1 text-center py-3 rounded-xl bg-muted/30">
+              <p className="text-xl font-bold text-green-600">{upcoming.filter(a => a.status === 'confirmed').length}</p>
+              <p className="text-xs text-muted-foreground">Confirmed</p>
+            </div>
+            <div className="flex-1 text-center py-3 rounded-xl bg-muted/30">
+              <p className="text-xl font-bold text-blue-600">{past.filter(a => a.status === 'completed').length}</p>
+              <p className="text-xs text-muted-foreground">Done</p>
+            </div>
+          </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-2 mb-6">
-            <TabsTrigger value="bookings">My Appointments</TabsTrigger>
-            <TabsTrigger value="chats">My Chats</TabsTrigger>
-          </TabsList>
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full grid-cols-2 mb-4">
+              <TabsTrigger value="bookings">
+                <Calendar className="h-4 w-4 mr-2" /> Appointments
+              </TabsTrigger>
+              <TabsTrigger value="chats">
+                <MessageSquare className="h-4 w-4 mr-2" /> Chats
+              </TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="bookings" className="space-y-4">
-            {apptLoading ? (
-              <div className="flex justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-sky-500" />
-              </div>
-            ) : appointments.length === 0 ? (
-              <Card>
-                <CardContent className="py-12 text-center">
-                  <Calendar className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-50" />
-                  <p className="text-muted-foreground">No appointments yet</p>
-                  <Button className="mt-4" onClick={() => navigate('/?mode=telemed')}>
-                    Find a Doctor
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <>
-                {upcoming.length > 0 && (
-                  <div>
-                    <h2 className="font-semibold text-lg mb-3">Upcoming</h2>
-                    <div className="space-y-3">
+            <TabsContent value="bookings" className="space-y-3">
+              {apptLoading ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              ) : appointments.length === 0 ? (
+                <div className="text-center py-16">
+                  <Calendar className="h-12 w-12 mx-auto mb-3 text-muted-foreground/30" />
+                  <p className="text-muted-foreground mb-4">No appointments yet</p>
+                  <Button onClick={() => navigate('/?mode=telemed')}>Find a Doctor</Button>
+                </div>
+              ) : (
+                <>
+                  {upcoming.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-muted-foreground">Upcoming</p>
                       {upcoming.map(appt => {
                         const cfg = STATUS_CONFIG[appt.status || 'pending'];
                         const Icon = cfg.icon;
                         return (
-                          <Card key={appt.id}>
+                          <Card key={appt.id} className="border-border/50">
                             <CardContent className="p-4">
                               <div className="flex items-start justify-between gap-3">
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2 mb-2 flex-wrap">
                                     <Badge className={`${cfg.color} text-white`}>
-                                      <Icon className="h-3 w-3 mr-1" />
-                                      {cfg.label}
+                                      <Icon className="h-3 w-3 mr-1" />{cfg.label}
                                     </Badge>
                                     <span className="text-sm text-muted-foreground flex items-center gap-1">
                                       <Calendar className="h-3 w-3" />
                                       {new Date(appt.appointment_date).toLocaleDateString()}
                                     </span>
                                     <span className="text-sm text-muted-foreground flex items-center gap-1">
-                                      <Clock className="h-3 w-3" />
-                                      {appt.appointment_time}
+                                      <Clock className="h-3 w-3" />{appt.appointment_time}
                                     </span>
                                   </div>
                                   <div className="flex items-center gap-2">
                                     <Stethoscope className="h-4 w-4 text-muted-foreground" />
-                                    <span className="font-medium">{appt.doctor?.full_name || 'Unknown Doctor'}</span>
-                                    {appt.doctor?.specialty && (
-                                      <Badge variant="outline" className="text-xs">{appt.doctor.specialty}</Badge>
-                                    )}
+                                    <span className="font-medium text-sm">{appt.doctor?.full_name || 'Unknown Doctor'}</span>
+                                    {appt.doctor?.specialty && <Badge variant="outline" className="text-xs">{appt.doctor.specialty}</Badge>}
                                   </div>
-                                  {appt.notes && (
-                                    <p className="text-sm text-muted-foreground mt-2 bg-muted p-2 rounded-lg">{appt.notes}</p>
-                                  )}
+                                  {appt.notes && <p className="text-sm text-muted-foreground mt-2 bg-muted p-2 rounded-lg">{appt.notes}</p>}
                                 </div>
                                 {appt.status === 'pending' && (
-                                  <Button size="sm" variant="destructive" onClick={() => cancelAppointment(appt.id)}>
-                                    Cancel
-                                  </Button>
+                                  <Button size="sm" variant="destructive" onClick={() => cancelAppointment(appt.id)}>Cancel</Button>
                                 )}
                               </div>
                             </CardContent>
@@ -205,48 +179,39 @@ const PatientDashboard = () => {
                         );
                       })}
                     </div>
-                  </div>
-                )}
-
-                {past.length > 0 && (
-                  <div>
-                    <h2 className="font-semibold text-lg mb-3 mt-6">History</h2>
-                    <div className="space-y-3">
+                  )}
+                  {past.length > 0 && (
+                    <div className="space-y-2 mt-4">
+                      <p className="text-sm font-medium text-muted-foreground">History</p>
                       {past.map(appt => {
                         const cfg = STATUS_CONFIG[appt.status || 'completed'];
                         const Icon = cfg.icon;
                         return (
-                          <Card key={appt.id} className="opacity-80">
-                            <CardContent className="p-4">
-                              <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                <Badge className={`${cfg.color} text-white`}>
-                                  <Icon className="h-3 w-3 mr-1" />
-                                  {cfg.label}
-                                </Badge>
+                          <Card key={appt.id} className="border-border/50 opacity-70">
+                            <CardContent className="p-3">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Badge className={`${cfg.color} text-white`}><Icon className="h-3 w-3 mr-1" />{cfg.label}</Badge>
                                 <span className="text-sm text-muted-foreground">
                                   {new Date(appt.appointment_date).toLocaleDateString()} at {appt.appointment_time}
                                 </span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Stethoscope className="h-4 w-4 text-muted-foreground" />
-                                <span className="font-medium">{appt.doctor?.full_name || 'Unknown Doctor'}</span>
+                                <span className="text-sm font-medium ml-auto">{appt.doctor?.full_name}</span>
                               </div>
                             </CardContent>
                           </Card>
                         );
                       })}
                     </div>
-                  </div>
-                )}
-              </>
-            )}
-          </TabsContent>
+                  )}
+                </>
+              )}
+            </TabsContent>
 
-          <TabsContent value="chats">
-            <TelemedChatRoom patientId={user?.id} patientName={user?.email?.split('@')[0]} userRole="patient" initialChatId={initialChatId} />
-          </TabsContent>
-        </Tabs>
-      </main>
+            <TabsContent value="chats">
+              <TelemedChatRoom patientId={user?.id} patientName={user?.email?.split('@')[0]} userRole="patient" initialChatId={initialChatId} />
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
     </div>
   );
 };
