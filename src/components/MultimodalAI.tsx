@@ -368,27 +368,26 @@ const MultimodalAI = () => {
     return data || [];
   };
 
-  // Start chat with doctor
+  // Start chat with doctor — navigate directly to chat tab with chatId
   const startChatWithDoctor = async (doctor: any) => {
     if (!user) { toast.error("Please log in to chat with a doctor"); navigate('/auth'); return; }
     try {
       // Check if chat already exists
-      const { data: existing } = await supabase.from('telemed_chats').select('*').eq('doctor_id', doctor.id).eq('patient_id', user.id).maybeSingle();
+      const { data: existing } = await supabase.from('telemed_chats').select('id').eq('doctor_id', doctor.id).eq('patient_id', user.id).maybeSingle();
       if (existing) {
-        toast.success(`Chat with Dr. ${doctor.full_name} - go to your dashboard`);
-        navigate('/telemed/patient');
+        navigate(`/telemed/patient?tab=chats&chatId=${existing.id}`);
         return;
       }
       // Create new chat
-      const { error } = await supabase.from('telemed_chats').insert({
+      const { data: newChat, error } = await supabase.from('telemed_chats').insert({
         doctor_id: doctor.id,
         patient_id: user.id,
         patient_name: profile?.full_name || user.email?.split('@')[0] || 'Patient',
         status: 'active',
-      });
+      }).select('id').single();
       if (error) throw error;
       toast.success(`Chat started with Dr. ${doctor.full_name}!`);
-      navigate('/telemed/patient');
+      navigate(`/telemed/patient?tab=chats&chatId=${newChat.id}`);
     } catch { toast.error("Failed to start chat"); }
   };
 
