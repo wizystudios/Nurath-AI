@@ -227,10 +227,10 @@ interface ChatHistory {
 
 const TELEMED_QUICK_ACTIONS = [
   { label: 'Find a Doctor', icon: Stethoscope, command: 'Find me a doctor' },
-  { label: 'Hospitals', icon: Building2, command: 'Show me hospitals' },
-  { label: 'Pharmacies', icon: Pill, command: 'Find pharmacies' },
+  { label: 'Hospitals', icon: Building2, command: 'Show me hospitals nearby' },
+  { label: 'Pharmacies', icon: Pill, command: 'Find pharmacies to buy medicine' },
   { label: 'Lab Tests', icon: FlaskConical, command: 'Show lab testing facilities' },
-  { label: 'Health Tips', icon: Heart, command: 'Give me health tips' },
+  { label: "I'm not feeling well", icon: Heart, command: "I have a headache and fever, what should I do?" },
 ];
 
 const GENERAL_QUICK_ACTIONS = [
