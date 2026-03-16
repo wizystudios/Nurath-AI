@@ -227,10 +227,10 @@ interface ChatHistory {
 
 const TELEMED_QUICK_ACTIONS = [
   { label: 'Find a Doctor', icon: Stethoscope, command: 'Find me a doctor' },
-  { label: 'Hospitals', icon: Building2, command: 'Show me hospitals' },
-  { label: 'Pharmacies', icon: Pill, command: 'Find pharmacies' },
+  { label: 'Hospitals', icon: Building2, command: 'Show me hospitals nearby' },
+  { label: 'Pharmacies', icon: Pill, command: 'Find pharmacies to buy medicine' },
   { label: 'Lab Tests', icon: FlaskConical, command: 'Show lab testing facilities' },
-  { label: 'Health Tips', icon: Heart, command: 'Give me health tips' },
+  { label: "I'm not feeling well", icon: Heart, command: "I have a headache and fever, what should I do?" },
 ];
 
 const GENERAL_QUICK_ACTIONS = [
@@ -420,13 +420,19 @@ const MultimodalAI = () => {
         const locationMatch = input.match(/(?:in|near|at|around|karibu na)\s+([A-Za-z\s]+?)(?:\s*$|[,.])/i);
         const locationFilter = locationMatch ? locationMatch[1].trim() : undefined;
 
-        if (lowerInput.includes('doctor') || lowerInput.includes('specialist') || lowerInput.includes('daktari') || lowerInput.includes('available')) {
-          const query = input.replace(/find|me|a|show|doctor|doctors|specialist|in|near|at|around|karibu\s+na|available|free\s+time|when|book/gi, '').replace(locationFilter || '', '').trim() || '';
+        // Symptom keywords that should trigger doctor suggestions
+        const symptomKeywords = ['pain', 'ache', 'fever', 'cough', 'sick', 'feeling', 'hurt', 'headache', 'stomach', 'chest', 
+          'dizzy', 'nausea', 'vomit', 'diarrhea', 'rash', 'allergy', 'breathing', 'fatigue', 'tired', 'swelling',
+          'maumivu', 'homa', 'kikohozi', 'kichwa', 'tumbo', 'kizunguzungu', 'kutapika', 'uchovu',
+          'symptoms', 'not feeling well', 'unwell', 'ill', 'sickness', 'diagnosis', 'condition'];
+        const hasSymptoms = symptomKeywords.some(k => lowerInput.includes(k));
+
+        if (lowerInput.includes('doctor') || lowerInput.includes('specialist') || lowerInput.includes('daktari') || lowerInput.includes('available') || hasSymptoms) {
+          const query = input.replace(/find|me|a|show|doctor|doctors|specialist|in|near|at|around|karibu\s+na|available|free\s+time|when|book|i have|i feel|i'm|my/gi, '').replace(locationFilter || '', '').trim() || '';
           const doctors = await searchDoctors(query, locationFilter);
           if (doctors.length > 0) {
             telemedData = doctors;
             telemedType = 'doctors';
-            // Get availability for top 3 doctors
             const availInfo: string[] = [];
             for (const doc of doctors.slice(0, 3)) {
               const avail = await getDoctorAvailability(doc.id);
@@ -434,13 +440,19 @@ const MultimodalAI = () => {
                 ? `Dr. ${doc.full_name} (${doc.specialty}) has free slots today: ${avail.freeSlots.slice(0, 5).join(', ')}.`
                 : `Dr. ${doc.full_name} is fully booked today.`);
             }
-            // Inject into AI context — the AI will just summarize, no questions asked
-            input = input + '\n\n[SYSTEM: Here are the doctors found. Present them directly to the user with their availability. Do NOT ask follow-up questions — just show the results.]\n' + availInfo.join('\n');
+            if (hasSymptoms) {
+              input = input + '\n\n[SYSTEM: The user described symptoms. First, briefly assess what type of specialist they might need based on their symptoms. Then show the matching doctors found with their availability. Recommend booking. Do NOT give a medical diagnosis — suggest consulting a doctor. Be empathetic and helpful.]\n' + availInfo.join('\n');
+            } else {
+              input = input + '\n\n[SYSTEM: Here are the doctors found. Present them directly to the user with their availability. Do NOT ask follow-up questions — just show the results.]\n' + availInfo.join('\n');
+            }
+          } else if (hasSymptoms) {
+            // No doctors found but user has symptoms — still provide health guidance
+            input = input + '\n\n[SYSTEM: No specific doctors were found matching the symptoms. Provide general health advice for the described symptoms and suggest the user search for a specific type of specialist. Be empathetic. Mention they can search for hospitals or clinics too.]';
           }
         } else if (lowerInput.includes('hospital') || lowerInput.includes('hospitali')) {
           telemedData = await searchOrganizations('hospital', locationFilter);
           telemedType = 'hospitals';
-        } else if (lowerInput.includes('pharmacy') || lowerInput.includes('duka') || lowerInput.includes('medicine')) {
+        } else if (lowerInput.includes('pharmacy') || lowerInput.includes('duka') || lowerInput.includes('medicine') || lowerInput.includes('dawa')) {
           telemedData = await searchOrganizations('pharmacy', locationFilter);
           telemedType = 'hospitals';
         } else if (lowerInput.includes('lab') || lowerInput.includes('test') || lowerInput.includes('maabara')) {
@@ -448,6 +460,9 @@ const MultimodalAI = () => {
           telemedType = 'hospitals';
         } else if (lowerInput.includes('clinic') || lowerInput.includes('kliniki')) {
           telemedData = await searchOrganizations('clinic', locationFilter);
+          telemedType = 'hospitals';
+        } else if (lowerInput.includes('health center') || lowerInput.includes('kituo cha afya')) {
+          telemedData = await searchOrganizations('health_center', locationFilter);
           telemedType = 'hospitals';
         }
       }
