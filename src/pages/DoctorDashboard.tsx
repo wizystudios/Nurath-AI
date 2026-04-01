@@ -14,14 +14,14 @@ import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
-  Stethoscope, Calendar, MessageSquare, LogOut, Clock, CheckCircle, X,
+  Stethoscope, Calendar, MessageSquare, Clock, CheckCircle, X,
   Loader2, User, Wifi, WifiOff, CalendarClock, FileText, FlaskConical, Plus,
-  Pill, ArrowLeft,
+  Pill,
 } from 'lucide-react';
 import { useTelemedAuth } from '@/hooks/useTelemedAuth';
 import { Doctor, Appointment } from '@/types/telemed';
 import TelemedChatRoom from '@/components/telemed/TelemedChatRoom';
-import { ThemeToggle } from '@/components/theme-toggle';
+import DashboardShell from '@/components/DashboardShell';
 
 const DoctorDashboard = () => {
   const navigate = useNavigate();
