@@ -106,20 +106,13 @@ const SuperAdminDashboard = () => {
   ];
 
   return (
-    <div className="flex flex-col h-screen bg-background">
-      <header className="flex items-center justify-between px-4 py-3 border-b border-border/50">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/')}><ArrowLeft className="h-5 w-5" /></Button>
-          <div>
-            <h1 className="text-lg font-semibold">Admin Dashboard</h1>
-            <p className="text-xs text-muted-foreground">{user?.email}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
-          <Button variant="ghost" size="icon" onClick={handleLogout}><LogOut className="h-4 w-4" /></Button>
-        </div>
-      </header>
+    <DashboardShell
+      title="Admin Dashboard"
+      subtitle={user?.email}
+      icon={<TrendingUp className="h-4 w-4 text-primary" />}
+      onLogout={handleLogout}
+      maxWidth="max-w-5xl"
+    >
 
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-5xl mx-auto px-4 py-4">
