@@ -156,9 +156,7 @@ const PharmacyDashboard = () => {
               {userRole?.organization_id && <MedicineManager organizationId={userRole.organization_id} />}
             </TabsContent>
           </Tabs>
-        </div>
-      </div>
-    </div>
+    </DashboardShell>
   );
 };
 

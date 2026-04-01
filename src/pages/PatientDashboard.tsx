@@ -498,8 +498,6 @@ const PatientDashboard = () => {
               )}
             </TabsContent>
           </Tabs>
-        </div>
-      </div>
 
       {/* Review Dialog */}
       <Dialog open={reviewDialog.open} onOpenChange={(open) => { if (!open) setReviewDialog({ open: false, doctorId: '', doctorName: '' }); }}>
@@ -524,7 +522,7 @@ const PatientDashboard = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </DashboardShell>
   );
 };
 

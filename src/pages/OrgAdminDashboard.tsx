@@ -153,11 +153,9 @@ const OrgAdminDashboard = () => {
               </Card>
             </TabsContent>
           </Tabs>
-        </div>
-      </div>
 
       {showDoctorForm && <DoctorForm onClose={() => setShowDoctorForm(false)} onSuccess={() => { setShowDoctorForm(false); handleRefresh(); }} />}
-    </div>
+    </DashboardShell>
   );
 };
 
