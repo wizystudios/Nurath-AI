@@ -170,8 +170,7 @@ const LabDashboard = () => {
               {userRole?.organization_id && <LabTestManager organizationId={userRole.organization_id} />}
             </TabsContent>
           </Tabs>
-        </div>
-      </div>
+
 
       {/* Results Dialog */}
       <Dialog open={resultDialog.open} onOpenChange={(open) => { if (!open) setResultDialog({ open: false, booking: null }); }}>
