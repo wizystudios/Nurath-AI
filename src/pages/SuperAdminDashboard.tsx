@@ -256,12 +256,10 @@ const SuperAdminDashboard = () => {
             <TabsContent value="chatbot"><FAQManager /></TabsContent>
             <TabsContent value="settings"><SystemSettings /></TabsContent>
           </Tabs>
-        </div>
-      </div>
 
       {showOrgForm && <OrganizationForm onClose={() => setShowOrgForm(false)} onSuccess={() => { setShowOrgForm(false); handleRefresh(); }} />}
       {showDoctorForm && <DoctorForm onClose={() => setShowDoctorForm(false)} onSuccess={() => { setShowDoctorForm(false); handleRefresh(); }} />}
-    </div>
+    </DashboardShell>
   );
 };
 
