@@ -2,12 +2,9 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Eye, EyeOff, Brain, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Brain, Loader2, ArrowLeft } from "lucide-react";
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -17,22 +14,22 @@ const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
-  const [loginForm, setLoginForm] = useState({ email: "", password: "" });
-  const [signupForm, setSignupForm] = useState({ email: "", password: "", confirmPassword: "", fullName: "" });
+  const [isSignup, setIsSignup] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [fullName, setFullName] = useState("");
 
   useEffect(() => {
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await handlePostAuthRedirect(user.id);
-      }
+      if (user) await handlePostAuthRedirect(user.id);
       setCheckingAuth(false);
     };
     checkUser();
   }, []);
 
   const handlePostAuthRedirect = async (userId: string) => {
-    // Check if user has a telemed role and redirect accordingly
     const { data: roleData } = await supabase
       .from('user_roles')
       .select('role, organization_id')
@@ -49,43 +46,28 @@ const Auth = () => {
       }
       if (roleData.role === 'doctor') { navigate('/telemed/doctor'); return; }
     }
-
-    // Regular user — go to the requested page
     navigate(redirectTo);
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: loginForm.email,
-        password: loginForm.password,
-      });
-      if (error) {
-        toast.error(error.message.includes('Invalid login') ? "Invalid email or password." : error.message);
-        return;
-      }
-      if (data.user) {
-        toast.success("Welcome back!");
-        await handlePostAuthRedirect(data.user.id);
-      }
-    } catch { toast.error("An unexpected error occurred."); } finally { setIsLoading(false); }
-  };
 
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    if (signupForm.password !== signupForm.confirmPassword) { toast.error("Passwords do not match"); setIsLoading(false); return; }
-    if (signupForm.password.length < 6) { toast.error("Password must be at least 6 characters"); setIsLoading(false); return; }
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email: signupForm.email,
-        password: signupForm.password,
-        options: { emailRedirectTo: `${window.location.origin}/`, data: { full_name: signupForm.fullName } }
-      });
-      if (error) { toast.error(error.message.includes('already registered') ? "Account exists. Please login." : error.message); return; }
-      if (data.user) { toast.success("Account created! Welcome to Nurath.AI!"); navigate(redirectTo); }
+      if (isSignup) {
+        if (password !== confirmPassword) { toast.error("Passwords do not match"); setIsLoading(false); return; }
+        if (password.length < 6) { toast.error("Password must be at least 6 characters"); setIsLoading(false); return; }
+        const { data, error } = await supabase.auth.signUp({
+          email, password,
+          options: { emailRedirectTo: `${window.location.origin}/`, data: { full_name: fullName } }
+        });
+        if (error) { toast.error(error.message.includes('already registered') ? "Account exists. Please login." : error.message); return; }
+        if (data.user) { toast.success("Welcome to Nurath.AI!"); navigate(redirectTo); }
+      } else {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) { toast.error(error.message.includes('Invalid login') ? "Invalid email or password." : error.message); return; }
+        if (data.user) { toast.success("Welcome back!"); await handlePostAuthRedirect(data.user.id); }
+      }
     } catch { toast.error("An unexpected error occurred."); } finally { setIsLoading(false); }
   };
 
@@ -98,88 +80,94 @@ const Auth = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center mb-4">
-            <div className="bg-primary p-3 rounded-2xl">
-              <Brain className="w-8 h-8 text-primary-foreground" />
-            </div>
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="w-full max-w-sm px-6">
+        {/* Logo */}
+        <div className="text-center mb-10">
+          <div className="inline-flex items-center justify-center w-14 h-14 bg-primary rounded-2xl mb-4">
+            <Brain className="w-7 h-7 text-primary-foreground" />
           </div>
-          <h1 className="text-3xl font-bold mb-2">Nurath.AI</h1>
-          <p className="text-muted-foreground">Your AI Assistant & Health Platform</p>
+          <h1 className="text-2xl font-bold text-foreground">Nurath.AI</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {isSignup ? "Create your account" : "Sign in to continue"}
+          </p>
         </div>
 
-        <Card className="border-border">
-          <Tabs defaultValue="login" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-4">
-              <TabsTrigger value="login" className="rounded-xl">Login</TabsTrigger>
-              <TabsTrigger value="signup" className="rounded-xl">Sign Up</TabsTrigger>
-            </TabsList>
+        {/* Form — no card, no border, no background */}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {isSignup && (
+            <Input
+              placeholder="Full name"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              required
+              className="h-12 rounded-2xl bg-muted/50 border-0 px-4"
+            />
+          )}
 
-            <TabsContent value="login">
-              <CardHeader className="text-center pb-4">
-                <CardTitle className="text-xl">Welcome Back</CardTitle>
-                <CardDescription>Sign in to your account</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="login-email">Email</Label>
-                    <Input id="login-email" type="email" placeholder="Enter your email" value={loginForm.email} onChange={(e) => setLoginForm({...loginForm, email: e.target.value})} required className="rounded-xl" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="login-password">Password</Label>
-                    <div className="relative">
-                      <Input id="login-password" type={showPassword ? "text" : "password"} placeholder="Enter your password" value={loginForm.password} onChange={(e) => setLoginForm({...loginForm, password: e.target.value})} required className="rounded-xl pr-10" />
-                      <Button type="button" variant="ghost" size="sm" className="absolute right-2 top-1/2 transform -translate-y-1/2" onClick={() => setShowPassword(!showPassword)}>
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </Button>
-                    </div>
-                  </div>
-                  <Button type="submit" className="w-full rounded-xl" disabled={isLoading}>
-                    {isLoading ? "Signing in..." : "Sign In"}
-                  </Button>
-                </form>
-              </CardContent>
-            </TabsContent>
+          <Input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            className="h-12 rounded-2xl bg-muted/50 border-0 px-4"
+          />
 
-            <TabsContent value="signup">
-              <CardHeader className="text-center pb-4">
-                <CardTitle className="text-xl">Create Account</CardTitle>
-                <CardDescription>Join Nurath.AI</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSignup} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-name">Full Name</Label>
-                    <Input id="signup-name" placeholder="Enter your full name" value={signupForm.fullName} onChange={(e) => setSignupForm({...signupForm, fullName: e.target.value})} required className="rounded-xl" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-email">Email</Label>
-                    <Input id="signup-email" type="email" placeholder="Enter your email" value={signupForm.email} onChange={(e) => setSignupForm({...signupForm, email: e.target.value})} required className="rounded-xl" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-password">Password</Label>
-                    <Input id="signup-password" type={showPassword ? "text" : "password"} placeholder="Create a password" value={signupForm.password} onChange={(e) => setSignupForm({...signupForm, password: e.target.value})} required className="rounded-xl" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-confirm">Confirm Password</Label>
-                    <Input id="signup-confirm" type={showPassword ? "text" : "password"} placeholder="Confirm your password" value={signupForm.confirmPassword} onChange={(e) => setSignupForm({...signupForm, confirmPassword: e.target.value})} required className="rounded-xl" />
-                  </div>
-                  <Button type="submit" className="w-full rounded-xl" disabled={isLoading}>
-                    {isLoading ? "Creating account..." : "Create Account"}
-                  </Button>
-                </form>
-              </CardContent>
-            </TabsContent>
-          </Tabs>
-        </Card>
+          <div className="relative">
+            <Input
+              type={showPassword ? "text" : "password"}
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="h-12 rounded-2xl bg-muted/50 border-0 px-4 pr-12"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
 
-        <div className="text-center mt-6">
-          <Button variant="ghost" onClick={() => navigate('/')} className="text-muted-foreground rounded-xl">
-            ← Continue without account
+          {isSignup && (
+            <Input
+              type={showPassword ? "text" : "password"}
+              placeholder="Confirm password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+              className="h-12 rounded-2xl bg-muted/50 border-0 px-4"
+            />
+          )}
+
+          <Button type="submit" className="w-full h-12 rounded-2xl text-base font-medium" disabled={isLoading}>
+            {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : isSignup ? "Create Account" : "Sign In"}
           </Button>
+        </form>
+
+        {/* Toggle */}
+        <div className="text-center mt-6">
+          <button
+            type="button"
+            onClick={() => setIsSignup(!isSignup)}
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {isSignup ? "Already have an account? Sign in" : "Don't have an account? Sign up"}
+          </button>
+        </div>
+
+        <div className="text-center mt-4">
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Continue without account
+          </button>
         </div>
       </div>
     </div>
