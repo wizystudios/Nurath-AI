@@ -9,12 +9,12 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import {
-  Calendar, Clock, User, Stethoscope, ArrowLeft, CheckCircle, XCircle, Timer,
+  Calendar, Clock, User, Stethoscope, CheckCircle, XCircle, Timer,
   MessageSquare, Loader2, Pill, FlaskConical, FileText, CreditCard, Star,
   Upload, Heart, Bell, Search, Plus, ChevronRight, Package,
 } from 'lucide-react';
 import { useTelemedAuth } from '@/hooks/useTelemedAuth';
-import { ThemeToggle } from '@/components/theme-toggle';
+import DashboardShell from '@/components/DashboardShell';
 import TelemedChatRoom from '@/components/telemed/TelemedChatRoom';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -148,30 +148,18 @@ const PatientDashboard = () => {
   const unreadNotifs = notifications.filter(n => !n.is_read).length;
 
   return (
-    <div className="flex flex-col h-screen bg-background">
-      {/* Header */}
-      <header className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-background">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-lg font-semibold">My Health</h1>
-            <p className="text-xs text-muted-foreground">Welcome, {user?.email?.split('@')[0]}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="relative" onClick={() => setActiveTab('notifications')}>
-            <Bell className="h-5 w-5" />
-            {unreadNotifs > 0 && <span className="absolute -top-0.5 -right-0.5 bg-destructive text-destructive-foreground text-[10px] rounded-full h-4 w-4 flex items-center justify-center">{unreadNotifs}</span>}
-          </Button>
-          <ThemeToggle />
-        </div>
-      </header>
-
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto px-4 py-4">
+    <DashboardShell
+      title="My Health"
+      subtitle={`Welcome, ${user?.email?.split('@')[0]}`}
+      icon={<Heart className="h-4 w-4 text-primary" />}
+      onLogout={async () => { await supabase.auth.signOut(); navigate('/auth'); }}
+      headerActions={
+        <Button variant="ghost" size="icon" className="relative" onClick={() => setActiveTab('notifications')}>
+          <Bell className="h-5 w-5" />
+          {unreadNotifs > 0 && <span className="absolute -top-0.5 -right-0.5 bg-destructive text-destructive-foreground text-[10px] rounded-full h-4 w-4 flex items-center justify-center">{unreadNotifs}</span>}
+        </Button>
+      }
+    >
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <ScrollArea className="w-full">
               <TabsList className="inline-flex w-auto mb-4">
@@ -510,8 +498,6 @@ const PatientDashboard = () => {
               )}
             </TabsContent>
           </Tabs>
-        </div>
-      </div>
 
       {/* Review Dialog */}
       <Dialog open={reviewDialog.open} onOpenChange={(open) => { if (!open) setReviewDialog({ open: false, doctorId: '', doctorName: '' }); }}>
@@ -536,7 +522,7 @@ const PatientDashboard = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </DashboardShell>
   );
 };
 

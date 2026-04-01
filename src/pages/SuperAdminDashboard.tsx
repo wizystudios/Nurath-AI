@@ -9,8 +9,8 @@ import { toast } from 'sonner';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Building2, Users, Stethoscope, Pill, FlaskConical, Calendar,
-  Settings, LogOut, Plus, Heart, TrendingUp, MessageSquare,
-  CreditCard, FileText, ArrowLeft, Star, ShoppingCart, TestTube,
+  Settings, Plus, TrendingUp, MessageSquare,
+  ShoppingCart, TestTube, Star,
 } from 'lucide-react';
 import { useTelemedAuth } from '@/hooks/useTelemedAuth';
 import { DashboardStats } from '@/types/telemed';
@@ -22,7 +22,7 @@ import AppointmentList from '@/components/telemed/AppointmentList';
 import FAQManager from '@/components/telemed/FAQManager';
 import SystemSettings from '@/components/telemed/SystemSettings';
 import UserManagement from '@/components/telemed/UserManagement';
-import { ThemeToggle } from '@/components/theme-toggle';
+import DashboardShell from '@/components/DashboardShell';
 
 const SuperAdminDashboard = () => {
   const navigate = useNavigate();
@@ -106,23 +106,14 @@ const SuperAdminDashboard = () => {
   ];
 
   return (
-    <div className="flex flex-col h-screen bg-background">
-      <header className="flex items-center justify-between px-4 py-3 border-b border-border/50">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/')}><ArrowLeft className="h-5 w-5" /></Button>
-          <div>
-            <h1 className="text-lg font-semibold">Admin Dashboard</h1>
-            <p className="text-xs text-muted-foreground">{user?.email}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
-          <Button variant="ghost" size="icon" onClick={handleLogout}><LogOut className="h-4 w-4" /></Button>
-        </div>
-      </header>
+    <DashboardShell
+      title="Admin Dashboard"
+      subtitle={user?.email}
+      icon={<TrendingUp className="h-4 w-4 text-primary" />}
+      onLogout={handleLogout}
+      maxWidth="max-w-5xl"
+    >
 
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-5xl mx-auto px-4 py-4">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <ScrollArea className="w-full">
               <TabsList className="inline-flex w-auto mb-4">
@@ -265,12 +256,10 @@ const SuperAdminDashboard = () => {
             <TabsContent value="chatbot"><FAQManager /></TabsContent>
             <TabsContent value="settings"><SystemSettings /></TabsContent>
           </Tabs>
-        </div>
-      </div>
 
       {showOrgForm && <OrganizationForm onClose={() => setShowOrgForm(false)} onSuccess={() => { setShowOrgForm(false); handleRefresh(); }} />}
       {showDoctorForm && <DoctorForm onClose={() => setShowDoctorForm(false)} onSuccess={() => { setShowDoctorForm(false); handleRefresh(); }} />}
-    </div>
+    </DashboardShell>
   );
 };
 

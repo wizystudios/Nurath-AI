@@ -8,13 +8,13 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  Pill, LogOut, Loader2, Package, AlertCircle, ArrowLeft,
+  Pill, Loader2, Package, AlertCircle,
   ShoppingCart, CheckCircle, Clock, Truck, XCircle,
 } from 'lucide-react';
 import { useTelemedAuth } from '@/hooks/useTelemedAuth';
 import { Organization } from '@/types/telemed';
 import MedicineManager from '@/components/telemed/MedicineManager';
-import { ThemeToggle } from '@/components/theme-toggle';
+import DashboardShell from '@/components/DashboardShell';
 
 const PharmacyDashboard = () => {
   const navigate = useNavigate();
@@ -83,26 +83,13 @@ const PharmacyDashboard = () => {
   const processingOrders = orders.filter(o => o.status === 'processing');
 
   return (
-    <div className="flex flex-col h-screen bg-background">
-      <header className="flex items-center justify-between px-4 py-3 border-b border-border/50">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/')}><ArrowLeft className="h-5 w-5" /></Button>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-green-500/10 rounded-full flex items-center justify-center"><Pill className="h-4 w-4 text-green-500" /></div>
-            <div>
-              <h1 className="text-sm font-semibold">{organization?.name || 'Pharmacy'}</h1>
-              <p className="text-xs text-muted-foreground">Pharmacy Dashboard</p>
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
-          <Button variant="ghost" size="icon" onClick={handleLogout}><LogOut className="h-4 w-4" /></Button>
-        </div>
-      </header>
+    <DashboardShell
+      title={organization?.name || 'Pharmacy'}
+      subtitle="Pharmacy Dashboard"
+      icon={<Pill className="h-4 w-4 text-primary" />}
+      onLogout={handleLogout}
+    >
 
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto px-4 py-4">
           {/* Stats */}
           <div className="grid grid-cols-4 gap-3 mb-4">
             <Card><CardContent className="p-3 text-center"><p className="text-xl font-bold">{stats.total}</p><p className="text-xs text-muted-foreground">Medicines</p></CardContent></Card>
@@ -169,9 +156,7 @@ const PharmacyDashboard = () => {
               {userRole?.organization_id && <MedicineManager organizationId={userRole.organization_id} />}
             </TabsContent>
           </Tabs>
-        </div>
-      </div>
-    </div>
+    </DashboardShell>
   );
 };
 

@@ -11,13 +11,13 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
-  FlaskConical, LogOut, Loader2, TestTube, CheckCircle, ArrowLeft,
+  FlaskConical, Loader2, TestTube, CheckCircle,
   FileText, Upload, Clock, User,
 } from 'lucide-react';
 import { useTelemedAuth } from '@/hooks/useTelemedAuth';
 import { Organization } from '@/types/telemed';
 import LabTestManager from '@/components/telemed/LabTestManager';
-import { ThemeToggle } from '@/components/theme-toggle';
+import DashboardShell from '@/components/DashboardShell';
 
 const LabDashboard = () => {
   const navigate = useNavigate();
@@ -103,26 +103,13 @@ const LabDashboard = () => {
   const inProgress = bookings.filter(b => b.status === 'in_progress');
 
   return (
-    <div className="flex flex-col h-screen bg-background">
-      <header className="flex items-center justify-between px-4 py-3 border-b border-border/50">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/')}><ArrowLeft className="h-5 w-5" /></Button>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-purple-500/10 rounded-full flex items-center justify-center"><FlaskConical className="h-4 w-4 text-purple-500" /></div>
-            <div>
-              <h1 className="text-sm font-semibold">{organization?.name || 'Laboratory'}</h1>
-              <p className="text-xs text-muted-foreground">Lab Dashboard</p>
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
-          <Button variant="ghost" size="icon" onClick={handleLogout}><LogOut className="h-4 w-4" /></Button>
-        </div>
-      </header>
+    <DashboardShell
+      title={organization?.name || 'Laboratory'}
+      subtitle="Lab Dashboard"
+      icon={<FlaskConical className="h-4 w-4 text-primary" />}
+      onLogout={handleLogout}
+    >
 
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto px-4 py-4">
           <div className="grid grid-cols-3 gap-3 mb-4">
             <Card><CardContent className="p-3 text-center"><p className="text-xl font-bold">{stats.total}</p><p className="text-xs text-muted-foreground">Total Tests</p></CardContent></Card>
             <Card><CardContent className="p-3 text-center"><p className="text-xl font-bold text-yellow-600">{pendingBookings.length}</p><p className="text-xs text-muted-foreground">Pending</p></CardContent></Card>
@@ -183,8 +170,7 @@ const LabDashboard = () => {
               {userRole?.organization_id && <LabTestManager organizationId={userRole.organization_id} />}
             </TabsContent>
           </Tabs>
-        </div>
-      </div>
+
 
       {/* Results Dialog */}
       <Dialog open={resultDialog.open} onOpenChange={(open) => { if (!open) setResultDialog({ open: false, booking: null }); }}>
@@ -203,7 +189,7 @@ const LabDashboard = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </DashboardShell>
   );
 };
 

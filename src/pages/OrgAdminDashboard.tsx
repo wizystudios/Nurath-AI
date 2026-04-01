@@ -11,8 +11,8 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
-  Building2, Stethoscope, Calendar, LogOut, Plus, MapPin, Phone, Mail,
-  Globe, Loader2, Edit, Save, ArrowLeft, Settings,
+  Building2, Stethoscope, Calendar, Plus, MapPin, Phone, Mail,
+  Globe, Loader2, Edit, Save, Settings,
 } from 'lucide-react';
 import { useTelemedAuth } from '@/hooks/useTelemedAuth';
 import { Organization } from '@/types/telemed';
@@ -20,7 +20,7 @@ import DoctorForm from '@/components/telemed/DoctorForm';
 import DoctorList from '@/components/telemed/DoctorList';
 import AppointmentList from '@/components/telemed/AppointmentList';
 import OrgServicesManager from '@/components/telemed/OrgServicesManager';
-import { ThemeToggle } from '@/components/theme-toggle';
+import DashboardShell from '@/components/DashboardShell';
 
 const OrgAdminDashboard = () => {
   const navigate = useNavigate();
@@ -64,26 +64,13 @@ const OrgAdminDashboard = () => {
   if (loading || orgLoading) return <div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
 
   return (
-    <div className="flex flex-col h-screen bg-background">
-      <header className="flex items-center justify-between px-4 py-3 border-b border-border/50">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/')}><ArrowLeft className="h-5 w-5" /></Button>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-emerald-500/10 rounded-full flex items-center justify-center"><Building2 className="h-4 w-4 text-emerald-500" /></div>
-            <div>
-              <h1 className="text-sm font-semibold">{organization?.name || 'Organization'}</h1>
-              <p className="text-xs text-muted-foreground capitalize">{organization?.type} Dashboard</p>
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
-          <Button variant="ghost" size="icon" onClick={handleLogout}><LogOut className="h-4 w-4" /></Button>
-        </div>
-      </header>
+    <DashboardShell
+      title={organization?.name || 'Organization'}
+      subtitle={`${organization?.type || ''} Dashboard`}
+      icon={<Building2 className="h-4 w-4 text-primary" />}
+      onLogout={handleLogout}
+    >
 
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto px-4 py-4">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <ScrollArea className="w-full">
               <TabsList className="inline-flex w-auto mb-4">
@@ -166,11 +153,9 @@ const OrgAdminDashboard = () => {
               </Card>
             </TabsContent>
           </Tabs>
-        </div>
-      </div>
 
       {showDoctorForm && <DoctorForm onClose={() => setShowDoctorForm(false)} onSuccess={() => { setShowDoctorForm(false); handleRefresh(); }} />}
-    </div>
+    </DashboardShell>
   );
 };
 

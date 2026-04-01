@@ -14,14 +14,14 @@ import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
-  Stethoscope, Calendar, MessageSquare, LogOut, Clock, CheckCircle, X,
+  Stethoscope, Calendar, MessageSquare, Clock, CheckCircle, X,
   Loader2, User, Wifi, WifiOff, CalendarClock, FileText, FlaskConical, Plus,
-  Pill, ArrowLeft,
+  Pill,
 } from 'lucide-react';
 import { useTelemedAuth } from '@/hooks/useTelemedAuth';
 import { Doctor, Appointment } from '@/types/telemed';
 import TelemedChatRoom from '@/components/telemed/TelemedChatRoom';
-import { ThemeToggle } from '@/components/theme-toggle';
+import DashboardShell from '@/components/DashboardShell';
 
 const DoctorDashboard = () => {
   const navigate = useNavigate();
@@ -231,35 +231,19 @@ const DoctorDashboard = () => {
   const today = appointments.filter(a => a.appointment_date === new Date().toISOString().split('T')[0] && a.status !== 'cancelled');
 
   return (
-    <div className="flex flex-col h-screen bg-background">
-      {/* Header */}
-      <header className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-background">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-              <Stethoscope className="h-4 w-4 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-sm font-semibold">Dr. {doctor?.full_name}</h1>
-              <p className="text-xs text-muted-foreground">{doctor?.specialty}</p>
-            </div>
-          </div>
+    <DashboardShell
+      title={`Dr. ${doctor?.full_name || ''}`}
+      subtitle={doctor?.specialty}
+      icon={<Stethoscope className="h-4 w-4 text-primary" />}
+      onLogout={handleLogout}
+      headerActions={
+        <div className="flex items-center gap-1.5">
+          {isOnline ? <Wifi className="h-3.5 w-3.5 text-green-500" /> : <WifiOff className="h-3.5 w-3.5 text-muted-foreground" />}
+          <Switch checked={isOnline} onCheckedChange={toggleOnlineStatus} />
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5">
-            {isOnline ? <Wifi className="h-3.5 w-3.5 text-green-500" /> : <WifiOff className="h-3.5 w-3.5 text-muted-foreground" />}
-            <Switch checked={isOnline} onCheckedChange={toggleOnlineStatus} />
-          </div>
-          <ThemeToggle />
-          <Button variant="ghost" size="icon" onClick={handleLogout}><LogOut className="h-4 w-4" /></Button>
-        </div>
-      </header>
+      }
+    >
 
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto px-4 py-4">
           {/* Stats */}
           <div className="grid grid-cols-3 gap-3 mb-4">
             <Card><CardContent className="p-3 text-center"><p className="text-xl font-bold text-yellow-600">{pending.length}</p><p className="text-xs text-muted-foreground">Pending</p></CardContent></Card>
@@ -405,8 +389,6 @@ const DoctorDashboard = () => {
               </Card>
             </TabsContent>
           </Tabs>
-        </div>
-      </div>
 
       {/* Suggest New Time Dialog */}
       <Dialog open={suggestDialog.open} onOpenChange={(open) => { if (!open) setSuggestDialog({ open: false, appointmentId: '', patientName: '' }); }}>
@@ -482,7 +464,7 @@ const DoctorDashboard = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </DashboardShell>
   );
 };
 
