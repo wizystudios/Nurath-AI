@@ -9,8 +9,8 @@ import { toast } from 'sonner';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Building2, Users, Stethoscope, Pill, FlaskConical, Calendar,
-  Settings, LogOut, Plus, Heart, TrendingUp, MessageSquare,
-  CreditCard, FileText, ArrowLeft, Star, ShoppingCart, TestTube,
+  Settings, Plus, TrendingUp, MessageSquare,
+  ShoppingCart, TestTube, Star,
 } from 'lucide-react';
 import { useTelemedAuth } from '@/hooks/useTelemedAuth';
 import { DashboardStats } from '@/types/telemed';
@@ -22,7 +22,7 @@ import AppointmentList from '@/components/telemed/AppointmentList';
 import FAQManager from '@/components/telemed/FAQManager';
 import SystemSettings from '@/components/telemed/SystemSettings';
 import UserManagement from '@/components/telemed/UserManagement';
-import { ThemeToggle } from '@/components/theme-toggle';
+import DashboardShell from '@/components/DashboardShell';
 
 const SuperAdminDashboard = () => {
   const navigate = useNavigate();
