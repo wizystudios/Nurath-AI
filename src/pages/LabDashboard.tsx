@@ -11,13 +11,13 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
-  FlaskConical, LogOut, Loader2, TestTube, CheckCircle, ArrowLeft,
+  FlaskConical, Loader2, TestTube, CheckCircle,
   FileText, Upload, Clock, User,
 } from 'lucide-react';
 import { useTelemedAuth } from '@/hooks/useTelemedAuth';
 import { Organization } from '@/types/telemed';
 import LabTestManager from '@/components/telemed/LabTestManager';
-import { ThemeToggle } from '@/components/theme-toggle';
+import DashboardShell from '@/components/DashboardShell';
 
 const LabDashboard = () => {
   const navigate = useNavigate();
