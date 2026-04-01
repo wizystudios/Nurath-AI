@@ -90,8 +90,6 @@ const PharmacyDashboard = () => {
       onLogout={handleLogout}
     >
 
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto px-4 py-4">
           {/* Stats */}
           <div className="grid grid-cols-4 gap-3 mb-4">
             <Card><CardContent className="p-3 text-center"><p className="text-xl font-bold">{stats.total}</p><p className="text-xs text-muted-foreground">Medicines</p></CardContent></Card>
