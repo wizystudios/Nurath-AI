@@ -11,8 +11,8 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
-  Building2, Stethoscope, Calendar, LogOut, Plus, MapPin, Phone, Mail,
-  Globe, Loader2, Edit, Save, ArrowLeft, Settings,
+  Building2, Stethoscope, Calendar, Plus, MapPin, Phone, Mail,
+  Globe, Loader2, Edit, Save, Settings,
 } from 'lucide-react';
 import { useTelemedAuth } from '@/hooks/useTelemedAuth';
 import { Organization } from '@/types/telemed';
@@ -20,7 +20,7 @@ import DoctorForm from '@/components/telemed/DoctorForm';
 import DoctorList from '@/components/telemed/DoctorList';
 import AppointmentList from '@/components/telemed/AppointmentList';
 import OrgServicesManager from '@/components/telemed/OrgServicesManager';
-import { ThemeToggle } from '@/components/theme-toggle';
+import DashboardShell from '@/components/DashboardShell';
 
 const OrgAdminDashboard = () => {
   const navigate = useNavigate();
