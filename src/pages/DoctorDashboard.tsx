@@ -389,8 +389,6 @@ const DoctorDashboard = () => {
               </Card>
             </TabsContent>
           </Tabs>
-        </div>
-      </div>
 
       {/* Suggest New Time Dialog */}
       <Dialog open={suggestDialog.open} onOpenChange={(open) => { if (!open) setSuggestDialog({ open: false, appointmentId: '', patientName: '' }); }}>
@@ -466,7 +464,7 @@ const DoctorDashboard = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </DashboardShell>
   );
 };
 
