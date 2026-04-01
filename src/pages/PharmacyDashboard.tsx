@@ -8,13 +8,13 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  Pill, LogOut, Loader2, Package, AlertCircle, ArrowLeft,
+  Pill, Loader2, Package, AlertCircle,
   ShoppingCart, CheckCircle, Clock, Truck, XCircle,
 } from 'lucide-react';
 import { useTelemedAuth } from '@/hooks/useTelemedAuth';
 import { Organization } from '@/types/telemed';
 import MedicineManager from '@/components/telemed/MedicineManager';
-import { ThemeToggle } from '@/components/theme-toggle';
+import DashboardShell from '@/components/DashboardShell';
 
 const PharmacyDashboard = () => {
   const navigate = useNavigate();
