@@ -9,12 +9,12 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import {
-  Calendar, Clock, User, Stethoscope, ArrowLeft, CheckCircle, XCircle, Timer,
+  Calendar, Clock, User, Stethoscope, CheckCircle, XCircle, Timer,
   MessageSquare, Loader2, Pill, FlaskConical, FileText, CreditCard, Star,
   Upload, Heart, Bell, Search, Plus, ChevronRight, Package,
 } from 'lucide-react';
 import { useTelemedAuth } from '@/hooks/useTelemedAuth';
-import { ThemeToggle } from '@/components/theme-toggle';
+import DashboardShell from '@/components/DashboardShell';
 import TelemedChatRoom from '@/components/telemed/TelemedChatRoom';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
