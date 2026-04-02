@@ -353,8 +353,12 @@ const MultimodalAI = () => {
   // Telemed helpers
   const searchDoctors = async (query: string, location?: string) => {
     let q = supabase.from('doctors').select('*, organization:organizations(*)').eq('is_approved', true);
-    if (query) q = q.or(`full_name.ilike.%${query}%,specialty.ilike.%${query}%,location.ilike.%${query}%`);
-    if (location) q = q.ilike('location', `%${location}%`);
+    const sanitized = query.replace(/[%_\\]/g, '').trim();
+    if (sanitized) q = q.or(`full_name.ilike.%${sanitized}%,specialty.ilike.%${sanitized}%,location.ilike.%${sanitized}%`);
+    if (location) {
+      const sanitizedLoc = location.replace(/[%_\\]/g, '').trim();
+      if (sanitizedLoc) q = q.ilike('location', `%${sanitizedLoc}%`);
+    }
     const { data } = await q.limit(10);
     return data || [];
   };
@@ -428,8 +432,15 @@ const MultimodalAI = () => {
         const hasSymptoms = symptomKeywords.some(k => lowerInput.includes(k));
 
         if (lowerInput.includes('doctor') || lowerInput.includes('specialist') || lowerInput.includes('daktari') || lowerInput.includes('available') || hasSymptoms) {
-          const query = input.replace(/find|me|a|show|doctor|doctors|specialist|in|near|at|around|karibu\s+na|available|free\s+time|when|book|i have|i feel|i'm|my/gi, '').replace(locationFilter || '', '').trim() || '';
-          const doctors = await searchDoctors(query, locationFilter);
+          // For symptom-based queries, search by specialty keywords or show all doctors
+          let doctors: any[] = [];
+          if (hasSymptoms) {
+            // First try all doctors (symptoms don't map to names)
+            doctors = await searchDoctors('', locationFilter);
+          } else {
+            const query = input.replace(/\b(?:find|me|show|doctor|doctors|specialist|in|near|at|around|karibu\s+na|available|free\s+time|when|book|i have|i feel|i'm)\b/gi, '').replace(locationFilter || '', '').replace(/[,.\-!?;:'"()]/g, ' ').replace(/\s+/g, ' ').trim() || '';
+            doctors = await searchDoctors(query, locationFilter);
+          }
           if (doctors.length > 0) {
             telemedData = doctors;
             telemedType = 'doctors';
