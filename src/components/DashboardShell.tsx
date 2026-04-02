@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ArrowLeft, LogOut } from "lucide-react";
+import DashboardNav from "@/components/DashboardNav";
 
 interface DashboardShellProps {
   title: string;
