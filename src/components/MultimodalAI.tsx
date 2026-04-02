@@ -432,7 +432,7 @@ const MultimodalAI = () => {
         const hasSymptoms = symptomKeywords.some(k => lowerInput.includes(k));
 
         if (lowerInput.includes('doctor') || lowerInput.includes('specialist') || lowerInput.includes('daktari') || lowerInput.includes('available') || hasSymptoms) {
-          const query = input.replace(/find|me|a|show|doctor|doctors|specialist|in|near|at|around|karibu\s+na|available|free\s+time|when|book|i have|i feel|i'm|my/gi, '').replace(locationFilter || '', '').replace(/[,.\-!?;:'"()]/g, ' ').replace(/\s+/g, ' ').trim() || '';
+          const query = input.replace(/\b(?:find|me|show|doctor|doctors|specialist|in|near|at|around|karibu\s+na|available|free\s+time|when|book|i have|i feel|i'm)\b/gi, '').replace(locationFilter || '', '').replace(/[,.\-!?;:'"()]/g, ' ').replace(/\s+/g, ' ').trim() || '';
           const doctors = await searchDoctors(query, locationFilter);
           if (doctors.length > 0) {
             telemedData = doctors;
