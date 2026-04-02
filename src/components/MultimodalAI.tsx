@@ -353,8 +353,12 @@ const MultimodalAI = () => {
   // Telemed helpers
   const searchDoctors = async (query: string, location?: string) => {
     let q = supabase.from('doctors').select('*, organization:organizations(*)').eq('is_approved', true);
-    if (query) q = q.or(`full_name.ilike.%${query}%,specialty.ilike.%${query}%,location.ilike.%${query}%`);
-    if (location) q = q.ilike('location', `%${location}%`);
+    const sanitized = query.replace(/[%_\\]/g, '').trim();
+    if (sanitized) q = q.or(`full_name.ilike.%${sanitized}%,specialty.ilike.%${sanitized}%,location.ilike.%${sanitized}%`);
+    if (location) {
+      const sanitizedLoc = location.replace(/[%_\\]/g, '').trim();
+      if (sanitizedLoc) q = q.ilike('location', `%${sanitizedLoc}%`);
+    }
     const { data } = await q.limit(10);
     return data || [];
   };
