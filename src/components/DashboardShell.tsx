@@ -30,6 +30,7 @@ const DashboardShell: React.FC<DashboardShellProps> = ({
     <div className="flex flex-col h-screen bg-background">
       <header className="flex items-center justify-between px-4 py-3 border-b border-border/50">
         <div className="flex items-center gap-3">
+          <DashboardNav />
           <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
