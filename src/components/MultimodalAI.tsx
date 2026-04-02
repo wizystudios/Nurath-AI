@@ -271,19 +271,19 @@ const MultimodalAI = () => {
     if (saved) { try { setChatHistory(JSON.parse(saved)); } catch {} }
   }, []);
 
-  const saveChatHistory = useCallback(() => {
+  useEffect(() => {
     if (conversation.length > 0 && currentConversationId) {
-      const existingIndex = chatHistory.findIndex(h => h.id === currentConversationId);
-      const title = conversation[0]?.content?.substring(0, 30) || 'New Chat';
-      const updatedHistory = existingIndex >= 0
-        ? chatHistory.map((h, i) => i === existingIndex ? { ...h, messages: conversation, title } : h)
-        : [...chatHistory, { id: currentConversationId, title, date: new Date().toISOString(), messages: conversation }];
-      setChatHistory(updatedHistory);
-      localStorage.setItem('nurath-chat-history', JSON.stringify(updatedHistory.slice(-20)));
+      setChatHistory(prev => {
+        const existingIndex = prev.findIndex(h => h.id === currentConversationId);
+        const title = conversation[0]?.content?.substring(0, 30) || 'New Chat';
+        const updatedHistory = existingIndex >= 0
+          ? prev.map((h, i) => i === existingIndex ? { ...h, messages: conversation, title } : h)
+          : [...prev, { id: currentConversationId, title, date: new Date().toISOString(), messages: conversation }];
+        localStorage.setItem('nurath-chat-history', JSON.stringify(updatedHistory.slice(-20)));
+        return updatedHistory;
+      });
     }
-  }, [conversation, currentConversationId, chatHistory]);
-
-  useEffect(() => { saveChatHistory(); }, [conversation, saveChatHistory]);
+  }, [conversation, currentConversationId]);
 
   useEffect(() => {
     const checkUser = async () => {
