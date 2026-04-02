@@ -432,8 +432,15 @@ const MultimodalAI = () => {
         const hasSymptoms = symptomKeywords.some(k => lowerInput.includes(k));
 
         if (lowerInput.includes('doctor') || lowerInput.includes('specialist') || lowerInput.includes('daktari') || lowerInput.includes('available') || hasSymptoms) {
-          const query = input.replace(/\b(?:find|me|show|doctor|doctors|specialist|in|near|at|around|karibu\s+na|available|free\s+time|when|book|i have|i feel|i'm)\b/gi, '').replace(locationFilter || '', '').replace(/[,.\-!?;:'"()]/g, ' ').replace(/\s+/g, ' ').trim() || '';
-          const doctors = await searchDoctors(query, locationFilter);
+          // For symptom-based queries, search by specialty keywords or show all doctors
+          let doctors: any[] = [];
+          if (hasSymptoms) {
+            // First try all doctors (symptoms don't map to names)
+            doctors = await searchDoctors('', locationFilter);
+          } else {
+            const query = input.replace(/\b(?:find|me|show|doctor|doctors|specialist|in|near|at|around|karibu\s+na|available|free\s+time|when|book|i have|i feel|i'm)\b/gi, '').replace(locationFilter || '', '').replace(/[,.\-!?;:'"()]/g, ' ').replace(/\s+/g, ' ').trim() || '';
+            doctors = await searchDoctors(query, locationFilter);
+          }
           if (doctors.length > 0) {
             telemedData = doctors;
             telemedType = 'doctors';
