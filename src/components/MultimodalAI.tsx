@@ -576,49 +576,35 @@ const MultimodalAI = () => {
     <div className="flex flex-col h-screen bg-background">
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-background">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="text-xl font-semibold px-2">
-              {headerTitle}
-              <ChevronDown className="w-4 h-4 ml-1.5 opacity-60" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-52">
-            <DropdownMenuItem onClick={startNewChat} className="cursor-pointer">
-              <Plus className="w-4 h-4 mr-3" /> New Chat
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setShowHistoryDialog(true)} className="cursor-pointer">
-              <History className="w-4 h-4 mr-3" /> Chat History
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            {isTelemedMode ? (
-              <>
+        <div className="flex items-center gap-2">
+          <DashboardNav />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="text-lg font-semibold px-2">
+                {headerTitle}
+                <ChevronDown className="w-4 h-4 ml-1.5 opacity-60" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-48">
+              <DropdownMenuItem onClick={startNewChat} className="cursor-pointer">
+                <Plus className="w-4 h-4 mr-3" /> New Chat
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowHistoryDialog(true)} className="cursor-pointer">
+                <History className="w-4 h-4 mr-3" /> Chat History
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {isTelemedMode ? (
                 <DropdownMenuItem onClick={() => navigate('/')} className="cursor-pointer">
-                  <Plus className="w-4 h-4 mr-3" /> General AI
+                  <MessageSquare className="w-4 h-4 mr-3" /> General AI
                 </DropdownMenuItem>
-                {user && (
-                  <DropdownMenuItem onClick={() => navigate('/telemed/patient')} className="cursor-pointer">
-                    <LayoutDashboard className="w-4 h-4 mr-3" /> My Health Dashboard
-                  </DropdownMenuItem>
-                )}
-              </>
-            ) : (
-              <DropdownMenuItem onClick={() => navigate('/?mode=telemed')} className="cursor-pointer text-primary">
-                <Heart className="w-4 h-4 mr-3" /> Telemed Health
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuSeparator />
-            {user ? (
-              <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive">
-                <LogOut className="w-4 h-4 mr-3" /> Logout ({user.email?.split('@')[0]})
-              </DropdownMenuItem>
-            ) : (
-              <DropdownMenuItem onClick={() => navigate('/auth')} className="cursor-pointer">
-                <LogIn className="w-4 h-4 mr-3" /> Sign Up / Login
-              </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+              ) : (
+                <DropdownMenuItem onClick={() => navigate('/?mode=telemed')} className="cursor-pointer text-primary">
+                  <Heart className="w-4 h-4 mr-3" /> Health Mode
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
         <ThemeToggle />
       </header>
 
