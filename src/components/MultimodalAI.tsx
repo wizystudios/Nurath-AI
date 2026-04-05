@@ -16,8 +16,9 @@ import {
   LogIn, LogOut, Heart, Stethoscope, Building2, Pill,
   FlaskConical, File as FileIcon, Image as ImageIcon,
   Loader2, Trash2, MapPin, Phone, Calendar, Mail, User,
-  MessageSquare, LayoutDashboard, Upload,
+  MessageSquare, LayoutDashboard, Upload, ImagePlus,
 } from "lucide-react";
+import DashboardNav from "./DashboardNav";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
