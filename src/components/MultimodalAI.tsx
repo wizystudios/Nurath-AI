@@ -367,6 +367,7 @@ const MultimodalAI = () => {
       try { localStorage.setItem('nurath-voice-enabled', String(next)); } catch {}
       if (!next) {
         if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+        try { window.speechSynthesis?.cancel(); } catch {}
         setIsSpeaking(false);
       }
       return next;
