@@ -291,16 +291,14 @@ const MultimodalAI = () => {
         const { data, error } = await supabase.functions.invoke('elevenlabs-tts', {
           body: { text },
         });
-        if (cancelled || error) return;
-        // Edge function returns binary mp3; supabase-js wraps in Blob
-        const blob = data instanceof Blob ? data : new Blob([data as any], { type: 'audio/mpeg' });
-        const url = URL.createObjectURL(blob);
+        if (cancelled || error || !data?.audioContent) return;
+        const url = `data:${data.mimeType || 'audio/mpeg'};base64,${data.audioContent}`;
         if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
         const audio = new Audio(url);
         audioRef.current = audio;
         audio.onplay = () => setIsSpeaking(true);
-        audio.onended = () => { setIsSpeaking(false); URL.revokeObjectURL(url); };
-        audio.onerror = () => { setIsSpeaking(false); URL.revokeObjectURL(url); };
+        audio.onended = () => setIsSpeaking(false);
+        audio.onerror = () => setIsSpeaking(false);
         await audio.play().catch(() => setIsSpeaking(false));
       } catch {
         setIsSpeaking(false);
