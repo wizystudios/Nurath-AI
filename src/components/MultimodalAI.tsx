@@ -256,6 +256,10 @@ const MultimodalAI = () => {
   const [currentLanguage, setCurrentLanguage] = useState('en');
   const [attachedFiles, setAttachedFiles] = useState<any[]>([]);
   const [showHistoryDialog, setShowHistoryDialog] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState<boolean>(() => {
+    try { return localStorage.getItem('nurath-voice-enabled') === 'true'; } catch { return false; }
+  });
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
