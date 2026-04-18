@@ -303,7 +303,8 @@ const MultimodalAI = () => {
     });
   }, []);
 
-
+  useEffect(() => {
+    const saved = localStorage.getItem('nurath-chat-history');
     if (saved) { try { setChatHistory(JSON.parse(saved)); } catch {} }
   }, []);
 
