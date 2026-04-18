@@ -16,9 +16,10 @@ import {
   LogIn, LogOut, Heart, Stethoscope, Building2, Pill,
   FlaskConical, File as FileIcon, Image as ImageIcon,
   Loader2, Trash2, MapPin, Phone, Calendar, Mail, User,
-  MessageSquare, LayoutDashboard, Upload, ImagePlus,
+  MessageSquare, LayoutDashboard, Upload, ImagePlus, Volume2, VolumeX, Mic,
 } from "lucide-react";
 import DashboardNav from "./DashboardNav";
+import VoiceInput from "./VoiceInput";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -255,6 +256,10 @@ const MultimodalAI = () => {
   const [currentLanguage, setCurrentLanguage] = useState('en');
   const [attachedFiles, setAttachedFiles] = useState<any[]>([]);
   const [showHistoryDialog, setShowHistoryDialog] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState<boolean>(() => {
+    try { return localStorage.getItem('nurath-voice-enabled') === 'true'; } catch { return false; }
+  });
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -266,6 +271,37 @@ const MultimodalAI = () => {
       setTimeout(() => { chatContainerRef.current!.scrollTop = chatContainerRef.current!.scrollHeight; }, 100);
     }
   }, [conversation]);
+
+  // Speak latest AI message when voice mode is on
+  useEffect(() => {
+    if (!voiceEnabled) return;
+    const last = conversation[conversation.length - 1];
+    if (!last || last.type !== 'ai' || !last.content) return;
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    try {
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(last.content.replace(/[#*_`>\[\]()]/g, '').slice(0, 800));
+      utter.lang = currentLanguage === 'sw' ? 'sw-KE' : 'en-US';
+      utter.rate = 1; utter.pitch = 1;
+      utter.onstart = () => setIsSpeaking(true);
+      utter.onend = () => setIsSpeaking(false);
+      utter.onerror = () => setIsSpeaking(false);
+      window.speechSynthesis.speak(utter);
+    } catch {}
+  }, [conversation, voiceEnabled, currentLanguage]);
+
+  const toggleVoice = useCallback(() => {
+    setVoiceEnabled(prev => {
+      const next = !prev;
+      try { localStorage.setItem('nurath-voice-enabled', String(next)); } catch {}
+      if (!next && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        setIsSpeaking(false);
+      }
+      toast.success(next ? 'Voice replies enabled' : 'Voice replies muted');
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     const saved = localStorage.getItem('nurath-chat-history');
@@ -707,6 +743,24 @@ const MultimodalAI = () => {
           <div className="flex items-end gap-2">
             <Button variant="ghost" size="icon" className="shrink-0" onClick={() => fileInputRef.current?.click()} disabled={isProcessing}>
               <Paperclip className="w-5 h-5" />
+            </Button>
+            <VoiceInput
+              disabled={isProcessing}
+              onTranscription={(text) => {
+                if (!text?.trim()) return;
+                handleAIInteraction(text);
+                setInputText("");
+              }}
+            />
+            <Button
+              type="button"
+              variant={voiceEnabled ? "default" : "ghost"}
+              size="icon"
+              className="shrink-0"
+              onClick={toggleVoice}
+              title={voiceEnabled ? "Mute voice replies" : "Enable voice replies"}
+            >
+              {voiceEnabled ? <Volume2 className={`w-5 h-5 ${isSpeaking ? 'animate-pulse' : ''}`} /> : <VolumeX className="w-5 h-5" />}
             </Button>
             <Textarea
               ref={inputRef}
