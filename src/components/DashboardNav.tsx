@@ -109,7 +109,7 @@ const DashboardNav: React.FC = () => {
 
   const roleDashboard = getRoleDashboard();
 
-  const NavButton: React.FC<{ item: NavItem }> = ({ item }) => (
+  const NavButton: React.FC<{ item: NavItem & { badge?: number } }> = ({ item }) => (
     <button
       onClick={() => handleNavigate(item.href)}
       className={cn(
@@ -120,8 +120,15 @@ const DashboardNav: React.FC = () => {
       )}
     >
       <item.icon className="h-4 w-4 shrink-0" />
-      <div>
-        <div className="leading-tight">{item.label}</div>
+      <div className="flex-1 min-w-0">
+        <div className="leading-tight flex items-center gap-2">
+          <span>{item.label}</span>
+          {item.badge && item.badge > 0 ? (
+            <span className="ml-auto inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[10px] font-semibold">
+              {item.badge > 99 ? '99+' : item.badge}
+            </span>
+          ) : null}
+        </div>
         {item.description && (
           <div className="text-[11px] text-muted-foreground leading-tight mt-0.5">{item.description}</div>
         )}
@@ -132,8 +139,11 @@ const DashboardNav: React.FC = () => {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button variant="ghost" size="icon" className="shrink-0">
+        <Button variant="ghost" size="icon" className="shrink-0 relative">
           <Menu className="h-5 w-5" />
+          {user && (unreadNotifs + pendingAppts) > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary border-2 border-background" />
+          )}
         </Button>
       </SheetTrigger>
       <SheetContent side="left" className="w-72 p-0">
