@@ -744,6 +744,24 @@ const MultimodalAI = () => {
             <Button variant="ghost" size="icon" className="shrink-0" onClick={() => fileInputRef.current?.click()} disabled={isProcessing}>
               <Paperclip className="w-5 h-5" />
             </Button>
+            <VoiceInput
+              disabled={isProcessing}
+              onTranscription={(text) => {
+                if (!text?.trim()) return;
+                handleAIInteraction(text);
+                setInputText("");
+              }}
+            />
+            <Button
+              type="button"
+              variant={voiceEnabled ? "default" : "ghost"}
+              size="icon"
+              className="shrink-0"
+              onClick={toggleVoice}
+              title={voiceEnabled ? "Mute voice replies" : "Enable voice replies"}
+            >
+              {voiceEnabled ? <Volume2 className={`w-5 h-5 ${isSpeaking ? 'animate-pulse' : ''}`} /> : <VolumeX className="w-5 h-5" />}
+            </Button>
             <Textarea
               ref={inputRef}
               value={inputText}
