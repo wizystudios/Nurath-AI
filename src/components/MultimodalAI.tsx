@@ -272,8 +272,38 @@ const MultimodalAI = () => {
     }
   }, [conversation]);
 
+  // Speak latest AI message when voice mode is on
   useEffect(() => {
-    const saved = localStorage.getItem('nurath-chat-history');
+    if (!voiceEnabled) return;
+    const last = conversation[conversation.length - 1];
+    if (!last || last.type !== 'ai' || !last.content) return;
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    try {
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(last.content.replace(/[#*_`>\[\]()]/g, '').slice(0, 800));
+      utter.lang = currentLanguage === 'sw' ? 'sw-KE' : 'en-US';
+      utter.rate = 1; utter.pitch = 1;
+      utter.onstart = () => setIsSpeaking(true);
+      utter.onend = () => setIsSpeaking(false);
+      utter.onerror = () => setIsSpeaking(false);
+      window.speechSynthesis.speak(utter);
+    } catch {}
+  }, [conversation, voiceEnabled, currentLanguage]);
+
+  const toggleVoice = useCallback(() => {
+    setVoiceEnabled(prev => {
+      const next = !prev;
+      try { localStorage.setItem('nurath-voice-enabled', String(next)); } catch {}
+      if (!next && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        setIsSpeaking(false);
+      }
+      toast.success(next ? 'Voice replies enabled' : 'Voice replies muted');
+      return next;
+    });
+  }, []);
+
+
     if (saved) { try { setChatHistory(JSON.parse(saved)); } catch {} }
   }, []);
 
