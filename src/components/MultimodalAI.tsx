@@ -274,6 +274,34 @@ const MultimodalAI = () => {
     }
   }, [conversation]);
 
+  // Auto-focus input on mount so user can type immediately
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  // Global keyboard listener: any printable key or Enter/Backspace refocuses the chat input
+  useEffect(() => {
+    const handleGlobalKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      // Skip if user is already typing in an input/textarea/contenteditable
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return;
+      // Skip modifier-only combos (Ctrl/Cmd shortcuts)
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      // Only refocus on printable keys, Enter, or Backspace
+      const isPrintable = e.key.length === 1;
+      if (!isPrintable && e.key !== 'Enter' && e.key !== 'Backspace') return;
+      inputRef.current?.focus();
+    };
+    window.addEventListener('keydown', handleGlobalKey);
+    return () => window.removeEventListener('keydown', handleGlobalKey);
+  }, []);
+
+  // Refocus input after each AI response so user can keep typing
+  useEffect(() => {
+    if (!isProcessing) inputRef.current?.focus();
+  }, [isProcessing, conversation.length]);
+
   // Speak latest AI message via ElevenLabs TTS (higher quality than browser)
   useEffect(() => {
     if (!voiceEnabled) return;
