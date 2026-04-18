@@ -314,25 +314,51 @@ const MultimodalAI = () => {
     if (!text.trim()) return;
 
     let cancelled = false;
+
+    const speakWithBrowser = () => {
+      if (cancelled || !('speechSynthesis' in window)) return;
+      try {
+        window.speechSynthesis.cancel();
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.rate = 1;
+        utter.pitch = 1;
+        utter.lang = 'en-US';
+        utter.onstart = () => setIsSpeaking(true);
+        utter.onend = () => setIsSpeaking(false);
+        utter.onerror = () => setIsSpeaking(false);
+        window.speechSynthesis.speak(utter);
+      } catch {
+        setIsSpeaking(false);
+      }
+    };
+
     (async () => {
       try {
         const { data, error } = await supabase.functions.invoke('elevenlabs-tts', {
           body: { text },
         });
-        if (cancelled || error || !data?.audioContent) return;
+        if (cancelled) return;
+        if (error || !data?.audioContent) {
+          // Fallback to browser speech (no API key needed)
+          speakWithBrowser();
+          return;
+        }
         const url = `data:${data.mimeType || 'audio/mpeg'};base64,${data.audioContent}`;
         if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
         const audio = new Audio(url);
         audioRef.current = audio;
         audio.onplay = () => setIsSpeaking(true);
         audio.onended = () => setIsSpeaking(false);
-        audio.onerror = () => setIsSpeaking(false);
-        await audio.play().catch(() => setIsSpeaking(false));
+        audio.onerror = () => { setIsSpeaking(false); speakWithBrowser(); };
+        await audio.play().catch(() => speakWithBrowser());
       } catch {
-        setIsSpeaking(false);
+        speakWithBrowser();
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      try { window.speechSynthesis?.cancel(); } catch {}
+    };
   }, [conversation, voiceEnabled]);
 
   const toggleVoice = useCallback(() => {
@@ -341,6 +367,7 @@ const MultimodalAI = () => {
       try { localStorage.setItem('nurath-voice-enabled', String(next)); } catch {}
       if (!next) {
         if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+        try { window.speechSynthesis?.cancel(); } catch {}
         setIsSpeaking(false);
       }
       return next;
