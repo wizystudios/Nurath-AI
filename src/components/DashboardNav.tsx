@@ -26,6 +26,17 @@ const DashboardNav: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [userRole, setUserRole] = useState<any>(null);
+  const [unreadNotifs, setUnreadNotifs] = useState(0);
+  const [pendingAppts, setPendingAppts] = useState(0);
+
+  const loadBadges = async (uid: string) => {
+    const [n, a] = await Promise.all([
+      supabase.from('notifications').select('id', { count: 'exact', head: true }).eq('user_id', uid).eq('is_read', false),
+      supabase.from('appointments').select('id', { count: 'exact', head: true }).eq('patient_id', uid).in('status', ['pending', 'confirmed']),
+    ]);
+    setUnreadNotifs(n.count || 0);
+    setPendingAppts(a.count || 0);
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -34,6 +45,7 @@ const DashboardNav: React.FC = () => {
       if (user) {
         const { data } = await supabase.from('user_roles').select('*').eq('user_id', user.id).maybeSingle();
         setUserRole(data);
+        loadBadges(user.id);
       }
     };
     load();
@@ -41,12 +53,19 @@ const DashboardNav: React.FC = () => {
       setUser(session?.user || null);
       if (session?.user) {
         supabase.from('user_roles').select('*').eq('user_id', session.user.id).maybeSingle().then(({ data }) => setUserRole(data));
+        loadBadges(session.user.id);
       } else {
         setUserRole(null);
+        setUnreadNotifs(0);
+        setPendingAppts(0);
       }
     });
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (open && user) loadBadges(user.id);
+  }, [open, user]);
 
   const handleNavigate = (href: string) => {
     setOpen(false);
@@ -65,11 +84,11 @@ const DashboardNav: React.FC = () => {
   ];
 
   // Patient-facing links (for all logged in users or patients)
-  const patientLinks: NavItem[] = [
+  const patientLinks: Array<NavItem & { badge?: number }> = [
     { label: "Find Doctors", href: "/?mode=telemed", icon: Search, description: "Search & book doctors" },
-    { label: "My Bookings", href: "/telemed/patient?tab=appointments", icon: Calendar, description: "View appointments" },
+    { label: "My Bookings", href: "/telemed/patient?tab=appointments", icon: Calendar, description: "View appointments", badge: pendingAppts },
     { label: "My Chats", href: "/telemed/patient?tab=chats", icon: MessageSquare, description: "Doctor conversations" },
-    { label: "Notifications", href: "/telemed/patient?tab=notifications", icon: Bell, description: "Updates & alerts" },
+    { label: "Notifications", href: "/telemed/patient?tab=notifications", icon: Bell, description: "Updates & alerts", badge: unreadNotifs },
   ];
 
   // Role-specific dashboard links
@@ -90,7 +109,7 @@ const DashboardNav: React.FC = () => {
 
   const roleDashboard = getRoleDashboard();
 
-  const NavButton: React.FC<{ item: NavItem }> = ({ item }) => (
+  const NavButton: React.FC<{ item: NavItem & { badge?: number } }> = ({ item }) => (
     <button
       onClick={() => handleNavigate(item.href)}
       className={cn(
@@ -101,8 +120,15 @@ const DashboardNav: React.FC = () => {
       )}
     >
       <item.icon className="h-4 w-4 shrink-0" />
-      <div>
-        <div className="leading-tight">{item.label}</div>
+      <div className="flex-1 min-w-0">
+        <div className="leading-tight flex items-center gap-2">
+          <span>{item.label}</span>
+          {item.badge && item.badge > 0 ? (
+            <span className="ml-auto inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[10px] font-semibold">
+              {item.badge > 99 ? '99+' : item.badge}
+            </span>
+          ) : null}
+        </div>
         {item.description && (
           <div className="text-[11px] text-muted-foreground leading-tight mt-0.5">{item.description}</div>
         )}
@@ -113,8 +139,11 @@ const DashboardNav: React.FC = () => {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button variant="ghost" size="icon" className="shrink-0">
+        <Button variant="ghost" size="icon" className="shrink-0 relative">
           <Menu className="h-5 w-5" />
+          {user && (unreadNotifs + pendingAppts) > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary border-2 border-background" />
+          )}
         </Button>
       </SheetTrigger>
       <SheetContent side="left" className="w-72 p-0">

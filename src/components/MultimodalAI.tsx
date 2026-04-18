@@ -264,6 +264,8 @@ const MultimodalAI = () => {
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const lastSpokenIdRef = useRef<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -272,33 +274,47 @@ const MultimodalAI = () => {
     }
   }, [conversation]);
 
-  // Speak latest AI message when voice mode is on
+  // Speak latest AI message via ElevenLabs TTS (higher quality than browser)
   useEffect(() => {
     if (!voiceEnabled) return;
     const last = conversation[conversation.length - 1];
     if (!last || last.type !== 'ai' || !last.content) return;
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-    try {
-      window.speechSynthesis.cancel();
-      const utter = new SpeechSynthesisUtterance(last.content.replace(/[#*_`>\[\]()]/g, '').slice(0, 800));
-      utter.lang = currentLanguage === 'sw' ? 'sw-KE' : 'en-US';
-      utter.rate = 1; utter.pitch = 1;
-      utter.onstart = () => setIsSpeaking(true);
-      utter.onend = () => setIsSpeaking(false);
-      utter.onerror = () => setIsSpeaking(false);
-      window.speechSynthesis.speak(utter);
-    } catch {}
-  }, [conversation, voiceEnabled, currentLanguage]);
+    if (lastSpokenIdRef.current === last.id) return;
+    lastSpokenIdRef.current = last.id;
+
+    const text = last.content.replace(/[#*_`>\[\]()]/g, '').slice(0, 1500);
+    if (!text.trim()) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('elevenlabs-tts', {
+          body: { text },
+        });
+        if (cancelled || error || !data?.audioContent) return;
+        const url = `data:${data.mimeType || 'audio/mpeg'};base64,${data.audioContent}`;
+        if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+        const audio = new Audio(url);
+        audioRef.current = audio;
+        audio.onplay = () => setIsSpeaking(true);
+        audio.onended = () => setIsSpeaking(false);
+        audio.onerror = () => setIsSpeaking(false);
+        await audio.play().catch(() => setIsSpeaking(false));
+      } catch {
+        setIsSpeaking(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [conversation, voiceEnabled]);
 
   const toggleVoice = useCallback(() => {
     setVoiceEnabled(prev => {
       const next = !prev;
       try { localStorage.setItem('nurath-voice-enabled', String(next)); } catch {}
-      if (!next && typeof window !== 'undefined' && 'speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
+      if (!next) {
+        if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
         setIsSpeaking(false);
       }
-      toast.success(next ? 'Voice replies enabled' : 'Voice replies muted');
       return next;
     });
   }, []);
