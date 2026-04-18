@@ -1,89 +1,97 @@
-
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Mic, MicOff } from "lucide-react";
-import { toast } from "@/components/ui/sonner";
 
 interface VoiceInputProps {
   onTranscription: (text: string) => void;
   disabled?: boolean;
+  /** When true, keeps the mic on after each utterance until user toggles off */
+  continuous?: boolean;
 }
 
-const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscription, disabled = false }) => {
+const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscription, disabled = false, continuous = true }) => {
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const shouldKeepListeningRef = useRef(false);
+  const onTranscriptionRef = useRef(onTranscription);
 
-  const startListening = async () => {
-    try {
-      if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-        toast.error("Speech recognition is not supported in your browser.");
-        return;
-      }
+  useEffect(() => { onTranscriptionRef.current = onTranscription; }, [onTranscription]);
 
-      // Create speech recognition instance
-      const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognitionAPI();
-      
-      // Configure speech recognition
-      recognitionRef.current.continuous = true;
-      recognitionRef.current.interimResults = true;
-      
-      // Setup event handlers
-      recognitionRef.current.onresult = (event) => {
-        const transcript = Array.from(event.results)
-          .map(result => result[0])
-          .map(result => result.transcript)
-          .join('');
-          
-        if (event.results[0].isFinal) {
-          onTranscription(transcript);
-          stopListening();
-        }
-      };
-      
-      recognitionRef.current.onerror = (event) => {
-        console.error("Speech recognition error", event.error);
-        toast.error("Error with voice input. Please try again.");
-        stopListening();
-      };
-
-      // Start listening
-      recognitionRef.current.start();
-      setIsListening(true);
-      toast.info("Listening...");
-    } catch (error) {
-      console.error("Error initializing speech recognition:", error);
-      toast.error("Could not start voice input. Please check your microphone permissions.");
-    }
-  };
-
-  const stopListening = () => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-      recognitionRef.current = null;
-    }
+  const stopListening = useCallback(() => {
+    shouldKeepListeningRef.current = false;
+    try { recognitionRef.current?.stop(); } catch {}
+    recognitionRef.current = null;
     setIsListening(false);
-  };
+  }, []);
+
+  const startListening = useCallback(() => {
+    const SpeechRecognitionAPI =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognitionAPI) return;
+
+    const recognition = new SpeechRecognitionAPI();
+    recognition.continuous = false; // get final result per utterance, then auto-restart
+    recognition.interimResults = false;
+    recognition.lang = "en-US";
+
+    recognition.onresult = (event: any) => {
+      const transcript = Array.from(event.results)
+        .map((r: any) => r[0].transcript)
+        .join("")
+        .trim();
+      if (transcript) onTranscriptionRef.current(transcript);
+    };
+
+    recognition.onerror = (event: any) => {
+      // Silently handle no-speech & aborts; only stop on permission errors
+      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+        shouldKeepListeningRef.current = false;
+        setIsListening(false);
+      }
+    };
+
+    recognition.onend = () => {
+      if (shouldKeepListeningRef.current && continuous) {
+        // Auto-restart so the mic stays on until user clicks off
+        try { recognition.start(); } catch { /* ignore */ }
+      } else {
+        setIsListening(false);
+      }
+    };
+
+    recognitionRef.current = recognition;
+    shouldKeepListeningRef.current = true;
+    try {
+      recognition.start();
+      setIsListening(true);
+    } catch {
+      setIsListening(false);
+    }
+  }, [continuous]);
 
   const toggleListening = () => {
-    if (isListening) {
-      stopListening();
-    } else {
-      startListening();
-    }
+    if (isListening) stopListening();
+    else startListening();
   };
+
+  // Cleanup on unmount
+  useEffect(() => () => stopListening(), [stopListening]);
 
   return (
     <Button
       type="button"
       size="icon"
-      variant={isListening ? "destructive" : "secondary"}
+      variant={isListening ? "default" : "ghost"}
       onClick={toggleListening}
       disabled={disabled}
-      className="flex-shrink-0"
-      title={isListening ? "Stop voice input" : "Start voice input"}
+      className="shrink-0"
+      title={isListening ? "Turn off microphone" : "Turn on microphone"}
     >
-      {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+      {isListening ? (
+        <Mic className="h-5 w-5 animate-pulse" />
+      ) : (
+        <MicOff className="h-5 w-5" />
+      )}
     </Button>
   );
 };
