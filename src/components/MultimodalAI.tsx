@@ -16,9 +16,10 @@ import {
   LogIn, LogOut, Heart, Stethoscope, Building2, Pill,
   FlaskConical, File as FileIcon, Image as ImageIcon,
   Loader2, Trash2, MapPin, Phone, Calendar, Mail, User,
-  MessageSquare, LayoutDashboard, Upload, ImagePlus,
+  MessageSquare, LayoutDashboard, Upload, ImagePlus, Volume2, VolumeX, Mic,
 } from "lucide-react";
 import DashboardNav from "./DashboardNav";
+import VoiceInput from "./VoiceInput";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
