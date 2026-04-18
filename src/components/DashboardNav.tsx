@@ -26,6 +26,17 @@ const DashboardNav: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [userRole, setUserRole] = useState<any>(null);
+  const [unreadNotifs, setUnreadNotifs] = useState(0);
+  const [pendingAppts, setPendingAppts] = useState(0);
+
+  const loadBadges = async (uid: string) => {
+    const [n, a] = await Promise.all([
+      supabase.from('notifications').select('id', { count: 'exact', head: true }).eq('user_id', uid).eq('is_read', false),
+      supabase.from('appointments').select('id', { count: 'exact', head: true }).eq('patient_id', uid).in('status', ['pending', 'confirmed']),
+    ]);
+    setUnreadNotifs(n.count || 0);
+    setPendingAppts(a.count || 0);
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -34,6 +45,7 @@ const DashboardNav: React.FC = () => {
       if (user) {
         const { data } = await supabase.from('user_roles').select('*').eq('user_id', user.id).maybeSingle();
         setUserRole(data);
+        loadBadges(user.id);
       }
     };
     load();
@@ -41,12 +53,19 @@ const DashboardNav: React.FC = () => {
       setUser(session?.user || null);
       if (session?.user) {
         supabase.from('user_roles').select('*').eq('user_id', session.user.id).maybeSingle().then(({ data }) => setUserRole(data));
+        loadBadges(session.user.id);
       } else {
         setUserRole(null);
+        setUnreadNotifs(0);
+        setPendingAppts(0);
       }
     });
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (open && user) loadBadges(user.id);
+  }, [open, user]);
 
   const handleNavigate = (href: string) => {
     setOpen(false);
@@ -65,11 +84,11 @@ const DashboardNav: React.FC = () => {
   ];
 
   // Patient-facing links (for all logged in users or patients)
-  const patientLinks: NavItem[] = [
+  const patientLinks: Array<NavItem & { badge?: number }> = [
     { label: "Find Doctors", href: "/?mode=telemed", icon: Search, description: "Search & book doctors" },
-    { label: "My Bookings", href: "/telemed/patient?tab=appointments", icon: Calendar, description: "View appointments" },
+    { label: "My Bookings", href: "/telemed/patient?tab=appointments", icon: Calendar, description: "View appointments", badge: pendingAppts },
     { label: "My Chats", href: "/telemed/patient?tab=chats", icon: MessageSquare, description: "Doctor conversations" },
-    { label: "Notifications", href: "/telemed/patient?tab=notifications", icon: Bell, description: "Updates & alerts" },
+    { label: "Notifications", href: "/telemed/patient?tab=notifications", icon: Bell, description: "Updates & alerts", badge: unreadNotifs },
   ];
 
   // Role-specific dashboard links
